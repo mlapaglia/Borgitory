@@ -5,19 +5,17 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
-from typing import Generator, AsyncGenerator
+from typing import Generator, AsyncGenerator, cast
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
 )
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
-from contextlib import contextmanager
-
-from sqlalchemy.orm import Session
+from contextlib import asynccontextmanager, contextmanager
 
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.jobs.job_models import (
@@ -191,8 +189,8 @@ class TestJobManagerTaskExecution:
     ) -> JobManager:
         """Create job manager with real database session and mocked services"""
 
-        @contextmanager
-        def db_session_factory() -> Generator[Session, None, None]:
+        @asynccontextmanager
+        async def db_session_factory() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield test_db
             finally:
@@ -203,13 +201,19 @@ class TestJobManagerTaskExecution:
             mock_event_broadcaster=mock_event_broadcaster
         )
 
-        # Override with real database session
-        deps.async_session_maker = db_session_factory
+        # Override with real database session (cast to expected type for type checker)
+        deps.async_session_maker = cast(
+            async_sessionmaker[AsyncSession], db_session_factory
+        )
 
         # Create a real database manager that uses the real database session
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        real_db_manager = JobDatabaseManager(async_session_maker=db_session_factory)
+        real_db_manager = JobDatabaseManager(
+            async_session_maker=cast(
+                async_sessionmaker[AsyncSession], db_session_factory
+            )
+        )
         deps.database_manager = real_db_manager
 
         manager = JobManager(dependencies=deps)
@@ -246,7 +250,7 @@ class TestJobManagerTaskExecution:
         """Create job manager with injected mock dependencies"""
 
         @contextmanager
-        def mock_db_session_factory() -> Generator[Session, None, None]:
+        def mock_db_session_factory() -> Generator[AsyncSession, None, None]:
             try:
                 yield test_db
             finally:
@@ -258,7 +262,9 @@ class TestJobManagerTaskExecution:
         )
 
         # Override with real database session and specific mocks
-        deps.async_session_maker = mock_db_session_factory
+        deps.async_session_maker = cast(
+            async_sessionmaker[AsyncSession], mock_db_session_factory
+        )
         deps.job_executor = mock_job_executor
         deps.database_manager = mock_database_manager
         deps.output_manager = mock_output_manager
@@ -477,10 +483,10 @@ class TestJobManagerTaskExecution:
         )
 
         # Get the database session from the job manager
-        db_session_factory = job_manager_with_db.dependencies.db_session_factory
+        db_session_factory = job_manager_with_db.dependencies.async_session_maker
         assert db_session_factory is not None
 
-        with db_session_factory() as db:
+        async with db_session_factory() as db:
             # Query the database for the job and its tasks using SQLAlchemy 2.0 syntax
             result = await db.execute(
                 select(DatabaseJob).where(DatabaseJob.id == job_id)
@@ -1067,20 +1073,24 @@ class TestJobManagerDatabaseIntegration:
     ) -> JobManager:
         """Create job manager with real database session"""
 
-        @contextmanager
-        def db_session_factory() -> Generator[Session, None, None]:
+        @asynccontextmanager
+        async def db_session_factory() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield test_db
             finally:
                 pass
 
         deps = JobManagerFactory.create_for_testing()
-        deps.async_session_maker = db_session_factory
+        deps.async_session_maker = cast(
+            async_sessionmaker[AsyncSession], db_session_factory
+        )
 
         # Create a real database manager instead of using the mock
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        deps.database_manager = JobDatabaseManager(db_session_factory)
+        deps.database_manager = JobDatabaseManager(
+            cast(async_sessionmaker[AsyncSession], db_session_factory)
+        )
 
         manager = JobManager(dependencies=deps)
 
