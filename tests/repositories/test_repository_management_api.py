@@ -33,15 +33,15 @@ class TestRepositoryManagementAPI:
         return mock
 
     @pytest.fixture
-    def test_repository(self, test_db: AsyncSession) -> Repository:
+    async def test_repository(self, test_db: AsyncSession) -> Repository:
         """Create test repository in database."""
         repo = Repository()
         repo.name = "test-repo"
         repo.path = "/test/repo/path"
         repo.set_passphrase("test_passphrase")
         test_db.add(repo)
-        test_db.commit()
-        test_db.refresh(repo)
+        await test_db.commit()
+        await test_db.refresh(repo)
         return repo
 
     def test_details_modal_endpoint(

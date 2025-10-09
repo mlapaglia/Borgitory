@@ -221,22 +221,26 @@ class TestArchiveManagerCaching:
         mock_result.stdout = json_output
         mock_result.stderr = ""
 
+        # Mock the BorgCommand object
+        mock_borg_command = MagicMock()
+        mock_borg_command.command = [
+            "borg",
+            "list",
+            "--json-lines",
+            "/test/repo::test_archive",
+        ]
+        mock_borg_command.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+
         # First call should hit borg list
         with (
             patch(
-                "borgitory.services.archives.archive_manager.secure_borg_command"
-            ) as mock_secure,
+                "borgitory.services.archives.archive_manager.create_borg_command",
+                return_value=mock_borg_command,
+            ),
             patch.object(
                 manager.command_executor, "execute_command", return_value=mock_result
             ) as mock_execute,
         ):
-            mock_secure.return_value.__aenter__.return_value = (
-                ["borg", "list", "--json-lines", "/test/repo::test_archive"],
-                {"BORG_PASSPHRASE": "test_passphrase"},
-                None,
-            )
-            mock_secure.return_value.__aexit__.return_value = None
-
             result1 = await manager.list_archive_directory_contents(
                 mock_repository, "test_archive", ""
             )
@@ -248,9 +252,6 @@ class TestArchiveManagerCaching:
         result2 = await manager.list_archive_directory_contents(
             mock_repository, "test_archive", ""
         )
-
-        # Should not have called command executor again (mock_execute is out of scope)
-        # We can verify this by checking that the results are the same
 
         # Results should be the same
         assert len(result1) == len(result2)
@@ -268,22 +269,26 @@ class TestArchiveManagerCaching:
         mock_result.stdout = json_output
         mock_result.stderr = ""
 
+        # Mock the BorgCommand object
+        mock_borg_command = MagicMock()
+        mock_borg_command.command = [
+            "borg",
+            "list",
+            "--json-lines",
+            "/test/repo::test_archive",
+        ]
+        mock_borg_command.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+
         # Call should hit borg list since cache is empty
         with (
             patch(
-                "borgitory.services.archives.archive_manager.secure_borg_command"
-            ) as mock_secure,
+                "borgitory.services.archives.archive_manager.create_borg_command",
+                return_value=mock_borg_command,
+            ),
             patch.object(
                 manager.command_executor, "execute_command", return_value=mock_result
             ) as mock_execute,
         ):
-            mock_secure.return_value.__aenter__.return_value = (
-                ["borg", "list", "--json-lines", "/test/repo::test_archive"],
-                {"BORG_PASSPHRASE": "test_passphrase"},
-                None,
-            )
-            mock_secure.return_value.__aexit__.return_value = None
-
             result = await manager.list_archive_directory_contents(
                 mock_repository, "test_archive", ""
             )

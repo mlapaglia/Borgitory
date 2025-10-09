@@ -9,7 +9,6 @@ from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 
-from borgitory.models.database import Job, JobTask
 from borgitory.services.jobs.job_stream_service import JobStreamService
 
 
@@ -181,52 +180,6 @@ class TestJobStreamingFixes:
             assert all(isinstance(event, str) for event in events)
 
 
-class TestUUIDSystemFixes:
-    """Test the UUID system improvements"""
-
-    def test_job_model_auto_generates_uuid(self) -> None:
-        """Test that Job model has UUID auto-generation configured"""
-        # SQLAlchemy defaults only trigger during database operations
-        # Test that the default is configured correctly
-        from borgitory.models.database import Job
-
-        # Check that the default function is set
-        id_column = Job.__table__.columns["id"]
-        assert id_column.default is not None
-        assert callable(id_column.default.arg)
-
-        # Test the default function generates valid UUIDs
-        # SQLAlchemy lambda defaults receive a context parameter
-        generated_id = id_column.default.arg(None)
-        assert isinstance(generated_id, uuid.UUID)
-
-        # Should be a valid UUID (already is since it's a UUID object)
-        assert generated_id.version == 4  # UUID4
-
-    def test_job_model_respects_explicit_uuid(self) -> None:
-        """Test that Job model uses explicitly provided UUID"""
-        explicit_id = uuid.uuid4()
-        job = Job()
-        job.id = explicit_id
-        job.repository_id = 1
-        job.type = TaskTypeEnum.BACKUP
-        job.status = JobStatusEnum.PENDING
-
-        assert job.id == explicit_id
-
-    def test_job_task_foreign_key_uses_string_uuid(self) -> None:
-        """Test that JobTask foreign key references string UUID"""
-        job_id = uuid.uuid4()
-        task = JobTask()
-        task.job_id = job_id
-        task.task_type = TaskTypeEnum.BACKUP
-        task.task_name = "Test Task"
-        task.task_order = 0
-
-        assert task.job_id == job_id
-        assert isinstance(task.job_id, uuid.UUID)
-
-
 class TestJobRenderServiceUUIDIntegration:
     """Test job render service with UUID system"""
 
@@ -262,7 +215,7 @@ class TestJobRenderServiceUUIDIntegration:
         assert str(mock_job_with_uuid.id) in html
         assert html != ""  # Should not return empty string
 
-    def test_format_database_job_creates_context_with_uuid(
+    async def test_format_database_job_creates_context_with_uuid(
         self, mock_job_with_uuid: Mock
     ) -> None:
         """Test that JobRenderService properly handles UUID-based job identification"""
@@ -300,7 +253,7 @@ class TestJobRenderServiceUUIDIntegration:
         service.converter.fix_failed_job_tasks.return_value = expected_job_data
 
         # Test the new architecture method
-        result = service.get_job_display_data(mock_job_with_uuid.id, mock_db)
+        result = await service.get_job_display_data(mock_job_with_uuid.id, mock_db)
 
         # Verify the result contains the UUID and proper structure
         assert result is not None

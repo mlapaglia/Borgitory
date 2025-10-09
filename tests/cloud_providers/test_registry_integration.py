@@ -5,15 +5,29 @@ These tests focus on business logic and verify that the registry system
 is properly integrated with the cloud sync services.
 """
 
+from typing import cast
+from fastapi import HTTPException
 import pytest
-from unittest.mock import Mock, patch
-from borgitory.services.cloud_sync_service import _get_sensitive_fields_for_provider
+from unittest.mock import Mock, patch, MagicMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from borgitory.services.cloud_providers.storage.s3_storage import S3StorageConfig
+from borgitory.services.cloud_sync_service import (
+    CloudSyncConfigService,
+    _get_sensitive_fields_for_provider,
+)
 from borgitory.api.cloud_sync import _get_supported_providers
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 
 
 class TestRegistryBusinessLogic:
     """Test registry functions directly (business logic)"""
+
+    @pytest.fixture
+    def mock_db(self) -> MagicMock:
+        """Mock database"""
+        db = MagicMock(spec=AsyncSession)
+        return db
 
     def test_get_all_provider_info_with_registered_providers(
         self, production_registry: ProviderRegistry
@@ -188,7 +202,7 @@ class TestAPIProviderIntegration:
 class TestServiceLayerIntegration:
     """Test service layer integration with registry"""
 
-    def test_config_validator_uses_registry(self) -> None:
+    async def test_config_validator_uses_registry(self) -> None:
         """Test that ConfigValidator uses registry for validation"""
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_providers.service import ConfigValidator
@@ -196,21 +210,25 @@ class TestServiceLayerIntegration:
         validator = ConfigValidator()
 
         # Test valid provider with complete config
-        config = validator.validate_config(
-            "s3",
-            {
-                "bucket_name": "test-bucket",
-                "access_key": "AKIAIOSFODNN7EXAMPLE",
-                "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-                "region": "us-east-1",
-            },
+        config = cast(
+            S3StorageConfig,
+            validator.validate_config(
+                "s3",
+                {
+                    "bucket_name": "test-bucket",
+                    "access_key": "AKIAIOSFODNN7EXAMPLE",
+                    "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                    "region": "us-east-1",
+                },
+            ),
         )
+
         assert config.bucket_name == "test-bucket"
         assert config.access_key == "AKIAIOSFODNN7EXAMPLE"
 
         # Test invalid provider
         with pytest.raises(ValueError) as exc_info:
-            validator.validate_config("unknown", {})
+            validator.validate_config(provider="unknown", config={})
 
         error_msg = str(exc_info.value)
         assert "Unknown provider: unknown" in error_msg
@@ -262,14 +280,21 @@ class TestServiceLayerIntegration:
 class TestCloudSyncConfigServiceIntegration:
     """Test CloudSyncConfigService integration with registry"""
 
-    def test_cloud_sync_service_validates_providers_using_registry(self) -> None:
-        """Test that CloudSyncConfigService validates providers using registry"""
-        # Import storage modules to trigger registration (if not already done)
-        from borgitory.services.cloud_sync_service import CloudSyncConfigService
-        from fastapi import HTTPException
+    @pytest.fixture
+    def mock_db(self) -> MagicMock:
+        """Mock database"""
+        db = MagicMock(spec=AsyncSession)
+        return db
 
-        mock_db = Mock()
-        mock_db.query().filter().first.return_value = None  # No existing config
+    async def test_cloud_sync_service_validates_providers_using_registry(
+        self, mock_db: AsyncSession
+    ) -> None:
+        """Test that CloudSyncConfigService validates providers using registry"""
+
+        # Mock SQLAlchemy 2.0 execute pattern: No existing config
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result  # type: ignore[attr-defined]
 
         # Get the registry for the service
         from borgitory.services.cloud_providers.registry import get_metadata
@@ -281,7 +306,6 @@ class TestCloudSyncConfigServiceIntegration:
         mock_encryption = Mock(spec=EncryptionService)
 
         service = CloudSyncConfigService(
-            db=mock_db,
             rclone_service=mock_rclone,
             storage_factory=mock_storage_factory,
             encryption_service=mock_encryption,
@@ -296,7 +320,7 @@ class TestCloudSyncConfigServiceIntegration:
 
         # Test with invalid provider - should use registry validation
         with pytest.raises(HTTPException) as exc_info:
-            service.create_cloud_sync_config(mock_config)
+            await service.create_cloud_sync_config(db=mock_db, config=mock_config)
 
         assert exc_info.value.status_code == 400
         detail = str(exc_info.value.detail)

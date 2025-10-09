@@ -3,6 +3,7 @@ Tests for auth HTMX functionality
 """
 
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import User
@@ -29,7 +30,8 @@ class TestAuthHTMX:
         assert "Registration successful! You can now log in." in response.text
 
         # Verify user was created in database
-        user = test_db.query(User).filter(User.username == "testuser").first()
+        result = await test_db.execute(select(User).where(User.username == "testuser"))
+        user = result.scalar_one_or_none()
         assert user is not None
         assert user.username == "testuser"
 
@@ -55,10 +57,11 @@ class TestAuthHTMX:
     ) -> None:
         """Test login via HTMX returns HTML template."""
         # Create a test user
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         user.set_password("testpassword")
         test_db.add(user)
-        test_db.commit()
+        await test_db.commit()
 
         # Make HTMX request
         response = await async_client.post(
@@ -111,10 +114,11 @@ class TestAuthHTMX:
     ) -> None:
         """Test check-users endpoint returns login form when users exist."""
         # Create a test user
-        user = User(username="existinguser")
+        user = User()
+        user.username = "existinguser"
         user.set_password("password123")
         test_db.add(user)
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/auth/check-users")
 

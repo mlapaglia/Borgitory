@@ -12,7 +12,10 @@ class TestSchedulerService:
     def setup_method(self) -> None:
         """Set up test fixtures"""
         mock_job_manager = Mock()
-        self.scheduler_service = SchedulerService(job_manager=mock_job_manager)
+        mock_job_service = Mock()
+        self.scheduler_service = SchedulerService(
+            job_manager=mock_job_manager, job_service=mock_job_service
+        )
 
     async def test_start_scheduler(self) -> None:
         """Test starting the scheduler"""

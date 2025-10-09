@@ -16,10 +16,11 @@ class TestAuthRedirectFlow:
     ) -> None:
         """Test the complete HTMX login flow with cookie authentication."""
         # Create a test user
-        user = User(username="testuser")
+        user = User()
+        user.username = "testuser"
         user.set_password("testpassword")
         test_db.add(user)
-        test_db.commit()
+        await test_db.commit()
 
         # Make login request (HTMX-style)
         response = await async_client.post(
@@ -69,10 +70,11 @@ class TestAuthRedirectFlow:
     ) -> None:
         """Test that login sets the cookie with correct attributes via HTMX."""
         # Create a test user
-        user = User(username="cookietest")
+        user = User()
+        user.username = "cookietest"
         user.set_password("testpassword")
         test_db.add(user)
-        test_db.commit()
+        await test_db.commit()
 
         # Make login request
         response = await async_client.post(

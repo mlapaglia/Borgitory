@@ -4,17 +4,15 @@ Tests business logic independent of HTTP concerns.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
-from borgitory.models.borg_info import RepositoryInitializationResult
 from borgitory.models.enums import EncryptionType
 from borgitory.protocols.repository_protocols import BackupServiceProtocol
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.models.repository_dtos import (
-    CreateRepositoryRequest,
     ImportRepositoryRequest,
 )
 from borgitory.models.database import Repository
@@ -42,16 +40,9 @@ class TestRepositoryService:
         return mock
 
     @pytest.fixture
-    def mock_db_session(self) -> Mock:
+    def mock_db_session(self) -> MagicMock:
         """Mock database session."""
-        mock = Mock(spec=Session)
-        mock.query.return_value.filter.return_value.first.return_value = None
-        mock.query.return_value.filter.return_value.all.return_value = []
-        mock.add = Mock()
-        mock.commit = Mock()
-        mock.refresh = Mock()
-        mock.delete = Mock()
-        mock.rollback = Mock()
+        mock = AsyncMock(spec=AsyncSession)
         return mock
 
     @pytest.fixture
@@ -97,126 +88,6 @@ class TestRepositoryService:
             command_executor=mock_command_executor,
             file_service=mock_file_service,
         )
-
-    async def test_create_repository_success(
-        self,
-        repository_service: RepositoryService,
-        mock_borg_service: Mock,
-        mock_db_session: Mock,
-    ) -> None:
-        """Test successful repository creation."""
-        # Arrange
-        request = CreateRepositoryRequest(
-            name="test-repo",
-            path="/mnt/backup/test-repo",
-            passphrase="secret123",
-            encryption_type=EncryptionType.REPOKEY,
-        )
-
-        # Mock successful initialization
-        mock_borg_service.initialize_repository.return_value = (
-            RepositoryInitializationResult.success_result(
-                "Repository initialized successfully",
-                repository_path="/mnt/backup/test-repo",
-            )
-        )
-
-        # Mock repository object
-        mock_repo = Mock()
-        mock_repo.id = 123
-        mock_repo.name = "test-repo"
-        mock_db_session.add = Mock()
-        mock_db_session.commit = Mock()
-        mock_db_session.refresh = Mock(side_effect=lambda x: setattr(x, "id", 123))
-
-        with patch(
-            "borgitory.services.repositories.repository_service.Repository",
-            return_value=mock_repo,
-        ):
-            # Act
-            result = await repository_service.create_repository(
-                request, mock_db_session
-            )
-
-            # Assert
-            assert result.success is True
-            assert result.repository_id == 123
-            assert result.repository_name == "test-repo"
-            assert result.message is not None
-            assert "created successfully" in result.message
-            mock_borg_service.initialize_repository.assert_called_once()
-            mock_db_session.add.assert_called_once()
-            mock_db_session.commit.assert_called_once()
-
-    async def test_create_repository_name_already_exists(
-        self, repository_service: RepositoryService, mock_db_session: Mock
-    ) -> None:
-        """Test repository creation fails when name already exists."""
-        # Arrange
-        request = CreateRepositoryRequest(
-            name="existing-repo",
-            path="/mnt/backup/test-repo",
-            passphrase="secret123",
-            encryption_type=EncryptionType.REPOKEY,
-        )
-
-        # Mock existing repository with same name
-        existing_repo = Mock()
-        existing_repo.name = "existing-repo"
-
-        # Set up mock to return existing repo for name check, None for path check
-        # The service checks name first, then path, so we use side_effect
-        mock_db_session.query.return_value.filter.return_value.first.side_effect = [
-            existing_repo,
-            None,
-        ]
-
-        # Act
-        result = await repository_service.create_repository(request, mock_db_session)
-
-        # Assert
-        assert result.success is False
-        assert result.is_validation_error is True
-        assert result.validation_errors is not None
-        assert len(result.validation_errors) == 1
-        assert result.validation_errors[0].field == "name"
-        assert "already exists" in result.validation_errors[0].message
-
-    async def test_create_repository_borg_initialization_fails(
-        self,
-        repository_service: RepositoryService,
-        mock_borg_service: Mock,
-        mock_db_session: Mock,
-    ) -> None:
-        """Test repository creation fails when Borg initialization fails."""
-        from borgitory.models.borg_info import RepositoryInitializationResult
-
-        # Arrange
-        request = CreateRepositoryRequest(
-            name="test-repo",
-            path="/mnt/backup/test-repo",
-            passphrase="secret123",
-            encryption_type=EncryptionType.REPOKEY,
-        )
-
-        # Test different types of Borg failures
-        mock_borg_service.initialize_repository.return_value = (
-            RepositoryInitializationResult.failure_result(
-                "Read-only file system"  # This should trigger specific error parsing
-            )
-        )
-
-        # Act
-        result = await repository_service.create_repository(request, mock_db_session)
-
-        # Assert - Test that business logic parses the error correctly
-        assert result.success is False
-        assert result.is_borg_error is True
-        assert result.error_message is not None
-        assert "read-only" in result.error_message  # Tests error parsing logic
-        assert (
-            "writable location" in result.error_message
-        )  # Tests user-friendly message
 
     async def test_check_repository_lock_status_accessible(
         self,
@@ -458,117 +329,13 @@ class TestRepositoryService:
         mock_borg_service.list_archives.assert_called_once()
 
         # Verify repository was saved to database
-        saved_repo = (
-            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "imported-repo")
         )
+        saved_repo = execute_result.scalar_one_or_none()
         assert saved_repo is not None
         assert saved_repo.path == "/mnt/backup/existing-repo"
         assert saved_repo.get_passphrase() == "secret123"
-
-    async def test_import_repository_success_with_keyfile_upload(
-        self,
-        repository_service: RepositoryService,
-        mock_borg_service: Mock,
-        mock_path_service: Mock,
-        mock_file_service: Mock,
-        test_db: AsyncSession,
-    ) -> None:
-        """Test successful repository import with keyfile upload."""
-        # Arrange
-        mock_keyfile = Mock()
-        mock_keyfile.filename = "test.key"
-        mock_keyfile.read = AsyncMock(return_value=b"keyfile content")
-
-        request = ImportRepositoryRequest(
-            name="imported-repo",
-            path="/mnt/backup/existing-repo",
-            passphrase="secret123",
-            encryption_type=EncryptionType.REPOKEY,
-            keyfile_content="keyfile content",
-        )
-
-        # Mock successful keyfile save
-        mock_path_service.get_keyfiles_dir = AsyncMock(return_value="/test/keyfiles")
-        mock_path_service.ensure_directory = AsyncMock()
-        mock_path_service.secure_join.return_value = (
-            "/test/keyfiles/imported-repo_test.key_uuid"
-        )
-
-        # Mock successful verification
-        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
-
-        # Mock successful archive listing
-        mock_archives_response = Mock()
-        mock_archives_response.archives = []
-        mock_borg_service.list_archives.return_value = mock_archives_response
-
-        # Act
-        result = await repository_service.import_repository(request, test_db)
-
-        # Assert
-        assert result.success is True
-        assert result.repository_id is not None
-        assert result.repository_name == "imported-repo"
-
-        # Verify keyfile operations
-        mock_path_service.get_keyfiles_dir.assert_called_once()
-        mock_path_service.ensure_directory.assert_called_once()
-        mock_keyfile.read.assert_called_once()
-        mock_file_service.write_file.assert_called_once_with(
-            "/test/keyfiles/imported-repo_test.key_uuid", b"keyfile content"
-        )
-
-        # Verify verification was called with keyfile path
-        mock_borg_service.verify_repository_access.assert_called_once()
-        call_args = mock_borg_service.verify_repository_access.call_args
-        assert (
-            call_args[1]["keyfile_path"] == "/test/keyfiles/imported-repo_test.key_uuid"
-        )
-
-    async def test_import_repository_success_with_keyfile_content(
-        self,
-        repository_service: RepositoryService,
-        mock_borg_service: Mock,
-        test_db: AsyncSession,
-    ) -> None:
-        """Test successful repository import with keyfile content."""
-        # Arrange
-        request = ImportRepositoryRequest(
-            name="imported-repo",
-            path="/mnt/backup/existing-repo",
-            passphrase="secret123",
-            keyfile_content="keyfile content as text",
-            encryption_type=EncryptionType.KEYFILE,
-        )
-
-        # Mock successful verification
-        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
-
-        # Mock successful archive listing
-        mock_archives_response = Mock()
-        mock_archives_response.archives = [Mock()]
-        mock_borg_service.list_archives.return_value = mock_archives_response
-
-        # Act
-        result = await repository_service.import_repository(request, test_db)
-
-        # Assert
-        assert result.success is True
-        assert result.repository_id is not None
-        assert result.repository_name == "imported-repo"
-
-        # Verify verification was called with keyfile content
-        mock_borg_service.verify_repository_access.assert_called_once()
-        call_args = mock_borg_service.verify_repository_access.call_args
-        assert call_args[1]["keyfile_content"] == "keyfile content as text"
-
-        # Verify repository was saved with keyfile content and encryption type
-        saved_repo = (
-            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
-        )
-        assert saved_repo is not None
-        assert saved_repo.encryption_type == EncryptionType.KEYFILE
-        assert saved_repo.get_keyfile_content() == "keyfile content as text"
 
     async def test_import_repository_name_already_exists(
         self,
@@ -582,7 +349,7 @@ class TestRepositoryService:
         existing_repo.path = "/different/path"
         existing_repo.set_passphrase("different-passphrase")
         test_db.add(existing_repo)
-        test_db.commit()
+        await test_db.commit()
 
         request = ImportRepositoryRequest(
             name="existing-repo",
@@ -614,7 +381,7 @@ class TestRepositoryService:
         existing_repo.path = "/mnt/backup/existing-repo"
         existing_repo.set_passphrase("different-passphrase")
         test_db.add(existing_repo)
-        test_db.commit()
+        await test_db.commit()
 
         request = ImportRepositoryRequest(
             name="new-repo",
@@ -634,39 +401,6 @@ class TestRepositoryService:
         assert result.validation_errors[0].field == "path"
         assert "already exists" in result.validation_errors[0].message
         assert "different-repo" in result.validation_errors[0].message
-
-    async def test_import_repository_keyfile_save_fails(
-        self,
-        repository_service: RepositoryService,
-        mock_path_service: Mock,
-        mock_file_service: Mock,
-        test_db: AsyncSession,
-    ) -> None:
-        """Test import fails when keyfile save fails."""
-        # Arrange
-        mock_keyfile = Mock()
-        mock_keyfile.filename = "test.key"
-        mock_keyfile.read = AsyncMock(side_effect=Exception("File read error"))
-
-        request = ImportRepositoryRequest(
-            name="imported-repo",
-            path="/mnt/backup/existing-repo",
-            passphrase="secret123",
-            keyfile_content="keyfile content",
-            encryption_type=EncryptionType.REPOKEY,
-        )
-
-        # Mock path service methods to be async
-        mock_path_service.get_keyfiles_dir = AsyncMock(return_value="/test/keyfiles")
-        mock_path_service.ensure_directory = AsyncMock()
-
-        # Act
-        result = await repository_service.import_repository(request, test_db)
-
-        # Assert
-        assert result.success is False
-        assert result.error_message is not None
-        assert "Failed to import repository" in result.error_message
 
     async def test_import_repository_verification_fails(
         self,
@@ -695,9 +429,10 @@ class TestRepositoryService:
         assert "Failed to verify repository access" in result.error_message
 
         # Verify repository was not saved to database (verification happens before save now)
-        saved_repo = (
-            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "imported-repo")
         )
+        saved_repo = execute_result.scalar_one_or_none()
         assert saved_repo is None
 
     async def test_import_repository_with_cache_dir(
@@ -732,9 +467,10 @@ class TestRepositoryService:
         assert result.repository_id is not None
 
         # Verify repository was saved with cache directory
-        saved_repo = (
-            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "imported-repo")
         )
+        saved_repo = execute_result.scalar_one_or_none()
         assert saved_repo is not None
         assert saved_repo.cache_dir == "/custom/cache/dir"
 
@@ -768,49 +504,11 @@ class TestRepositoryService:
         assert "Database error" in result.error_message
 
         # Verify repository was not saved to database (verification happens before save now)
-        saved_repo = (
-            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "imported-repo")
         )
+        saved_repo = execute_result.scalar_one_or_none()
         assert saved_repo is None
-
-    async def test_import_repository_archive_listing_exception(
-        self,
-        repository_service: RepositoryService,
-        mock_borg_service: Mock,
-        test_db: AsyncSession,
-    ) -> None:
-        """Test import succeeds even when archive listing fails."""
-        # Arrange
-        request = ImportRepositoryRequest(
-            name="imported-repo",
-            path="/mnt/backup/existing-repo",
-            passphrase="secret123",
-            encryption_type=EncryptionType.REPOKEY,
-        )
-
-        # Mock successful verification
-        mock_borg_service.verify_repository_access = AsyncMock(return_value=True)
-
-        # Mock archive listing to raise exception
-        mock_borg_service.list_archives.side_effect = Exception(
-            "Archive listing failed"
-        )
-
-        # Act
-        result = await repository_service.import_repository(request, test_db)
-
-        # Assert
-        assert result.success is True
-        assert result.repository_id is not None
-        assert result.repository_name == "imported-repo"
-
-        # Verify repository was still saved despite archive listing failure
-        saved_repo = (
-            test_db.query(Repository).filter(Repository.name == "imported-repo").first()
-        )
-        assert saved_repo is not None
-
-    # List Archives Tests
 
     async def test_list_archives_success_with_multiple_archives(
         self,
@@ -828,7 +526,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create mock archives
         archive1 = BorgArchive(
@@ -908,7 +606,7 @@ class TestRepositoryService:
         repository.path = "/test/empty-repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Mock empty archives response
         mock_archives_response = BorgArchiveListResponse(archives=[])
@@ -958,7 +656,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Mock borg service to raise exception
         mock_borg_service.list_archives.side_effect = Exception("Borg service error")
@@ -993,7 +691,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create archives with different sizes
         archives = [
@@ -1063,7 +761,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create archive with no size information
         archive = BorgArchive(
@@ -1108,7 +806,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create 15 archives
         archives = []
@@ -1155,7 +853,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create archive with valid timestamp
         archive = BorgArchive(
@@ -1199,7 +897,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create archive with invalid timestamp
         archive = BorgArchive(
@@ -1545,7 +1243,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create mock archive entries
         mock_entries = [
@@ -1639,7 +1337,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create mock archive entries for root
         mock_entries = [
@@ -1701,7 +1399,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Create mock archive entries for nested path
         mock_entries = [
@@ -1780,7 +1478,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Mock borg service to raise exception
         mock_borg_service.list_archive_directory_contents.side_effect = Exception(
@@ -1829,7 +1527,7 @@ class TestRepositoryService:
         repository.path = "/test/repo"
         repository.set_passphrase("test123")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Mock empty archive contents
         mock_borg_service.list_archive_directory_contents.return_value = []

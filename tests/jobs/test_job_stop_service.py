@@ -6,13 +6,14 @@ Tests business logic directly without mocking
 import uuid
 from unittest.mock import Mock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_service import JobService
 from borgitory.models.job_results import JobStopResult, JobStopError
 from borgitory.models.database import Repository, Job
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.protocols.job_protocols import JobManagerProtocol
+from borgitory.models.database import StringUUID
 
 
 class TestJobStopService:
@@ -20,9 +21,8 @@ class TestJobStopService:
 
     def setup_method(self) -> None:
         """Set up test fixtures with proper DI"""
-        self.mock_db = Mock(spec=Session)
-        self.mock_job_manager = AsyncMock()
-        self.job_service = JobService(self.mock_db, self.mock_job_manager)
+        self.mock_job_manager = AsyncMock(spec=JobManagerProtocol)
+        self.job_service = JobService(job_manager=self.mock_job_manager)
 
     async def test_stop_composite_job_success(self) -> None:
         """Test stopping a composite job successfully"""
@@ -99,16 +99,16 @@ class TestJobStopService:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()  # UUID to trigger database path
+        job.id = StringUUID(uuid.uuid4().hex)  # UUID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock to return success
         self.mock_job_manager.stop_job.return_value = {
@@ -119,7 +119,7 @@ class TestJobStopService:
         }
 
         # Use real database in service
-        job_service = JobService(test_db, self.mock_job_manager)
+        job_service = JobService(self.mock_job_manager)
 
         # Act
         result = await job_service.stop_job(job.id)
@@ -145,17 +145,17 @@ class TestJobStopService:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()  # UUID to trigger database path
+        job.id = StringUUID(uuid.uuid4().hex)  # UUID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.COMPLETED
         job.started_at = now_utc()
         job.finished_at = now_utc()
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock to return error for invalid status
         self.mock_job_manager.stop_job.return_value = {
@@ -165,7 +165,7 @@ class TestJobStopService:
         }
 
         # Use real database in service
-        job_service = JobService(test_db, self.mock_job_manager)
+        job_service = JobService(self.mock_job_manager)
 
         # Act
         result = await job_service.stop_job(job.id)
@@ -179,7 +179,7 @@ class TestJobStopService:
     async def test_stop_job_not_found_anywhere(self, test_db: AsyncSession) -> None:
         """Test stopping job that doesn't exist in manager or database"""
         # Arrange
-        job_service = JobService(test_db, self.mock_job_manager)
+        job_service = JobService(self.mock_job_manager)
         self.mock_job_manager.stop_job = AsyncMock(
             return_value={
                 "success": False,
@@ -228,16 +228,16 @@ class TestJobStopService:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()
+        job.id = StringUUID(uuid.uuid4().hex)
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock to return error for database exception
         self.mock_job_manager.stop_job.return_value = {
@@ -247,9 +247,9 @@ class TestJobStopService:
         }
 
         # Mock database to raise exception
-        mock_db = Mock(spec=Session)
+        mock_db = Mock(spec=AsyncSession)
         mock_db.query.side_effect = Exception("Database connection error")
-        job_service = JobService(mock_db, self.mock_job_manager)
+        job_service = JobService(self.mock_job_manager)
 
         # Act
         result = await job_service.stop_job(job.id)

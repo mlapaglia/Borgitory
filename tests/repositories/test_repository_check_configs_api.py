@@ -3,15 +3,42 @@ Tests for repository_check_configs API endpoints - HTMX and response validation 
 """
 
 import pytest
-from unittest.mock import MagicMock
-from fastapi import Request
+from typing import cast
+from unittest.mock import AsyncMock, MagicMock
+from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from borgitory.api.repository_check_configs import (
+    create_repository_check_config,
+    delete_repository_check_config,
+    disable_repository_check_config,
+    enable_repository_check_config,
+    get_policy_form,
+    get_repository_check_config,
+    get_repository_check_config_edit_form,
+    get_repository_check_configs_html,
+    get_repository_check_form,
+    toggle_custom_options,
+    update_check_options,
+    update_repository_check_config,
+)
 from borgitory.models.schemas import (
     CheckType,
     RepositoryCheckConfigCreate,
     RepositoryCheckConfigUpdate,
 )
+from borgitory.services.repositories.repository_check_config_service import (
+    RepositoryCheckConfigService,
+)
+from borgitory.dependencies import TemplatesDep
+
+
+@pytest.fixture
+def mock_db() -> MagicMock:
+    """Mock database"""
+    db = MagicMock(spec=AsyncSession)
+    return db
 
 
 @pytest.fixture
@@ -33,10 +60,10 @@ def mock_templates() -> MagicMock:
 
 
 @pytest.fixture
-def mock_service() -> MagicMock:
+def mock_service() -> RepositoryCheckConfigService:
     """Mock RepositoryCheckConfigService"""
-    service = MagicMock()
-    return service
+    service = AsyncMock(spec=RepositoryCheckConfigService)
+    return cast(RepositoryCheckConfigService, service)
 
 
 @pytest.fixture
@@ -81,26 +108,25 @@ class TestRepositoryCheckConfigsAPI:
     async def test_create_config_success_htmx_response(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
         sample_config_create: RepositoryCheckConfigCreate,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful config creation returns correct HTMX response."""
-        from borgitory.api.repository_check_configs import (
-            create_repository_check_config,
-        )
 
         # Mock successful service response
         mock_config = MagicMock()
         mock_config.name = "test-config"
-        mock_service.create_config.return_value = (True, mock_config, None)
+        mock_service.create_config.return_value = (True, mock_config, None)  # type: ignore[attr-defined]
 
         result = await create_repository_check_config(
-            mock_request, sample_config_create, mock_templates, mock_service
+            mock_request, sample_config_create, mock_templates, mock_service, db=mock_db
         )
 
         # Verify service was called with correct parameters
-        mock_service.create_config.assert_called_once_with(
+        mock_service.create_config.assert_called_once_with(  # type: ignore[attr-defined]
+            db=mock_db,
             name=sample_config_create.name,
             description=sample_config_create.description,
             check_type=sample_config_create.check_type,
@@ -115,7 +141,7 @@ class TestRepositoryCheckConfigsAPI:
         )
 
         # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/create_success.html",
             {"config_name": "test-config"},
@@ -130,11 +156,9 @@ class TestRepositoryCheckConfigsAPI:
         mock_templates: MagicMock,
         mock_service: MagicMock,
         sample_config_create: RepositoryCheckConfigCreate,
+        mock_db: AsyncSession,
     ) -> None:
         """Test failed config creation returns correct HTMX error response."""
-        from borgitory.api.repository_check_configs import (
-            create_repository_check_config,
-        )
 
         # Mock service failure
         mock_service.create_config.return_value = (
@@ -144,7 +168,7 @@ class TestRepositoryCheckConfigsAPI:
         )
 
         await create_repository_check_config(
-            mock_request, sample_config_create, mock_templates, mock_service
+            mock_request, sample_config_create, mock_templates, mock_service, db=mock_db
         )
 
         # Verify error template response
@@ -158,14 +182,12 @@ class TestRepositoryCheckConfigsAPI:
     async def test_create_config_server_error_htmx_response(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
+        mock_templates: TemplatesDep,
         mock_service: MagicMock,
         sample_config_create: RepositoryCheckConfigCreate,
+        mock_db: AsyncSession,
     ) -> None:
         """Test server error during creation returns correct status code."""
-        from borgitory.api.repository_check_configs import (
-            create_repository_check_config,
-        )
 
         # Mock service failure with "Failed to" error
         mock_service.create_config.return_value = (
@@ -175,57 +197,57 @@ class TestRepositoryCheckConfigsAPI:
         )
 
         await create_repository_check_config(
-            mock_request, sample_config_create, mock_templates, mock_service
+            mock_request, sample_config_create, mock_templates, mock_service, db=mock_db
         )
 
         # Verify error template response with 500 status
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/create_error.html",
             {"error_message": "Failed to create config"},
             status_code=500,
         )
 
-    def test_get_configs_html_success(
+    async def test_get_configs_html_success(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
+        mock_db: AsyncSession,
     ) -> None:
         """Test getting configs HTML returns correct template response."""
-        from borgitory.api.repository_check_configs import (
-            get_repository_check_configs_html,
-        )
 
         mock_configs = [MagicMock(), MagicMock()]
-        mock_service.get_all_configs.return_value = mock_configs
+        mock_service.get_all_configs.return_value = mock_configs  # type: ignore[attr-defined]
 
-        get_repository_check_configs_html(mock_request, mock_templates, mock_service)
+        await get_repository_check_configs_html(
+            mock_request, mock_templates, mock_service, db=mock_db
+        )
 
         # Verify service was called
-        mock_service.get_all_configs.assert_called_once()
+        mock_service.get_all_configs.assert_called_once_with(mock_db)  # type: ignore[attr-defined]
 
         # Verify correct template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/config_list_content.html",
             {"configs": mock_configs},
         )
 
-    def test_get_configs_html_exception(
+    async def test_get_configs_html_exception(
         self,
         mock_request: MagicMock,
         mock_templates: MagicMock,
         mock_service: MagicMock,
+        mock_db: AsyncSession,
     ) -> None:
         """Test getting configs HTML with exception returns error template."""
-        from borgitory.api.repository_check_configs import (
-            get_repository_check_configs_html,
-        )
 
         mock_service.get_all_configs.side_effect = Exception("Service error")
 
-        get_repository_check_configs_html(mock_request, mock_templates, mock_service)
+        await get_repository_check_configs_html(
+            mock_request, mock_templates, mock_service, db=mock_db
+        )
 
         # Verify error template response
         mock_templates.TemplateResponse.assert_called_once_with(
@@ -239,14 +261,16 @@ class TestRepositoryCheckConfigsAPI:
         mock_request: MagicMock,
         mock_templates: MagicMock,
         mock_service: MagicMock,
+        mock_db: AsyncSession,
     ) -> None:
         """Test getting form returns correct HTMX template response."""
-        from borgitory.api.repository_check_configs import get_repository_check_form
 
         mock_form_data = {"repositories": [MagicMock()], "check_configs": [MagicMock()]}
         mock_service.get_form_data.return_value = mock_form_data
 
-        await get_repository_check_form(mock_request, mock_templates, mock_service)
+        await get_repository_check_form(
+            mock_request, mock_templates, mock_service, db=mock_db
+        )
 
         # Verify service was called
         mock_service.get_form_data.assert_called_once()
@@ -259,15 +283,14 @@ class TestRepositoryCheckConfigsAPI:
         )
 
     async def test_get_policy_form_htmx_response(
-        self, mock_request: MagicMock, mock_templates: MagicMock
+        self, mock_request: MagicMock, mock_templates: TemplatesDep
     ) -> None:
         """Test getting policy form returns correct HTMX template response."""
-        from borgitory.api.repository_check_configs import get_policy_form
 
         await get_policy_form(mock_request, mock_templates)
 
         # Verify correct template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/create_form.html",
             {},
@@ -276,26 +299,24 @@ class TestRepositoryCheckConfigsAPI:
     async def test_get_config_edit_form_success(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
+        mock_db: AsyncSession,
     ) -> None:
         """Test getting edit form returns correct HTMX template response."""
-        from borgitory.api.repository_check_configs import (
-            get_repository_check_config_edit_form,
-        )
 
         mock_config = MagicMock()
-        mock_service.get_config_by_id.return_value = mock_config
+        mock_service.get_config_by_id.return_value = mock_config  # type: ignore[attr-defined]
 
         await get_repository_check_config_edit_form(
-            mock_request, 1, mock_templates, mock_service
+            mock_request, 1, mock_templates, mock_service, db=mock_db
         )
 
         # Verify service was called
-        mock_service.get_config_by_id.assert_called_once_with(1)
+        mock_service.get_config_by_id.assert_called_once_with(mock_db, 1)  # type: ignore[attr-defined]
 
         # Verify correct template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/edit_form.html",
             {"config": mock_config, "is_edit_mode": True},
@@ -306,18 +327,15 @@ class TestRepositoryCheckConfigsAPI:
         mock_request: MagicMock,
         mock_templates: MagicMock,
         mock_service: MagicMock,
+        mock_db: AsyncSession,
     ) -> None:
         """Test getting edit form for non-existent config raises HTTPException."""
-        from borgitory.api.repository_check_configs import (
-            get_repository_check_config_edit_form,
-        )
-        from fastapi import HTTPException
 
         mock_service.get_config_by_id.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
             await get_repository_check_config_edit_form(
-                mock_request, 999, mock_templates, mock_service
+                mock_request, 999, mock_templates, mock_service, db=mock_db
             )
 
         assert exc_info.value.status_code == 404
@@ -326,29 +344,32 @@ class TestRepositoryCheckConfigsAPI:
     async def test_update_config_success_htmx_response(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
         sample_config_update: RepositoryCheckConfigUpdate,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful config update returns correct HTMX response."""
-        from borgitory.api.repository_check_configs import (
-            update_repository_check_config,
-        )
 
         mock_config = MagicMock()
         mock_config.name = "updated-config"
-        mock_service.update_config.return_value = (True, mock_config, None)
+        mock_service.update_config.return_value = (True, mock_config, None)  # type: ignore[attr-defined]
 
         result = await update_repository_check_config(
-            mock_request, 1, sample_config_update, mock_templates, mock_service
+            mock_request,
+            1,
+            sample_config_update,
+            mock_templates,
+            mock_service,
+            db=mock_db,
         )
 
         # Verify service was called with correct parameters
         update_dict = sample_config_update.model_dump(exclude_unset=True)
-        mock_service.update_config.assert_called_once_with(1, update_dict)
+        mock_service.update_config.assert_called_once_with(mock_db, 1, update_dict)  # type: ignore[attr-defined]
 
         # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/update_success.html",
             {"config_name": "updated-config"},
@@ -363,16 +384,19 @@ class TestRepositoryCheckConfigsAPI:
         mock_templates: MagicMock,
         mock_service: MagicMock,
         sample_config_update: RepositoryCheckConfigUpdate,
+        mock_db: AsyncSession,
     ) -> None:
         """Test failed config update returns correct HTMX error response."""
-        from borgitory.api.repository_check_configs import (
-            update_repository_check_config,
-        )
 
         mock_service.update_config.return_value = (False, None, "Config not found")
 
         await update_repository_check_config(
-            mock_request, 999, sample_config_update, mock_templates, mock_service
+            mock_request,
+            999,
+            sample_config_update,
+            mock_templates,
+            mock_service,
+            db=mock_db,
         )
 
         # Verify error template response
@@ -386,29 +410,27 @@ class TestRepositoryCheckConfigsAPI:
     async def test_enable_config_success_htmx_response(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful config enable returns correct HTMX response."""
-        from borgitory.api.repository_check_configs import (
-            enable_repository_check_config,
-        )
 
-        mock_service.enable_config.return_value = (
+        mock_service.enable_config.return_value = (  # type: ignore[attr-defined]
             True,
             "Config enabled successfully!",
             None,
         )
 
         result = await enable_repository_check_config(
-            mock_request, 1, mock_templates, mock_service
+            mock_request, 1, mock_templates, mock_service, db=mock_db
         )
 
         # Verify service was called
-        mock_service.enable_config.assert_called_once_with(1)
+        mock_service.enable_config.assert_called_once_with(mock_db, 1)  # type: ignore[attr-defined]
 
         # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/action_success.html",
             {"message": "Config enabled successfully!"},
@@ -420,29 +442,27 @@ class TestRepositoryCheckConfigsAPI:
     async def test_disable_config_success_htmx_response(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful config disable returns correct HTMX response."""
-        from borgitory.api.repository_check_configs import (
-            disable_repository_check_config,
-        )
 
-        mock_service.disable_config.return_value = (
+        mock_service.disable_config.return_value = (  # type: ignore[attr-defined]
             True,
             "Config disabled successfully!",
             None,
         )
 
         result = await disable_repository_check_config(
-            mock_request, 1, mock_templates, mock_service
+            mock_request, 1, mock_templates, mock_service, db=mock_db
         )
 
         # Verify service was called
-        mock_service.disable_config.assert_called_once_with(1)
+        mock_service.disable_config.assert_called_once_with(mock_db, 1)  # type: ignore[attr-defined]
 
         # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/action_success.html",
             {"message": "Config disabled successfully!"},
@@ -454,25 +474,23 @@ class TestRepositoryCheckConfigsAPI:
     async def test_delete_config_success_htmx_response(
         self,
         mock_request: MagicMock,
-        mock_templates: MagicMock,
-        mock_service: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
+        mock_db: AsyncSession,
     ) -> None:
         """Test successful config deletion returns correct HTMX response."""
-        from borgitory.api.repository_check_configs import (
-            delete_repository_check_config,
-        )
 
-        mock_service.delete_config.return_value = (True, "test-config", None)
+        mock_service.delete_config.return_value = (True, "test-config", None)  # type: ignore[attr-defined]
 
         result = await delete_repository_check_config(
-            mock_request, 1, mock_templates, mock_service
+            mock_request, 1, mock_templates, mock_service, db=mock_db
         )
 
         # Verify service was called
-        mock_service.delete_config.assert_called_once_with(1)
+        mock_service.delete_config.assert_called_once_with(mock_db, 1)  # type: ignore[attr-defined]
 
         # Verify HTMX success template response
-        mock_templates.TemplateResponse.assert_called_once_with(
+        mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
             "partials/repository_check/delete_success.html",
             {"config_name": "test-config"},
@@ -486,16 +504,14 @@ class TestRepositoryCheckConfigsAPI:
         mock_request: MagicMock,
         mock_templates: MagicMock,
         mock_service: MagicMock,
+        mock_db: AsyncSession,
     ) -> None:
         """Test failed config deletion returns correct HTMX error response."""
-        from borgitory.api.repository_check_configs import (
-            delete_repository_check_config,
-        )
 
         mock_service.delete_config.return_value = (False, None, "Config not found")
 
         await delete_repository_check_config(
-            mock_request, 999, mock_templates, mock_service
+            mock_request, 999, mock_templates, mock_service, db=mock_db
         )
 
         # Verify error template response
@@ -506,41 +522,41 @@ class TestRepositoryCheckConfigsAPI:
             status_code=404,
         )
 
-    def test_get_config_by_id_success(self, mock_service: MagicMock) -> None:
+    async def test_get_config_by_id_success(
+        self, mock_service: RepositoryCheckConfigService, mock_db: AsyncSession
+    ) -> None:
         """Test getting config by ID returns service result."""
-        from borgitory.api.repository_check_configs import get_repository_check_config
 
         mock_config = MagicMock()
-        mock_service.get_config_by_id.return_value = mock_config
+        mock_service.get_config_by_id.return_value = mock_config  # type: ignore[attr-defined]
 
-        result = get_repository_check_config(1, mock_service)
+        result = await get_repository_check_config(1, mock_service, mock_db)
 
         # Verify service was called
-        mock_service.get_config_by_id.assert_called_once_with(1)
+        mock_service.get_config_by_id.assert_called_once_with(mock_db, 1)  # type: ignore[attr-defined]
 
         # Verify result is returned
         assert result == mock_config
 
-    def test_get_config_by_id_not_found(self, mock_service: MagicMock) -> None:
+    async def test_get_config_by_id_not_found(
+        self, mock_service: RepositoryCheckConfigService, mock_db: AsyncSession
+    ) -> None:
         """Test getting non-existent config by ID raises HTTPException."""
-        from borgitory.api.repository_check_configs import get_repository_check_config
-        from fastapi import HTTPException
 
-        mock_service.get_config_by_id.return_value = None
+        mock_service.get_config_by_id.return_value = None  # type: ignore[attr-defined]
 
         with pytest.raises(HTTPException) as exc_info:
-            get_repository_check_config(999, mock_service)
+            await get_repository_check_config(999, mock_service, mock_db)
 
         assert exc_info.value.status_code == 404
         assert "Check policy not found" in str(exc_info.value.detail)
 
-    def test_toggle_custom_options_show_custom(
+    async def test_toggle_custom_options_show_custom(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
         """Test toggling custom options shows custom options when no config selected."""
-        from borgitory.api.repository_check_configs import toggle_custom_options
 
-        toggle_custom_options(mock_request, mock_templates, check_config_id="")
+        await toggle_custom_options(mock_request, mock_templates, check_config_id="")
 
         # Verify correct template response
         mock_templates.TemplateResponse.assert_called_once_with(
@@ -549,13 +565,12 @@ class TestRepositoryCheckConfigsAPI:
             {"show_custom": True},
         )
 
-    def test_toggle_custom_options_hide_custom(
+    async def test_toggle_custom_options_hide_custom(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
         """Test toggling custom options hides custom options when config selected."""
-        from borgitory.api.repository_check_configs import toggle_custom_options
 
-        toggle_custom_options(mock_request, mock_templates, check_config_id="123")
+        await toggle_custom_options(mock_request, mock_templates, check_config_id="123")
 
         # Verify correct template response
         mock_templates.TemplateResponse.assert_called_once_with(
@@ -564,13 +579,12 @@ class TestRepositoryCheckConfigsAPI:
             {"show_custom": False},
         )
 
-    def test_update_check_options_repository_only_type(
+    async def test_update_check_options_repository_only_type(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
         """Test update check options for repository_only check type."""
-        from borgitory.api.repository_check_configs import update_check_options
 
-        update_check_options(
+        await update_check_options(
             mock_request,
             mock_templates,
             check_type="repository_only",
@@ -588,13 +602,12 @@ class TestRepositoryCheckConfigsAPI:
         assert context["time_limit_display"] == "block"
         assert context["archive_filters_display"] == "none"
 
-    def test_update_check_options_full_check_type(
+    async def test_update_check_options_full_check_type(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
         """Test update check options for full check type."""
-        from borgitory.api.repository_check_configs import update_check_options
 
-        update_check_options(
+        await update_check_options(
             mock_request,
             mock_templates,
             check_type="full",

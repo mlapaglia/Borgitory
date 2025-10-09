@@ -7,7 +7,7 @@ import subprocess
 from typing import Any, Optional, cast
 from unittest.mock import patch, MagicMock, Mock, AsyncMock
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.protocols.command_executor_protocol import CommandResult
 from borgitory.services.debug_service import DebugService
 
@@ -88,7 +88,7 @@ def debug_service(
 @pytest.fixture
 def mock_db_session() -> MagicMock:
     """Mock database session"""
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
     return session
 
 
@@ -302,31 +302,28 @@ class TestDebugService:
 
         assert result.debug_mode is True
 
-    def test_get_database_info_success(
+    async def test_get_database_info_success(
         self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test successful database info collection"""
-        # Mock query results with different chains for different calls
-        repo_query_mock = MagicMock()
-        repo_query_mock.count.return_value = 5
+        # Mock execute() results for SQLAlchemy 2.0 syntax
+        # Each execute() returns a Result object with scalar() method
+        repo_result_mock = MagicMock()
+        repo_result_mock.scalar.return_value = 5
 
-        job_query_mock = MagicMock()
-        job_query_mock.count.return_value = 100
+        job_result_mock = MagicMock()
+        job_result_mock.scalar.return_value = 100
 
-        filtered_job_query_mock = MagicMock()
-        filtered_job_query_mock.count.return_value = 10
+        recent_jobs_result_mock = MagicMock()
+        recent_jobs_result_mock.scalar.return_value = 10
 
-        # Setup the mock to return different objects for different query calls
-        mock_db_session.query.side_effect = [
-            repo_query_mock,
-            job_query_mock,
-            filtered_job_query_mock,
-        ]
-
-        # Mock the filter method for the third query (recent jobs)
-        filtered_job_query_mock.filter = MagicMock(return_value=filtered_job_query_mock)
-        mock_db_session.query.return_value.filter = MagicMock(
-            return_value=filtered_job_query_mock
+        # Setup execute() to return different Result objects for each call
+        mock_db_session.execute = AsyncMock(
+            side_effect=[
+                repo_result_mock,
+                job_result_mock,
+                recent_jobs_result_mock,
+            ]
         )
 
         with (
@@ -334,7 +331,7 @@ class TestDebugService:
             patch("os.path.exists", return_value=True),
             patch("os.path.getsize", return_value=1024 * 1024),
         ):  # 1MB
-            result = debug_service._get_database_info(mock_db_session)
+            result = await debug_service._get_database_info(mock_db_session)
 
             assert result.repository_count == 5
             assert result.total_jobs == 100
@@ -345,11 +342,14 @@ class TestDebugService:
             assert result.database_size_bytes == 1024 * 1024
             assert result.database_accessible is True
 
-    def test_get_database_info_size_formatting(
+    async def test_get_database_info_size_formatting(
         self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test database size formatting for different sizes"""
-        mock_db_session.query.return_value.count.return_value = 1
+        # Mock execute() to return Result objects with scalar() returning 1
+        result_mock = MagicMock()
+        result_mock.scalar.return_value = 1
+        mock_db_session.execute = AsyncMock(return_value=result_mock)
 
         # Test bytes
         with (
@@ -357,7 +357,7 @@ class TestDebugService:
             patch("os.path.exists", return_value=True),
             patch("os.path.getsize", return_value=512),
         ):
-            result = debug_service._get_database_info(mock_db_session)
+            result = await debug_service._get_database_info(mock_db_session)
             assert result.database_size == "512 B"
 
         # Test KB
@@ -366,7 +366,7 @@ class TestDebugService:
             patch("os.path.exists", return_value=True),
             patch("os.path.getsize", return_value=2048),
         ):
-            result = debug_service._get_database_info(mock_db_session)
+            result = await debug_service._get_database_info(mock_db_session)
             assert result.database_size == "2.0 KB"
 
         # Test GB
@@ -375,16 +375,16 @@ class TestDebugService:
             patch("os.path.exists", return_value=True),
             patch("os.path.getsize", return_value=2 * 1024 * 1024 * 1024),
         ):
-            result = debug_service._get_database_info(mock_db_session)
+            result = await debug_service._get_database_info(mock_db_session)
             assert result.database_size == "2.0 GB"
 
-    def test_get_database_info_exception_handling(
+    async def test_get_database_info_exception_handling(
         self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test database info exception handling"""
         mock_db_session.query.side_effect = Exception("Database error")
 
-        result = debug_service._get_database_info(mock_db_session)
+        result = await debug_service._get_database_info(mock_db_session)
 
         assert result.error != ""
         assert result.database_accessible is False

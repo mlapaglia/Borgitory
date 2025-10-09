@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse
 from httpx import AsyncClient
 
 from borgitory.main import app
-from borgitory.models.database import Repository, Job
+from borgitory.models.database import Repository, Job, StringUUID
 from borgitory.models.job_results import (
     JobCreationResult,
     JobCreationError,
@@ -40,24 +40,24 @@ class TestJobsAPI:
     """Test class for jobs API endpoints."""
 
     @pytest.fixture
-    def sample_repository(self, test_db: AsyncSession) -> Repository:
+    async def sample_repository(self, test_db: AsyncSession) -> Repository:
         """Create a sample repository for testing."""
         repo = Repository()
         repo.name = "test-repo"
         repo.path = "/tmp/test-repo"
         repo.set_passphrase("test-passphrase")
         test_db.add(repo)
-        test_db.commit()
-        test_db.refresh(repo)
+        await test_db.commit()
+        await test_db.refresh(repo)
         return repo
 
     @pytest.fixture
-    def sample_database_job(
+    async def sample_database_job(
         self, test_db: AsyncSession, sample_repository: Repository
     ) -> Job:
         """Create a sample database job for testing."""
         job = Job()
-        job.id = uuid.uuid4()
+        job.id = StringUUID(uuid.uuid4().hex)
         job.repository_id = sample_repository.id
         job.type = "backup"
         job.status = JobStatusEnum.COMPLETED
@@ -68,8 +68,8 @@ class TestJobsAPI:
         job.total_tasks = 1
         job.completed_tasks = 1
         test_db.add(job)
-        test_db.commit()
-        test_db.refresh(job)
+        await test_db.commit()
+        await test_db.refresh(job)
         return job
 
     @pytest.fixture
