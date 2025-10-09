@@ -3,9 +3,8 @@ Tests for TaskDefinitionBuilder - Centralized task definition creation
 """
 
 import pytest
-from typing import Any
-from unittest.mock import MagicMock
-from sqlalchemy.orm import Session
+from unittest.mock import MagicMock, AsyncMock
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 from borgitory.models.database import (
@@ -18,15 +17,15 @@ from borgitory.services.jobs.job_models import TaskTypeEnum
 
 
 @pytest.fixture
-def mock_db() -> MagicMock:
+def mock_db() -> AsyncMock:
     """Mock database session"""
-    return MagicMock(spec=Session)
+    return AsyncMock(spec=AsyncSession)
 
 
 @pytest.fixture
-def task_builder(mock_db: MagicMock) -> TaskDefinitionBuilder:
+def task_builder() -> TaskDefinitionBuilder:
     """TaskDefinitionBuilder instance with mock database"""
-    return TaskDefinitionBuilder(mock_db)
+    return TaskDefinitionBuilder()
 
 
 @pytest.fixture
@@ -136,18 +135,19 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_prune_task_from_config_simple_strategy(
+    @pytest.mark.asyncio
+    async def test_build_prune_task_from_config_simple_strategy(
         self,
         task_builder: TaskDefinitionBuilder,
-        mock_db: MagicMock,
+        mock_db: AsyncMock,
         mock_prune_config: MagicMock,
     ) -> None:
         """Test building prune task from simple strategy config"""
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_prune_config
-        )
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_prune_config
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_prune_task_from_config(1, "test-repo")
+        task = await task_builder.build_prune_task_from_config(mock_db, 1, "test-repo")
 
         expected = TaskDefinition(
             type=TaskTypeEnum.PRUNE,
@@ -163,18 +163,19 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_prune_task_from_config_advanced_strategy(
+    @pytest.mark.asyncio
+    async def test_build_prune_task_from_config_advanced_strategy(
         self,
         task_builder: TaskDefinitionBuilder,
-        mock_db: MagicMock,
+        mock_db: AsyncMock,
         mock_advanced_prune_config: MagicMock,
     ) -> None:
         """Test building prune task from advanced strategy config"""
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_advanced_prune_config
-        )
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_advanced_prune_config
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_prune_task_from_config(2, "test-repo")
+        task = await task_builder.build_prune_task_from_config(mock_db, 2, "test-repo")
 
         expected = TaskDefinition(
             type=TaskTypeEnum.PRUNE,
@@ -196,13 +197,18 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_prune_task_from_config_not_found(
-        self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
+    @pytest.mark.asyncio
+    async def test_build_prune_task_from_config_not_found(
+        self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
         """Test building prune task when config not found"""
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_prune_task_from_config(999, "test-repo")
+        task = await task_builder.build_prune_task_from_config(
+            mock_db, 999, "test-repo"
+        )
 
         assert task is None
 
@@ -272,18 +278,19 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_check_task_from_config(
+    @pytest.mark.asyncio
+    async def test_build_check_task_from_config(
         self,
         task_builder: TaskDefinitionBuilder,
-        mock_db: MagicMock,
+        mock_db: AsyncMock,
         mock_check_config: MagicMock,
     ) -> None:
         """Test building check task from borgitory.configuration"""
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_check_config
-        )
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_check_config
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_check_task_from_config(1, "test-repo")
+        task = await task_builder.build_check_task_from_config(mock_db, 1, "test-repo")
 
         expected = TaskDefinition(
             type=TaskTypeEnum.CHECK,
@@ -303,13 +310,18 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_check_task_from_config_not_found(
-        self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
+    @pytest.mark.asyncio
+    async def test_build_check_task_from_config_not_found(
+        self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
         """Test building check task when config not found"""
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_check_task_from_config(999, "test-repo")
+        task = await task_builder.build_check_task_from_config(
+            mock_db, 999, "test-repo"
+        )
 
         assert task is None
 
@@ -390,18 +402,19 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_notification_task(
+    @pytest.mark.asyncio
+    async def test_build_notification_task(
         self,
         task_builder: TaskDefinitionBuilder,
-        mock_db: MagicMock,
+        mock_db: AsyncMock,
         mock_notification_config: MagicMock,
     ) -> None:
         """Test building notification task"""
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_notification_config
-        )
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_notification_config
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_notification_task(1, "test-repo")
+        task = await task_builder.build_notification_task(mock_db, 1, "test-repo")
 
         expected = TaskDefinition(
             type=TaskTypeEnum.NOTIFICATION,
@@ -411,42 +424,58 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    def test_build_notification_task_not_found(
-        self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
+    @pytest.mark.asyncio
+    async def test_build_notification_task_not_found(
+        self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
         """Test building notification task when config not found"""
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
 
-        task = task_builder.build_notification_task(999, "test-repo")
+        task = await task_builder.build_notification_task(mock_db, 999, "test-repo")
 
         assert task is None
 
-    def test_build_task_list_comprehensive(
+    @pytest.mark.asyncio
+    async def test_build_task_list_comprehensive(
         self,
         task_builder: TaskDefinitionBuilder,
-        mock_db: MagicMock,
+        mock_db: AsyncMock,
         mock_prune_config: MagicMock,
         mock_check_config: MagicMock,
         mock_notification_config: MagicMock,
     ) -> None:
         """Test building comprehensive task list with all task types"""
 
-        # Setup mock returns for different configs
-        def mock_query_side_effect(model: Any) -> MagicMock:
-            query_mock = MagicMock()
-            if model == PruneConfig:
-                query_mock.filter.return_value.first.return_value = mock_prune_config
-            elif model == RepositoryCheckConfig:
-                query_mock.filter.return_value.first.return_value = mock_check_config
-            elif model == NotificationConfig:
-                query_mock.filter.return_value.first.return_value = (
-                    mock_notification_config
-                )
-            return query_mock
+        # Setup mock execute to return different configs based on the call
+        def mock_execute_side_effect(*args, **kwargs):
+            mock_result = MagicMock()
+            # Check which config is being requested by inspecting the statement
+            # This is a simplified approach - in real tests you might want more sophisticated matching
+            # For now, we'll just return configs in order
+            if not hasattr(mock_execute_side_effect, "call_count"):
+                mock_execute_side_effect.call_count = 0
 
-        mock_db.query.side_effect = mock_query_side_effect
+            call_order = [
+                mock_prune_config,
+                mock_check_config,
+                mock_notification_config,
+            ]
+            if mock_execute_side_effect.call_count < len(call_order):
+                mock_result.scalar_one_or_none.return_value = call_order[
+                    mock_execute_side_effect.call_count
+                ]
+                mock_execute_side_effect.call_count += 1
+            else:
+                mock_result.scalar_one_or_none.return_value = None
 
-        tasks = task_builder.build_task_list(
+            return mock_result
+
+        mock_db.execute.side_effect = mock_execute_side_effect
+
+        tasks = await task_builder.build_task_list(
+            mock_db,
             repository_name="test-repo",
             include_backup=True,
             backup_params={"source_path": "/custom", "compression": "lz4"},
@@ -471,28 +500,33 @@ class TestTaskDefinitionBuilder:
         assert backup_task.parameters["source_path"] == "/custom"
         assert backup_task.parameters["compression"] == "lz4"
 
-    def test_build_task_list_minimal(self, task_builder: TaskDefinitionBuilder) -> None:
+    @pytest.mark.asyncio
+    async def test_build_task_list_minimal(
+        self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
+    ) -> None:
         """Test building minimal task list with only backup"""
-        tasks = task_builder.build_task_list(
-            repository_name="test-repo", include_backup=True
+        tasks = await task_builder.build_task_list(
+            mock_db, repository_name="test-repo", include_backup=True
         )
 
         assert len(tasks) == 1
         assert tasks[0].type == TaskTypeEnum.BACKUP
         assert tasks[0].name == "Backup test-repo"
 
-    def test_build_task_list_no_backup(
+    @pytest.mark.asyncio
+    async def test_build_task_list_no_backup(
         self,
         task_builder: TaskDefinitionBuilder,
-        mock_db: MagicMock,
+        mock_db: AsyncMock,
         mock_prune_config: MagicMock,
     ) -> None:
         """Test building task list without backup task"""
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_prune_config
-        )
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_prune_config
+        mock_db.execute.return_value = mock_result
 
-        tasks = task_builder.build_task_list(
+        tasks = await task_builder.build_task_list(
+            mock_db,
             repository_name="test-repo",
             include_backup=False,
             prune_config_id=1,
@@ -505,8 +539,9 @@ class TestTaskDefinitionBuilder:
         assert TaskTypeEnum.PRUNE in task_types
         assert TaskTypeEnum.CLOUD_SYNC in task_types
 
-    def test_build_task_list_prune_request_over_config(
-        self, task_builder: TaskDefinitionBuilder
+    @pytest.mark.asyncio
+    async def test_build_task_list_prune_request_over_config(
+        self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
     ) -> None:
         """Test that prune request takes precedence over config when both provided"""
         prune_request = MagicMock(spec=PruneRequest)
@@ -514,7 +549,8 @@ class TestTaskDefinitionBuilder:
         prune_request.keep_within_days = 14
         prune_request.dry_run = True
 
-        tasks = task_builder.build_task_list(
+        tasks = await task_builder.build_task_list(
+            mock_db,
             repository_name="test-repo",
             include_backup=False,
             prune_config_id=1,  # This should be ignored
@@ -527,15 +563,17 @@ class TestTaskDefinitionBuilder:
         assert prune_task.parameters["dry_run"] is True
         assert prune_task.parameters["keep_within"] == "14d"
 
-    def test_build_task_list_check_request_over_config(
-        self, task_builder: TaskDefinitionBuilder
+    @pytest.mark.asyncio
+    async def test_build_task_list_check_request_over_config(
+        self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
     ) -> None:
         """Test that check request takes precedence over config when both provided"""
         check_request = MagicMock(spec=CheckRequest)
         check_request.check_type = "archives_only"
         check_request.verify_data = True
 
-        tasks = task_builder.build_task_list(
+        tasks = await task_builder.build_task_list(
+            mock_db,
             repository_name="test-repo",
             include_backup=False,
             check_config_id=1,  # This should be ignored
