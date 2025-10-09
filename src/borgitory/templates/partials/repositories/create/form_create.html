@@ -95,11 +95,7 @@
                            name="passphrase"
                            {% if not repository %}required{% endif %}
                            class="input-modern mt-1"
-                           {% if repository -%}
-                           placeholder="Enter new passphrase (leave empty to keep current)"
-                           {%- else -%}
-                           placeholder="Enter repository passphrase"
-                           {%- endif %}>
+                           {% if repository %} placeholder="Enter new passphrase (leave empty to keep current)" {% else %} placeholder="Enter repository passphrase" {% endif %}>
                     {% if repository %}
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             Leave empty to keep the current passphrase
@@ -113,7 +109,7 @@
                     {% set input_id = "create-cache-dir" %}
                     {% set input_name = "cache_dir" %}
                     {% set input_value = repository.cache_dir if repository else "" %}
-                    {% set placeholder = "Leave empty for default" %}
+                    {% set placeholder = default_directories.cache_dir if default_directories else "Leave empty for default" %}
                     {% set required = false %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">

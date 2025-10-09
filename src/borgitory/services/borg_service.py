@@ -9,6 +9,7 @@ from typing import List
 from borgitory.models.database import Repository
 from borgitory.models.borg_info import (
     BorgArchiveListResponse,
+    BorgDefaultDirectories,
     RepositoryInitializationResult,
 )
 from borgitory.protocols import (
@@ -17,6 +18,7 @@ from borgitory.protocols import (
     JobManagerProtocol,
 )
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
 from borgitory.utils.security import create_borg_command
 
@@ -39,6 +41,7 @@ class BorgService:
         job_manager: JobManagerProtocol,
         archive_service: ArchiveServiceProtocol,
         command_executor: CommandExecutorProtocol,
+        path_service: PathServiceInterface,
     ) -> None:
         """
         Initialize BorgService with mandatory dependency injection.
@@ -49,20 +52,18 @@ class BorgService:
             job_manager: Job manager for handling job lifecycle
             archive_service: Archive service for managing archive operations
             command_executor: Command executor for cross-platform command execution
+            path_service: Path service for secure path operations
         """
         self.job_executor = job_executor
         self.command_runner = command_runner
         self.job_manager = job_manager
         self.archive_service = archive_service
         self.command_executor = command_executor
+        self.path_service = path_service
         self.progress_pattern = re.compile(
             r"(?P<original_size>\d+)\s+(?P<compressed_size>\d+)\s+(?P<deduplicated_size>\d+)\s+"
             r"(?P<nfiles>\d+)\s+(?P<path>.*)"
         )
-
-    def _get_job_manager(self) -> JobManagerProtocol:
-        """Get job manager instance - guaranteed to be available via DI"""
-        return self.job_manager
 
     async def initialize_repository(
         self, repository: "Repository"
@@ -159,17 +160,15 @@ class BorgService:
                 additional_args=["--json"],
             )
 
-            job_manager = self._get_job_manager()
-            job_id = await job_manager.start_borg_command(
+            job_id = await self.job_manager.start_borg_command(
                 result.command, env=result.environment
             )
 
-            # Wait for completion
             max_wait = 30
             wait_time = 0.0
 
             while wait_time < max_wait:
-                status = job_manager.get_job_status(job_id)
+                status = self.job_manager.get_job_status(job_id)
 
                 if not status:
                     return False
@@ -179,8 +178,8 @@ class BorgService:
                     or status.status == JobStatusEnum.FAILED
                 ):
                     success = status.return_code == 0
-                    # Clean up job
-                    self._get_job_manager().cleanup_job(job_id)
+
+                    self.job_manager.cleanup_job(job_id)
                     return bool(success)
 
                 await asyncio.sleep(0.5)
@@ -191,3 +190,71 @@ class BorgService:
         except Exception as e:
             logger.error(f"Failed to verify repository access: {e}")
             return False
+
+    async def get_default_directories(self) -> BorgDefaultDirectories:
+        """
+        Determine Borg's default directories based on environment variable resolution.
+
+        Uses command executor to query environment variables from the actual execution
+        environment (e.g., WSL when running on Windows but executing in Linux).
+
+        Follows Borg's environment variable precedence rules:
+        - BORG_BASE_DIR defaults to $HOME or ~$USER or ~
+        - BORG_CACHE_DIR defaults to $BORG_BASE_DIR/.cache/borg (or $XDG_CACHE_HOME/borg if XDG is set)
+        - BORG_CONFIG_DIR defaults to $BORG_BASE_DIR/.config/borg (or $XDG_CONFIG_HOME/borg if XDG is set)
+        - BORG_SECURITY_DIR defaults to $BORG_CONFIG_DIR/security
+        - BORG_KEYS_DIR defaults to $BORG_CONFIG_DIR/keys
+        """
+
+        async def get_env_var(var_name: str) -> str:
+            """Get environment variable from execution environment."""
+            result = await self.command_executor.execute_command(
+                ["echo", f"${var_name}"]
+            )
+
+            return result.stdout.strip() if result.success and result.stdout else ""
+
+        borg_base_dir_explicit = await get_env_var("BORG_BASE_DIR")
+
+        if borg_base_dir_explicit:
+            base_dir = borg_base_dir_explicit
+        else:
+            home = await get_env_var("HOME")
+            if not home:
+                user = await get_env_var("USER")
+                if user:
+                    result = await self.command_executor.execute_command(
+                        ["cd", "~", "&&", "pwd"]
+                    )
+                    home = result.stdout.strip() if result.success else ""
+            base_dir = home
+
+        xdg_cache_home = await get_env_var("XDG_CACHE_HOME")
+        xdg_config_home = await get_env_var("XDG_CONFIG_HOME")
+
+        if not borg_base_dir_explicit and xdg_cache_home:
+            cache_dir = self.path_service.secure_join(xdg_cache_home, "borg")
+        else:
+            cache_dir = self.path_service.secure_join(base_dir, ".cache", "borg")
+
+        if not borg_base_dir_explicit and xdg_config_home:
+            config_dir = self.path_service.secure_join(xdg_config_home, "borg")
+        else:
+            config_dir = self.path_service.secure_join(base_dir, ".config", "borg")
+
+        security_dir = self.path_service.secure_join(config_dir, "security")
+        keys_dir = self.path_service.secure_join(config_dir, "keys")
+
+        temp_result = await self.command_executor.execute_command(
+            ["echo", "${TMPDIR:-/tmp}"]
+        )
+        temp_dir = temp_result.stdout.strip() if temp_result.success else "/tmp"
+
+        return BorgDefaultDirectories(
+            base_dir=base_dir,
+            cache_dir=cache_dir,
+            config_dir=config_dir,
+            security_dir=security_dir,
+            keys_dir=keys_dir,
+            temp_dir=temp_dir,
+        )

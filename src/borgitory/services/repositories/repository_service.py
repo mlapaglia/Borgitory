@@ -1009,30 +1009,16 @@ class RepositoryService:
             List of DirectoryInfo objects matching the criteria
         """
         try:
-            directories = []
+            directories: List[DirectoryInfo] = []
 
-            # Use special handling for Windows/WSL environments
-            if self.path_service.get_platform_name() == "windows":
-                # Special handling for root directory - show /mnt directory where Windows drives are mounted
-                if path == "/" or path == "":
-                    # Instead of showing Unix root, show /mnt where Windows drives are mounted
-                    directories = await self.path_service.list_directory(
-                        "/mnt", include_files=include_files
-                    )
-                else:
-                    directories = await self.path_service.list_directory(
-                        path, include_files=include_files
-                    )
+            if not self.path_service.path_exists(path):
+                directories = []
+            elif not self.path_service.is_directory(path):
+                directories = []
             else:
-                # Fallback to legacy functions for non-WSL
-                if not secure_exists(path):
-                    directories = []
-                elif not secure_isdir(path):
-                    directories = []
-                else:
-                    directories = await get_directory_listing(
-                        path, self.file_service, include_files=include_files
-                    )
+                directories = await self.path_service.list_directory(
+                    path, include_files=include_files
+                )
 
             # Filter directories based on search term
             if search_term:

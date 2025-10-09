@@ -84,7 +84,7 @@
                     {% set input_id = "import-cache-dir" %}
                     {% set input_name = "cache_dir" %}
                     {% set input_value = "" %}
-                    {% set placeholder = "/cache/borg" %}
+                    {% set placeholder = default_directories.cache_dir if default_directories else "Leave empty for default" %}
                     {% set required = false %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">

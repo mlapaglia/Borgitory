@@ -1145,6 +1145,7 @@ def get_borg_service(
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
     archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    path_service: "PathServiceInterface" = Depends(get_path_service),
 ) -> BorgService:
     """
     Provide BorgService with all mandatory dependencies injected.
@@ -1155,7 +1156,7 @@ def get_borg_service(
         job_manager: Injected job manager for job lifecycle
         archive_service: Injected archive service for archive operations
         command_executor: Injected command executor for cross-platform execution
-        file_service: Injected file service for file operations
+        path_service: Injected path service for secure path operations
 
     Returns:
         BorgService: Fully configured service with all dependencies
@@ -1166,6 +1167,7 @@ def get_borg_service(
         job_manager=job_manager,
         archive_service=archive_service,
         command_executor=command_executor,
+        path_service=path_service,
     )
 
 
