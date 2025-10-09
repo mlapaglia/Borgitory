@@ -7,7 +7,7 @@ and ensures it properly navigates to the archives tab with preselected repositor
 
 import pytest
 from httpx import AsyncClient
-from typing import Any, Generator
+from typing import Any, AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,14 +17,14 @@ from borgitory.models.database import User, Repository
 
 
 @pytest.fixture
-def mock_current_user(test_db: AsyncSession) -> Generator[User, None, None]:
+async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]:
     """Create a mock current user for testing."""
     test_user = User()
     test_user.username = "testuser"
     test_user.set_password("testpass")
     test_db.add(test_user)
-    test_db.commit()
-    test_db.refresh(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
 
     def override_get_current_user() -> User:
         return test_user
@@ -52,7 +52,7 @@ class TestRepositoryArchivesNavigation:
         repo2.set_passphrase("pass2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         # Get repository list HTML
         response = await async_client.get("/api/repositories/html")
@@ -82,7 +82,7 @@ class TestRepositoryArchivesNavigation:
         repo.path = "/tmp/navigation-test"
         repo.set_passphrase("navpass")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Simulate clicking the View Archives button by calling the archives tab with preselect_repo
         response = await async_client.get(
@@ -113,7 +113,7 @@ class TestRepositoryArchivesNavigation:
         repo2.set_passphrase("sel2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         # Test archives selector with preselected repository
         response = await async_client.get(
@@ -151,7 +151,7 @@ class TestRepositoryArchivesNavigation:
         repo.path = "/tmp/normal"
         repo.set_passphrase("normal")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Test archives selector without preselection
         response = await async_client.get(
@@ -218,7 +218,7 @@ class TestRepositoryArchivesNavigation:
         repo.path = "/tmp/oob-test"
         repo.set_passphrase("oobpass")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Test archives tab response
         response = await async_client.get(

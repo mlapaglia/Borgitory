@@ -23,15 +23,15 @@ class TestPackageSelectionEndpoints:
     """Test package selection HTMX endpoints"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_test_dependencies(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup dependency overrides for each test."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user
@@ -278,15 +278,15 @@ class TestPackageRemovalEndpoints:
     """Test package removal functionality"""
 
     @pytest.fixture(scope="function")
-    def setup_removal_test(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_removal_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for removal tests."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user
@@ -389,15 +389,15 @@ class TestErrorHandling:
     """Test error handling in package selection endpoints"""
 
     @pytest.fixture(scope="function")
-    def setup_error_test(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_error_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for error handling tests."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user
@@ -473,15 +473,15 @@ class TestPackageSearchEndpoints:
     """Test package search and autocomplete functionality"""
 
     @pytest.fixture(scope="function")
-    def setup_search_test(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_search_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for search tests."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user
@@ -651,15 +651,15 @@ class TestInstalledPackagesEndpoint:
     """Test listing installed packages"""
 
     @pytest.fixture(scope="function")
-    def setup_installed_test(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_installed_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for installed packages tests."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user
@@ -797,15 +797,17 @@ class TestPackageRemovalEndpoint:
     """Test package removal functionality"""
 
     @pytest.fixture(scope="function")
-    def setup_removal_endpoint_test(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_removal_endpoint_test(
+        self, test_db: AsyncSession
+    ) -> Dict[str, Any]:
         """Setup for package removal tests."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user
@@ -961,15 +963,15 @@ class TestPackageInfoEndpoint:
     """Test package info functionality"""
 
     @pytest.fixture(scope="function")
-    def setup_info_test(self, test_db: AsyncSession) -> Dict[str, Any]:
+    async def setup_info_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for package info tests."""
         # Create mock current user
         test_user = User()
         test_user.username = "testuser"
         test_user.set_password("testpass")
         test_db.add(test_user)
-        test_db.commit()
-        test_db.refresh(test_user)
+        await test_db.commit()
+        await test_db.refresh(test_user)
 
         def override_get_current_user() -> User:
             return test_user

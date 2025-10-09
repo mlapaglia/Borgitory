@@ -141,8 +141,8 @@ class TestNotificationConfigsAPIHTMX:
             name="enable-html-test", enabled=False
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.post(f"/api/notifications/{config.id}/enable")
 
@@ -159,8 +159,8 @@ class TestNotificationConfigsAPIHTMX:
             name="disable-html-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.post(f"/api/notifications/{config.id}/disable")
 
@@ -177,8 +177,8 @@ class TestNotificationConfigsAPIHTMX:
             name="test-config-html", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         # Mock the notification service test
         with patch(
@@ -199,8 +199,8 @@ class TestNotificationConfigsAPIHTMX:
             name="edit-form-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.get(f"/api/notifications/{config.id}/edit")
 
@@ -219,8 +219,8 @@ class TestNotificationConfigsAPIHTMX:
             name="update-html-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         form_data = {
             "name": "updated-name",
@@ -246,8 +246,8 @@ class TestNotificationConfigsAPIHTMX:
             name="delete-html-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.delete(f"/api/notifications/{config.id}")
 

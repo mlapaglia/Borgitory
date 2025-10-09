@@ -2,6 +2,10 @@
 Tests for manual schedule run functionality using APScheduler one-time jobs.
 """
 
+from apscheduler.executors.asyncio import AsyncIOExecutor
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.base import MemoryJobStore
+from apscheduler.triggers.date import DateTrigger
 import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
@@ -11,7 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.main import app
 from borgitory.models.database import Schedule, Repository
 from borgitory.services.scheduling.schedule_service import ScheduleService
-from borgitory.services.scheduling.scheduler_service import SchedulerService
+from borgitory.services.scheduling.scheduler_service import (
+    SchedulerService,
+    execute_scheduled_backup,
+)
 from borgitory.dependencies import get_schedule_service
 from borgitory.protocols.job_protocols import JobManagerProtocol
 
@@ -23,11 +30,6 @@ def create_test_scheduler_service(
 ) -> SchedulerService:
     """Create a scheduler service with in-memory job store for testing"""
     scheduler_service = SchedulerService(job_manager, job_service_factory)
-
-    # Override to use in-memory job store to avoid CI database issues
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
-    from apscheduler.jobstores.memory import MemoryJobStore
-    from apscheduler.executors.asyncio import AsyncIOExecutor
 
     jobstores = {"default": MemoryJobStore()}
     executors = {"default": AsyncIOExecutor()}
@@ -73,26 +75,24 @@ class TestManualRunAPScheduler:
         return mock
 
     @pytest.fixture
-    def schedule_service(
-        self, test_db: AsyncSession, mock_scheduler_service: AsyncMock
-    ) -> ScheduleService:
+    def schedule_service(self, mock_scheduler_service: AsyncMock) -> ScheduleService:
         """Create schedule service with mocked scheduler service"""
-        return ScheduleService(test_db, mock_scheduler_service)
+        return ScheduleService(mock_scheduler_service)
 
     @pytest.fixture
-    def test_repository(self, test_db: AsyncSession) -> Repository:
+    async def test_repository(self, test_db: AsyncSession) -> Repository:
         """Create test repository"""
         repo = Repository()
         repo.name = "test_repo"
         repo.path = "/test/path"
         repo.set_passphrase("test_pass")
         test_db.add(repo)
-        test_db.commit()
-        test_db.refresh(repo)
+        await test_db.commit()
+        await test_db.refresh(repo)
         return repo
 
     @pytest.fixture
-    def test_schedule(
+    async def test_schedule(
         self, test_db: AsyncSession, test_repository: Repository
     ) -> Schedule:
         """Create test schedule"""
@@ -103,8 +103,8 @@ class TestManualRunAPScheduler:
         schedule.source_path = "/test/source"
         schedule.enabled = True
         test_db.add(schedule)
-        test_db.commit()
-        test_db.refresh(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
         return schedule
 
     async def test_scheduler_service_run_schedule_once_success(
@@ -181,12 +181,15 @@ class TestManualRunAPScheduler:
         schedule_service: ScheduleService,
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
+        test_db: AsyncSession,
     ) -> None:
         """Test ScheduleService.run_schedule_manually calls scheduler service correctly"""
         expected_job_id = uuid.uuid4()
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
-        result = await schedule_service.run_schedule_manually(test_schedule.id)
+        result = await schedule_service.run_schedule_manually(
+            test_schedule.id, db=test_db
+        )
 
         assert result.success is True
         assert result.job_details is not None
@@ -199,10 +202,13 @@ class TestManualRunAPScheduler:
         )
 
     async def test_schedule_service_run_schedule_manually_not_found(
-        self, schedule_service: ScheduleService, mock_scheduler_service: AsyncMock
+        self,
+        schedule_service: ScheduleService,
+        mock_scheduler_service: AsyncMock,
+        test_db: AsyncSession,
     ) -> None:
         """Test ScheduleService.run_schedule_manually with non-existent schedule"""
-        result = await schedule_service.run_schedule_manually(999)
+        result = await schedule_service.run_schedule_manually(999, db=test_db)
 
         assert result.success is False
         assert result.job_details is not None
@@ -217,13 +223,16 @@ class TestManualRunAPScheduler:
         schedule_service: ScheduleService,
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
+        test_db: AsyncSession,
     ) -> None:
         """Test ScheduleService.run_schedule_manually with scheduler service error"""
         mock_scheduler_service.run_schedule_once.side_effect = RuntimeError(
             "Scheduler not running"
         )
 
-        result = await schedule_service.run_schedule_manually(test_schedule.id)
+        result = await schedule_service.run_schedule_manually(
+            test_schedule.id, db=test_db
+        )
 
         assert result.success is False
         assert result.job_details is not None
@@ -240,7 +249,10 @@ class TestManualRunAPScheduler:
         )
 
     def test_manual_run_api_endpoint_success(
-        self, test_db: AsyncSession, test_schedule: Schedule
+        self,
+        test_schedule: Schedule,
+        mock_scheduler_service: AsyncMock,
+        test_db: AsyncSession,
     ) -> None:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
@@ -248,7 +260,7 @@ class TestManualRunAPScheduler:
         expected_job_id = uuid.uuid4()
         mock_scheduler_service.run_schedule_once.return_value = expected_job_id
 
-        schedule_service = ScheduleService(test_db, mock_scheduler_service)
+        schedule_service = ScheduleService(mock_scheduler_service)
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
 
         try:
@@ -265,7 +277,10 @@ class TestManualRunAPScheduler:
             app.dependency_overrides.clear()
 
     def test_manual_run_api_endpoint_scheduler_error(
-        self, test_db: AsyncSession, test_schedule: Schedule
+        self,
+        test_schedule: Schedule,
+        mock_scheduler_service: AsyncMock,
+        test_db: AsyncSession,
     ) -> None:
         """Test the API endpoint with scheduler service error"""
         # Setup dependency override
@@ -274,7 +289,7 @@ class TestManualRunAPScheduler:
             "Scheduler not running"
         )
 
-        schedule_service = ScheduleService(test_db, mock_scheduler_service)
+        schedule_service = ScheduleService(mock_scheduler_service)
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
 
         try:
@@ -307,8 +322,8 @@ class TestManualRunAPScheduler:
             job = scheduler_service.scheduler.get_job(job_id)
             assert job is not None
 
-            # Verify job configuration
-            assert job.args == (schedule_id,)
+            assert len(job.args) == 2
+            assert job.args[0] == schedule_id
             assert job.name == f"Manual run: {schedule_name}"
             assert job.max_instances == 1
             assert job.misfire_grace_time == 60
@@ -367,7 +382,7 @@ class TestManualRunAPScheduler:
         # Create a mock job manager that tracks calls
         mock_job_manager = Mock(spec=JobManagerProtocol)
         test_job_id = uuid.uuid4()
-        mock_job_manager.create_composite_job = AsyncMock(return_value=test_job_id)
+        mock_job_manager.create_composite_job.return_value = test_job_id
 
         # Create a mock job service factory
         mock_job_service = Mock()
@@ -396,18 +411,11 @@ class TestManualRunAPScheduler:
             job = scheduler_service.scheduler.get_job(job_id)
             assert job is not None
             assert job.name == f"Manual run: {schedule_name}"
-            assert job.args == (schedule_id,)
-
-            # Verify it's configured as a one-time job
-            from apscheduler.triggers.date import DateTrigger
+            # args should be (schedule_id, job_service) - two arguments
+            assert len(job.args) == 2
+            assert job.args[0] == schedule_id
 
             assert isinstance(job.trigger, DateTrigger)
-
-            # The job function should be execute_scheduled_backup
-            from borgitory.services.scheduling.scheduler_service import (
-                execute_scheduled_backup,
-            )
-
             assert job.func == execute_scheduled_backup
 
         finally:

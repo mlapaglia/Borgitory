@@ -33,7 +33,7 @@ class TestRepositoriesAPI:
         repo2.set_passphrase("passphrase-2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/api/repositories/")
 
@@ -54,7 +54,7 @@ class TestRepositoriesAPI:
             repo.path = f"/tmp/repo-{i}"
             repo.set_passphrase(f"passphrase-{i}")
             test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Test with limit
         response = await async_client.get("/api/repositories/?skip=1&limit=2")
