@@ -221,7 +221,9 @@ class JobManagerFactory:
         mock_event_broadcaster = mock_event_broadcaster or Mock(
             spec=JobEventBroadcasterProtocol
         )
-        session_maker_mock = mock_async_session_maker or Mock(spec=async_sessionmaker[AsyncSession])
+        session_maker_mock = mock_async_session_maker or Mock(
+            spec=async_sessionmaker[AsyncSession]
+        )
         rclone_mock = mock_rclone_service if mock_rclone_service is not None else Mock()
 
         mock_encryption_service = Mock()
