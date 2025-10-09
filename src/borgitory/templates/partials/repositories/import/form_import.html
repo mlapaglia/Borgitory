@@ -52,11 +52,15 @@
                         <option value="keyfile">Keyfile (keyfile)</option>
                         <option value="keyfile-blake2">Keyfile Blake2 (keyfile-blake2)</option>
                         <option value="authenticated">Authenticated (authenticated)</option>
-                        <option value="authenticated-blake2">Authenticated Blake2 (authenticated-blake2)</option>
+                        <option value="authenticated-blake2">
+                            Authenticated Blake2 (authenticated-blake2)
+                        </option>
                         <option value="none">No Encryption (none)</option>
                     </select>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Choose the <a href="https://borgbackup.readthedocs.io/en/stable/usage/init.html#more-encryption-modes" target="_blank" class="text-blue-600 hover:text-blue-700">encryption method</a> for your existing repository
+                        Choose the <a href="https://borgbackup.readthedocs.io/en/stable/usage/init.html#more-encryption-modes"
+    target="_blank"
+    class="text-blue-600 hover:text-blue-700">encryption method</a> for your existing repository
                     </p>
                 </div>
                 <!-- Container for dynamic encryption fields -->
@@ -68,10 +72,10 @@
                         Passphrase
                     </label>
                     <input type="password"
-                            name="passphrase"
-                            class="input-modern mt-1"
-                            placeholder="Enter repository passphrase"
-                            required>
+                           name="passphrase"
+                           class="input-modern mt-1"
+                           placeholder="Enter repository passphrase"
+                           required>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">

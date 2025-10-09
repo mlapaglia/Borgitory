@@ -17,6 +17,7 @@ from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_queue_manager_protocol import JobQueueManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
+from borgitory.services.rclone_service import RcloneService
 
 
 class JobManagerFactory:
@@ -204,29 +205,25 @@ class JobManagerFactory:
         cls,
         mock_event_broadcaster: Optional[JobEventBroadcasterProtocol] = None,
         mock_subprocess: Optional[Callable[..., Any]] = None,
-        mock_async_session_maker: Optional[Callable[[], Any]] = None,
-        mock_rclone_service: Optional[Any] = None,
+        mock_async_session_maker: Optional[async_sessionmaker[AsyncSession]] = None,
+        mock_rclone_service: Optional[RcloneService] = None,
         mock_http_client: Optional[Callable[[], Any]] = None,
         config: Optional[JobManagerConfig] = None,
     ) -> JobManagerDependencies:
         """Create dependencies with mocked services for testing"""
 
-        # Create mock services for testing
         from unittest.mock import Mock
 
         mock_job_executor = Mock(spec=ProcessExecutorProtocol)
-        mock_async_session_maker = mock_async_session_maker or Mock(
-            spec=async_sessionmaker[AsyncSession]
-        )
         mock_output_manager = Mock(spec=JobOutputManagerProtocol)
         mock_queue_manager = Mock(spec=JobQueueManagerProtocol)
         mock_database_manager = Mock(spec=JobDatabaseManagerProtocol)
         mock_event_broadcaster = mock_event_broadcaster or Mock(
             spec=JobEventBroadcasterProtocol
         )
+        session_maker_mock = mock_async_session_maker or Mock(spec=async_sessionmaker[AsyncSession])
+        rclone_mock = mock_rclone_service if mock_rclone_service is not None else Mock()
 
-        # Create mock services for all required dependencies
-        mock_rclone_service = mock_rclone_service or Mock()
         mock_encryption_service = Mock()
         mock_storage_factory = Mock()
         mock_provider_registry = Mock()
@@ -240,8 +237,8 @@ class JobManagerFactory:
             output_manager=mock_output_manager,
             queue_manager=mock_queue_manager,
             database_manager=mock_database_manager,
-            async_session_maker=mock_async_session_maker,
-            rclone_service=mock_rclone_service,
+            async_session_maker=session_maker_mock,
+            rclone_service=rclone_mock,
             http_client_factory=mock_http_client_factory,
             encryption_service=mock_encryption_service,
             storage_factory=mock_storage_factory,
@@ -275,8 +272,8 @@ def get_default_job_manager_dependencies() -> JobManagerDependencies:
 def get_test_job_manager_dependencies(
     mock_event_broadcaster: JobEventBroadcasterProtocol,
     mock_subprocess: Optional[Callable[..., Any]] = None,
-    mock_async_session_maker: Optional[Callable[[], Any]] = None,
-    mock_rclone_service: Optional[Any] = None,
+    mock_async_session_maker: Optional[async_sessionmaker[AsyncSession]] = None,
+    mock_rclone_service: Optional[RcloneService] = None,
 ) -> JobManagerDependencies:
     """Get job manager dependencies for testing"""
     return JobManagerFactory.create_for_testing(
