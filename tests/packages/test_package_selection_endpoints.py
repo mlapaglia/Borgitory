@@ -6,7 +6,7 @@ Tests the frontend behavior and template rendering for package selection.
 import pytest
 from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock, ANY
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,8 +15,6 @@ from borgitory.models.database import User
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.dependencies import get_templates, get_package_manager_service
 from borgitory.api.auth import get_current_user
-
-client = TestClient(app)
 
 
 class TestPackageSelectionEndpoints:
@@ -89,12 +87,12 @@ class TestPackageSelectionEndpoints:
             "templates": mock_templates,
         }
 
-    def test_select_package_empty_form(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_select_package_empty_form(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test selecting a package with no existing selections"""
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/select", data={"package_name": "curl"}
             )
 
@@ -109,12 +107,12 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_select_package_with_existing_selections(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_select_package_with_existing_selections(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test selecting a package when others are already selected"""
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/select",
                 data={
                     "package_name": "jq",
@@ -137,10 +135,12 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_clear_selections(self, setup_test_dependencies: Dict[str, Any]) -> None:
+    async def test_clear_selections(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
         """Test clearing all package selections"""
         try:
-            response = client.get("/api/packages/clear-selections")
+            response = await async_client.get("/api/packages/clear-selections")
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -153,14 +153,14 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_install_with_selected_packages(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_install_with_selected_packages(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test installing packages using the new form field format"""
         mock_package_service = setup_test_dependencies["package_service"]
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/install",
                 data={
                     "selected_package_0": "curl",
@@ -185,14 +185,14 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_install_with_no_selections(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_install_with_no_selections(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test installing with no packages selected"""
         mock_package_service = setup_test_dependencies["package_service"]
 
         try:
-            response = client.post("/api/packages/install", data={})
+            response = await async_client.post("/api/packages/install", data={})
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -208,8 +208,8 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_install_success_triggers_clear_selections(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_install_success_triggers_clear_selections(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test that successful install triggers clear-selections"""
         mock_package_service = setup_test_dependencies["package_service"]
@@ -219,7 +219,7 @@ class TestPackageSelectionEndpoints:
         )
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/install", data={"selected_package_0": "curl"}
             )
 
@@ -232,8 +232,8 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_install_failure_no_trigger(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_install_failure_no_trigger(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test that failed install doesn't trigger clear-selections"""
         mock_package_service = setup_test_dependencies["package_service"]
@@ -243,7 +243,7 @@ class TestPackageSelectionEndpoints:
         )
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/install", data={"selected_package_0": "nonexistent"}
             )
 
@@ -260,12 +260,12 @@ class TestPackageSelectionEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_missing_package_name_validation(
-        self, setup_test_dependencies: Dict[str, Any]
+    async def test_missing_package_name_validation(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test select endpoint without package_name"""
         try:
-            response = client.post("/api/packages/select", data={})
+            response = await async_client.post("/api/packages/select", data={})
 
             # Should return validation error
             assert response.status_code == 422
@@ -334,10 +334,12 @@ class TestPackageRemovalEndpoints:
             "templates": mock_templates,
         }
 
-    def test_remove_package_selection(self, setup_removal_test: Dict[str, Any]) -> None:
+    async def test_remove_package_selection(
+        self, setup_removal_test: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
         """Test removing a package from selections"""
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/remove-selection",
                 data={
                     "package_name": "curl",
@@ -359,12 +361,12 @@ class TestPackageRemovalEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_remove_nonexistent_package(
-        self, setup_removal_test: Dict[str, Any]
+    async def test_remove_nonexistent_package(
+        self, setup_removal_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing a package that's not in selections"""
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/remove-selection",
                 data={
                     "package_name": "nonexistent",
@@ -444,8 +446,8 @@ class TestErrorHandling:
             "templates": mock_templates,
         }
 
-    def test_package_service_error_handling(
-        self, setup_error_test: Dict[str, Any]
+    async def test_package_service_error_handling(
+        self, setup_error_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test handling of package service errors"""
         mock_package_service = setup_error_test["package_service"]
@@ -454,7 +456,7 @@ class TestErrorHandling:
         )
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/install", data={"selected_package_0": "curl"}
             )
 
@@ -555,14 +557,16 @@ class TestPackageSearchEndpoints:
             "templates": mock_templates,
         }
 
-    def test_search_packages_autocomplete_valid_query(
-        self, setup_search_test: Dict[str, Any]
+    async def test_search_packages_autocomplete_valid_query(
+        self, setup_search_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test package search with valid query"""
         mock_package_service = setup_search_test["package_service"]
 
         try:
-            response = client.get("/api/packages/search/autocomplete?search=curl")
+            response = await async_client.get(
+                "/api/packages/search/autocomplete?search=curl"
+            )
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -581,14 +585,16 @@ class TestPackageSearchEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_search_packages_autocomplete_short_query(
-        self, setup_search_test: Dict[str, Any]
+    async def test_search_packages_autocomplete_short_query(
+        self, setup_search_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test package search with query too short"""
         mock_package_service = setup_search_test["package_service"]
 
         try:
-            response = client.get("/api/packages/search/autocomplete?search=c")
+            response = await async_client.get(
+                "/api/packages/search/autocomplete?search=c"
+            )
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -604,14 +610,14 @@ class TestPackageSearchEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_search_packages_autocomplete_empty_query(
-        self, setup_search_test: Dict[str, Any]
+    async def test_search_packages_autocomplete_empty_query(
+        self, setup_search_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test package search with empty query"""
         mock_package_service = setup_search_test["package_service"]
 
         try:
-            response = client.get("/api/packages/search/autocomplete")
+            response = await async_client.get("/api/packages/search/autocomplete")
 
             assert response.status_code == 200
 
@@ -625,8 +631,8 @@ class TestPackageSearchEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_search_packages_autocomplete_service_error(
-        self, setup_search_test: Dict[str, Any]
+    async def test_search_packages_autocomplete_service_error(
+        self, setup_search_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test package search with service error"""
         mock_package_service = setup_search_test["package_service"]
@@ -635,7 +641,9 @@ class TestPackageSearchEndpoints:
         )
 
         try:
-            response = client.get("/api/packages/search/autocomplete?search=curl")
+            response = await async_client.get(
+                "/api/packages/search/autocomplete?search=curl"
+            )
 
             assert response.status_code == 200
 
@@ -744,14 +752,14 @@ class TestInstalledPackagesEndpoint:
             "templates": mock_templates,
         }
 
-    def test_list_installed_packages_success(
-        self, setup_installed_test: Dict[str, Any]
+    async def test_list_installed_packages_success(
+        self, setup_installed_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test listing installed packages successfully"""
         mock_package_service = setup_installed_test["package_service"]
 
         try:
-            response = client.get("/api/packages/installed")
+            response = await async_client.get("/api/packages/installed")
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -773,8 +781,8 @@ class TestInstalledPackagesEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_list_installed_packages_service_error(
-        self, setup_installed_test: Dict[str, Any]
+    async def test_list_installed_packages_service_error(
+        self, setup_installed_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test listing installed packages with service error"""
         mock_package_service = setup_installed_test["package_service"]
@@ -783,7 +791,7 @@ class TestInstalledPackagesEndpoint:
         )
 
         try:
-            response = client.get("/api/packages/installed")
+            response = await async_client.get("/api/packages/installed")
 
             assert response.status_code == 200
 
@@ -863,14 +871,14 @@ class TestPackageRemovalEndpoint:
             "templates": mock_templates,
         }
 
-    def test_remove_packages_success(
-        self, setup_removal_endpoint_test: Dict[str, Any]
+    async def test_remove_packages_success(
+        self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing packages successfully"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/remove",
                 data={
                     "remove_package_0": "curl",
@@ -894,14 +902,14 @@ class TestPackageRemovalEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_remove_packages_no_selection(
-        self, setup_removal_endpoint_test: Dict[str, Any]
+    async def test_remove_packages_no_selection(
+        self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing packages with no selection"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
 
         try:
-            response = client.post("/api/packages/remove", data={})
+            response = await async_client.post("/api/packages/remove", data={})
 
             assert response.status_code == 200
 
@@ -916,15 +924,15 @@ class TestPackageRemovalEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_remove_packages_service_failure(
-        self, setup_removal_endpoint_test: Dict[str, Any]
+    async def test_remove_packages_service_failure(
+        self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing packages with service failure"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
         mock_package_service.remove_packages.return_value = (False, "Removal failed")
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/remove",
                 data={"remove_package_0": "nonexistent"},
             )
@@ -938,8 +946,8 @@ class TestPackageRemovalEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_remove_packages_service_exception(
-        self, setup_removal_endpoint_test: Dict[str, Any]
+    async def test_remove_packages_service_exception(
+        self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test removing packages with service exception"""
         mock_package_service = setup_removal_endpoint_test["package_service"]
@@ -948,7 +956,7 @@ class TestPackageRemovalEndpoint:
         )
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 "/api/packages/remove",
                 data={"remove_package_0": "curl"},
             )
@@ -1037,12 +1045,14 @@ class TestPackageInfoEndpoint:
             "templates": mock_templates,
         }
 
-    def test_get_package_info_success(self, setup_info_test: Dict[str, Any]) -> None:
+    async def test_get_package_info_success(
+        self, setup_info_test: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
         """Test getting package info successfully"""
         mock_package_service = setup_info_test["package_service"]
 
         try:
-            response = client.get("/api/packages/curl/info")
+            response = await async_client.get("/api/packages/curl/info")
 
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
@@ -1059,13 +1069,15 @@ class TestPackageInfoEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_get_package_info_not_found(self, setup_info_test: Dict[str, Any]) -> None:
+    async def test_get_package_info_not_found(
+        self, setup_info_test: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
         """Test getting package info for non-existent package"""
         mock_package_service = setup_info_test["package_service"]
         mock_package_service.get_package_info = AsyncMock(return_value=None)
 
         try:
-            response = client.get("/api/packages/nonexistent/info")
+            response = await async_client.get("/api/packages/nonexistent/info")
 
             # Should return 500 due to HTTPException being caught by general exception handler
             assert response.status_code == 500
@@ -1077,8 +1089,8 @@ class TestPackageInfoEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_get_package_info_value_error(
-        self, setup_info_test: Dict[str, Any]
+    async def test_get_package_info_value_error(
+        self, setup_info_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test getting package info with invalid package name"""
         mock_package_service = setup_info_test["package_service"]
@@ -1087,7 +1099,7 @@ class TestPackageInfoEndpoint:
         )
 
         try:
-            response = client.get("/api/packages/invalid!/info")
+            response = await async_client.get("/api/packages/invalid!/info")
 
             assert response.status_code == 400
 
@@ -1098,8 +1110,8 @@ class TestPackageInfoEndpoint:
         finally:
             app.dependency_overrides.clear()
 
-    def test_get_package_info_service_error(
-        self, setup_info_test: Dict[str, Any]
+    async def test_get_package_info_service_error(
+        self, setup_info_test: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test getting package info with service error"""
         mock_package_service = setup_info_test["package_service"]
@@ -1108,7 +1120,7 @@ class TestPackageInfoEndpoint:
         )
 
         try:
-            response = client.get("/api/packages/curl/info")
+            response = await async_client.get("/api/packages/curl/info")
 
             assert response.status_code == 500
 

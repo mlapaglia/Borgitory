@@ -4,7 +4,7 @@ Tests that endpoints return proper HTML responses for HTMX integration.
 """
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from unittest.mock import Mock, AsyncMock
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,11 +16,6 @@ from borgitory.dependencies import get_repository_service
 
 class TestRepositoryManagementAPI:
     """Test repository management API endpoints for HTMX responses."""
-
-    @pytest.fixture
-    def client(self) -> TestClient:
-        """Create test client."""
-        return TestClient(app)
 
     @pytest.fixture
     def mock_repository_service(self) -> Mock:
@@ -44,11 +39,13 @@ class TestRepositoryManagementAPI:
         await test_db.refresh(repo)
         return repo
 
-    def test_details_modal_endpoint(
-        self, client: TestClient, test_repository: Repository
+    async def test_details_modal_endpoint(
+        self, async_client: AsyncClient, test_repository: Repository
     ) -> None:
         """Test repository details modal endpoint returns proper HTML."""
-        response = client.get(f"/api/repositories/{test_repository.id}/details-modal")
+        response = await async_client.get(
+            f"/api/repositories/{test_repository.id}/details-modal"
+        )
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
@@ -63,17 +60,17 @@ class TestRepositoryManagementAPI:
         assert "hx-get" in html_content
         assert 'hx-trigger="load"' in html_content
 
-    def test_close_modal_endpoint(self, client: TestClient) -> None:
+    async def test_close_modal_endpoint(self, async_client: AsyncClient) -> None:
         """Test close modal endpoint returns empty response."""
-        response = client.get("/api/repositories/modal/close")
+        response = await async_client.get("/api/repositories/modal/close")
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
         assert response.text.strip() == ""
 
-    def test_lock_status_endpoint_unlocked(
+    async def test_lock_status_endpoint_unlocked(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -92,7 +89,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/lock-status")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/lock-status"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/html")
@@ -106,9 +105,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_lock_status_endpoint_locked(
+    async def test_lock_status_endpoint_locked(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -127,7 +126,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/lock-status")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/lock-status"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/html")
@@ -141,9 +142,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_lock_status_endpoint_error(
+    async def test_lock_status_endpoint_error(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -162,7 +163,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/lock-status")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/lock-status"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/html")
@@ -176,9 +179,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_break_lock_button_endpoint_locked(
+    async def test_break_lock_button_endpoint_locked(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -197,7 +200,7 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(
+            response = await async_client.get(
                 f"/api/repositories/{test_repository.id}/break-lock-button"
             )
 
@@ -214,9 +217,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_break_lock_button_endpoint_unlocked(
+    async def test_break_lock_button_endpoint_unlocked(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -235,7 +238,7 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(
+            response = await async_client.get(
                 f"/api/repositories/{test_repository.id}/break-lock-button"
             )
 
@@ -252,9 +255,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_break_lock_button_modal_endpoint(
+    async def test_break_lock_button_modal_endpoint(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -273,7 +276,7 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(
+            response = await async_client.get(
                 f"/api/repositories/{test_repository.id}/break-lock-button-modal"
             )
 
@@ -290,9 +293,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_break_lock_endpoint_success(
+    async def test_break_lock_endpoint_success(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -307,7 +310,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.post(f"/api/repositories/{test_repository.id}/break-lock")
+            response = await async_client.post(
+                f"/api/repositories/{test_repository.id}/break-lock"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/html")
@@ -322,9 +327,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_break_lock_modal_endpoint_success(
+    async def test_break_lock_modal_endpoint_success(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -346,7 +351,7 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.post(
+            response = await async_client.post(
                 f"/api/repositories/{test_repository.id}/break-lock-modal"
             )
 
@@ -361,9 +366,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_borg_info_endpoint_success(
+    async def test_borg_info_endpoint_success(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -391,7 +396,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/borg-info")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/borg-info"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/html")
@@ -418,9 +425,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_borg_info_endpoint_error(
+    async def test_borg_info_endpoint_error(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -439,7 +446,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/borg-info")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/borg-info"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("text/html")
@@ -453,9 +462,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_export_key_endpoint_success(
+    async def test_export_key_endpoint_success(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -474,7 +483,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/export-key")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/export-key"
+            )
 
             assert response.status_code == 200
             assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -485,9 +496,9 @@ class TestRepositoryManagementAPI:
         finally:
             app.dependency_overrides.clear()
 
-    def test_export_key_endpoint_failure(
+    async def test_export_key_endpoint_failure(
         self,
-        client: TestClient,
+        async_client: AsyncClient,
         test_repository: Repository,
         mock_repository_service: Mock,
     ) -> None:
@@ -505,7 +516,9 @@ class TestRepositoryManagementAPI:
         )
 
         try:
-            response = client.get(f"/api/repositories/{test_repository.id}/export-key")
+            response = await async_client.get(
+                f"/api/repositories/{test_repository.id}/export-key"
+            )
 
             assert response.status_code == 500
             assert (

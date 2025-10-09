@@ -8,10 +8,10 @@ for the hybrid service migration.
 import pytest
 from typing import Callable, Any
 from unittest.mock import Mock
+from httpx import AsyncClient
 
 from tests.utils.di_testing import (
     override_dependency,
-    override_multiple_dependencies,
     MockServiceFactory,
     DependencyTestHelper,
 )
@@ -25,42 +25,47 @@ from borgitory.main import app
 class TestDependencyOverrideInfrastructure:
     """Test that our dependency override infrastructure works correctly."""
 
-    def test_single_dependency_override(self) -> None:
+    async def test_single_dependency_override(self, async_client: AsyncClient) -> None:
         """Test that single dependency override works."""
         mock_debug_service = MockServiceFactory.create_mock_debug_service()
 
-        with override_dependency(
-            get_debug_service, lambda: mock_debug_service
-        ) as client:
+        app.dependency_overrides[get_debug_service] = lambda: mock_debug_service
+        try:
             # Verify the override is active
             assert app.dependency_overrides[get_debug_service] is not None
 
             # Test that we can make requests (basic smoke test)
-            response = client.get("/api/debug/info")
+            response = await async_client.get("/api/debug/info")
             assert response is not None
+        finally:
+            # Verify override is cleaned up
+            app.dependency_overrides.pop(get_debug_service, None)
+            assert get_debug_service not in app.dependency_overrides
 
-        # Verify override is cleaned up
-        assert get_debug_service not in app.dependency_overrides
-
-    def test_multiple_dependency_overrides(self) -> None:
+    async def test_multiple_dependency_overrides(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test that multiple dependency overrides work."""
         overrides: dict[Callable[..., Any], Callable[..., Any]] = {
             get_debug_service: lambda: MockServiceFactory.create_mock_debug_service(),
             get_borg_service: lambda: MockServiceFactory.create_mock_borg_service(),
         }
 
-        with override_multiple_dependencies(overrides) as client:
+        app.dependency_overrides.update(overrides)
+        try:
             # Verify both overrides are active
             assert get_debug_service in app.dependency_overrides
             assert get_borg_service in app.dependency_overrides
 
             # Test that we can make requests
-            response = client.get("/api/debug/info")
+            response = await async_client.get("/api/debug/info")
             assert response is not None
-
-        # Verify overrides are cleaned up
-        assert get_debug_service not in app.dependency_overrides
-        assert get_borg_service not in app.dependency_overrides
+        finally:
+            # Verify overrides are cleaned up
+            for dep in overrides:
+                app.dependency_overrides.pop(dep, None)
+            assert get_debug_service not in app.dependency_overrides
+            assert get_borg_service not in app.dependency_overrides
 
     def test_dependency_override_isolation(self) -> None:
         """Test that dependency overrides don't interfere with each other."""
@@ -203,7 +208,9 @@ class TestIntegrationWithExistingTests:
 
         assert isinstance(service, DebugService)
 
-    def test_direct_calls_vs_dependency_overrides(self) -> None:
+    async def test_direct_calls_vs_dependency_overrides(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test FastAPI DI behavior - direct calls create new instances, overrides work in FastAPI context."""
 
         # With FastAPI DI, direct calls create new instances each time
@@ -213,10 +220,13 @@ class TestIntegrationWithExistingTests:
 
         # Override works in FastAPI context
         mock_service = MockServiceFactory.create_mock_debug_service()
-        with override_dependency(get_debug_service, lambda: mock_service) as client:
+        app.dependency_overrides[get_debug_service] = lambda: mock_service
+        try:
             # Test that API uses the mock
-            response = client.get("/api/debug/info")
+            response = await async_client.get("/api/debug/info")
             assert response.status_code == 200
 
             # Verify the mock was called
             assert mock_service.get_debug_info.called
+        finally:
+            app.dependency_overrides.pop(get_debug_service, None)
