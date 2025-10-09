@@ -220,7 +220,7 @@ def _render_page_with_tab(
 async def root(
     request: Request, db: AsyncSession = Depends(get_db)
 ) -> RedirectResponse:
-    current_user = auth.get_current_user_optional(request, db)
+    current_user = await auth.get_current_user_optional(request, db)
 
     if not current_user:
         return RedirectResponse(url="/login?next=/repositories", status_code=302)
@@ -233,7 +233,7 @@ async def root(
 async def login_page(
     request: Request, db: AsyncSession = Depends(get_db)
 ) -> RedirectResponse | _TemplateResponse:
-    current_user = auth.get_current_user_optional(request, db)
+    current_user = await auth.get_current_user_optional(request, db)
     next_url = request.query_params.get("next", "/repositories")
     # Strip backslashes, and validate redirect target is internal
     cleaned_next_url = next_url.replace("\\", "")

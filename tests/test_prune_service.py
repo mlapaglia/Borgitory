@@ -4,6 +4,7 @@ Tests for PruneService - Business logic tests
 
 import pytest
 from unittest.mock import patch
+from sqlalchemy import select
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,11 +16,11 @@ from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate, Prune
 @pytest.fixture
 def service(test_db: AsyncSession) -> PruneService:
     """PruneService instance with real database session."""
-    return PruneService(test_db)
+    return PruneService()
 
 
 @pytest.fixture
-def sample_repository(test_db: AsyncSession) -> Repository:
+async def sample_repository(test_db: AsyncSession) -> Repository:
     """Create a sample repository for testing."""
     repository = Repository()
     repository.name = "test-repo"
@@ -27,20 +28,24 @@ def sample_repository(test_db: AsyncSession) -> Repository:
     repository.encrypted_passphrase = "test-encrypted-passphrase"
 
     test_db.add(repository)
-    test_db.commit()
-    test_db.refresh(repository)
+    await test_db.commit()
+    await test_db.refresh(repository)
     return repository
 
 
 class TestPruneService:
     """Test class for PruneService business logic."""
 
-    def test_get_prune_configs_empty(self, service: PruneService) -> None:
+    @pytest.mark.asyncio
+    async def test_get_prune_configs_empty(
+        self, service: PruneService, test_db: AsyncSession
+    ) -> None:
         """Test getting prune configs when none exist."""
-        result = service.get_prune_configs()
+        result = await service.get_prune_configs(db=test_db)
         assert result == []
 
-    def test_get_prune_configs_with_data(
+    @pytest.mark.asyncio
+    async def test_get_prune_configs_with_data(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting prune configs with data."""
@@ -69,15 +74,16 @@ class TestPruneService:
         config2.keep_yearly = 2
         config2.enabled = False
         test_db.add_all([config1, config2])
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_prune_configs()
+        result = await service.get_prune_configs(db=test_db)
         assert len(result) == 2
         names = [c.name for c in result]
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_prune_configs_with_pagination(
+    @pytest.mark.asyncio
+    async def test_get_prune_configs_with_pagination(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting prune configs with pagination."""
@@ -95,12 +101,13 @@ class TestPruneService:
             config.keep_yearly = 0
             config.enabled = True
             test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_prune_configs(skip=2, limit=2)
+        result = await service.get_prune_configs(db=test_db, skip=2, limit=2)
         assert len(result) == 2
 
-    def test_get_prune_config_by_id_success(
+    @pytest.mark.asyncio
+    async def test_get_prune_config_by_id_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting prune config by ID successfully."""
@@ -117,22 +124,26 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
-        result = service.get_prune_config_by_id(config.id)
+        result = await service.get_prune_config_by_id(db=test_db, config_id=config.id)
         assert result is not None
         assert result.name == "test-config"
         assert result.id == config.id
 
-    def test_get_prune_config_by_id_not_found(self, service: PruneService) -> None:
+    @pytest.mark.asyncio
+    async def test_get_prune_config_by_id_not_found(
+        self, service: PruneService, test_db: AsyncSession
+    ) -> None:
         """Test getting non-existent prune config raises exception."""
         with pytest.raises(
             Exception, match="Prune configuration with id 999 not found"
         ):
-            service.get_prune_config_by_id(999)
+            await service.get_prune_config_by_id(db=test_db, config_id=999)
 
-    def test_create_prune_config_success(
+    @pytest.mark.asyncio
+    async def test_create_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successful prune config creation."""
@@ -149,7 +160,7 @@ class TestPruneService:
             keep_yearly=0,
         )
 
-        result = service.create_prune_config(config_data)
+        result = await service.create_prune_config(db=test_db, prune_config=config_data)
         success, config, error = result.success, result.config, result.error_message
 
         assert success is True
@@ -161,13 +172,15 @@ class TestPruneService:
         assert config.enabled is True
 
         # Verify saved to database
-        saved_config = (
-            test_db.query(PruneConfig).filter(PruneConfig.name == "new-config").first()
+        result = await test_db.execute(
+            select(PruneConfig).where(PruneConfig.name == "new-config")
         )
+        saved_config = result.scalar_one_or_none()
         assert saved_config is not None
         assert saved_config.strategy == PruneStrategy.SIMPLE
 
-    def test_create_prune_config_duplicate_name(
+    @pytest.mark.asyncio
+    async def test_create_prune_config_duplicate_name(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test prune config creation with duplicate name."""
@@ -183,7 +196,7 @@ class TestPruneService:
         existing_config.keep_monthly = 0
         existing_config.keep_yearly = 0
         test_db.add(existing_config)
-        test_db.commit()
+        await test_db.commit()
 
         config_data = PruneConfigCreate(
             name="duplicate-name",
@@ -198,7 +211,7 @@ class TestPruneService:
             keep_yearly=0,
         )
 
-        result = service.create_prune_config(config_data)
+        result = await service.create_prune_config(db=test_db, prune_config=config_data)
         success, config, error = result.success, result.config, result.error_message
 
         assert success is False
@@ -206,7 +219,8 @@ class TestPruneService:
         assert error is not None
         assert "A prune policy with this name already exists" in error
 
-    def test_create_prune_config_database_error(
+    @pytest.mark.asyncio
+    async def test_create_prune_config_database_error(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test prune config creation with database error."""
@@ -224,7 +238,9 @@ class TestPruneService:
         )
 
         with patch.object(test_db, "commit", side_effect=Exception("Database error")):
-            result = service.create_prune_config(config_data)
+            result = await service.create_prune_config(
+                db=test_db, prune_config=config_data
+            )
             success, config, error = result.success, result.config, result.error_message
 
             assert success is False
@@ -232,7 +248,8 @@ class TestPruneService:
             assert error is not None
             assert "Failed to create prune configuration" in error
 
-    def test_update_prune_config_success(
+    @pytest.mark.asyncio
+    async def test_update_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successful prune config update."""
@@ -249,12 +266,14 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         config_update = PruneConfigUpdate(name="updated-config", keep_within_days=60)
 
-        result = service.update_prune_config(config.id, config_update)
+        result = await service.update_prune_config(
+            db=test_db, config_id=config.id, prune_config_update=config_update
+        )
 
         success, updated_config, error = (
             result.success,
@@ -268,11 +287,16 @@ class TestPruneService:
         assert updated_config.name == "updated-config"
         assert updated_config.keep_within_days == 60
 
-    def test_update_prune_config_not_found(self, service: PruneService) -> None:
+    @pytest.mark.asyncio
+    async def test_update_prune_config_not_found(
+        self, service: PruneService, test_db: AsyncSession
+    ) -> None:
         """Test updating non-existent prune config."""
         config_update = PruneConfigUpdate(name="new-name")
 
-        result = service.update_prune_config(999, config_update)
+        result = await service.update_prune_config(
+            db=test_db, config_id=999, prune_config_update=config_update
+        )
         success, config, error = result.success, result.config, result.error_message
 
         assert success is False
@@ -280,7 +304,8 @@ class TestPruneService:
         assert error is not None
         assert "Prune configuration not found" in error
 
-    def test_update_prune_config_duplicate_name(
+    @pytest.mark.asyncio
+    async def test_update_prune_config_duplicate_name(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test updating prune config with duplicate name."""
@@ -309,11 +334,13 @@ class TestPruneService:
         config2.keep_yearly = 0
         config2.enabled = True
         test_db.add_all([config1, config2])
-        test_db.commit()
+        await test_db.commit()
 
         config_update = PruneConfigUpdate(name="config-2")
 
-        result = service.update_prune_config(config1.id, config_update)
+        result = await service.update_prune_config(
+            db=test_db, config_id=config1.id, prune_config_update=config_update
+        )
         success, config, error = result.success, result.config, result.error_message
 
         assert success is False
@@ -321,7 +348,8 @@ class TestPruneService:
         assert error is not None
         assert "A prune policy with this name already exists" in error
 
-    def test_enable_prune_config_success(
+    @pytest.mark.asyncio
+    async def test_enable_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successfully enabling prune config."""
@@ -338,10 +366,12 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = False
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
-        result = service.enable_prune_config(config.id)
+        result = await service.enable_prune_config(
+            db=test_db, prune_config_id=config.id
+        )
         success, updated_config, error = (
             result.success,
             result.config,
@@ -353,16 +383,20 @@ class TestPruneService:
         assert updated_config is not None
         assert updated_config.enabled is True
 
-    def test_enable_prune_config_not_found(self, service: PruneService) -> None:
+    @pytest.mark.asyncio
+    async def test_enable_prune_config_not_found(
+        self, service: PruneService, test_db: AsyncSession
+    ) -> None:
         """Test enabling non-existent prune config."""
-        result = service.enable_prune_config(999)
+        result = await service.enable_prune_config(db=test_db, prune_config_id=999)
 
         assert result.success is False
         assert result.config is None
         assert result.error_message is not None
         assert "Prune configuration not found" in result.error_message
 
-    def test_disable_prune_config_success(
+    @pytest.mark.asyncio
+    async def test_disable_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successfully disabling prune config."""
@@ -379,10 +413,12 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
-        result = service.disable_prune_config(config.id)
+        result = await service.disable_prune_config(
+            db=test_db, prune_config_id=config.id
+        )
         success, updated_config, error = (
             result.success,
             result.config,
@@ -394,9 +430,12 @@ class TestPruneService:
         assert updated_config is not None
         assert updated_config.enabled is False
 
-    def test_disable_prune_config_not_found(self, service: PruneService) -> None:
+    @pytest.mark.asyncio
+    async def test_disable_prune_config_not_found(
+        self, service: PruneService, test_db: AsyncSession
+    ) -> None:
         """Test disabling non-existent prune config."""
-        result = service.disable_prune_config(999)
+        result = await service.disable_prune_config(db=test_db, prune_config_id=999)
         success, config, error = result.success, result.config, result.error_message
 
         assert success is False
@@ -404,7 +443,8 @@ class TestPruneService:
         assert error is not None
         assert "Prune configuration not found" in error
 
-    def test_delete_prune_config_success(
+    @pytest.mark.asyncio
+    async def test_delete_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successful prune config deletion."""
@@ -421,11 +461,13 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
         config_id = config.id
 
-        result = service.delete_prune_config(config_id)
+        result = await service.delete_prune_config(
+            db=test_db, prune_config_id=config_id
+        )
         success, config_name, error = (
             result.success,
             result.config_name,
@@ -437,14 +479,18 @@ class TestPruneService:
         assert error is None
 
         # Verify removed from database
-        deleted_config = (
-            test_db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
+        result = await test_db.execute(
+            select(PruneConfig).where(PruneConfig.id == config_id)
         )
+        deleted_config = result.scalar_one_or_none()
         assert deleted_config is None
 
-    def test_delete_prune_config_not_found(self, service: PruneService) -> None:
+    @pytest.mark.asyncio
+    async def test_delete_prune_config_not_found(
+        self, service: PruneService, test_db: AsyncSession
+    ) -> None:
         """Test deleting non-existent prune config."""
-        result = service.delete_prune_config(999)
+        result = await service.delete_prune_config(db=test_db, prune_config_id=999)
         success, config_name, error = (
             result.success,
             result.config_name,
@@ -456,7 +502,8 @@ class TestPruneService:
         assert error is not None
         assert "Prune configuration not found" in error
 
-    def test_get_configs_with_descriptions_simple_strategy(
+    @pytest.mark.asyncio
+    async def test_get_configs_with_descriptions_simple_strategy(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for simple strategy."""
@@ -473,14 +520,15 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_configs_with_descriptions()
+        result = await service.get_configs_with_descriptions(db=test_db)
 
         assert len(result) == 1
         assert result[0]["description"] == "Keep archives within 30 days"
 
-    def test_get_configs_with_descriptions_advanced_strategy(
+    @pytest.mark.asyncio
+    async def test_get_configs_with_descriptions_advanced_strategy(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for advanced strategy."""
@@ -493,15 +541,16 @@ class TestPruneService:
         config.keep_yearly = 2
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_configs_with_descriptions()
+        result = await service.get_configs_with_descriptions(db=test_db)
 
         assert len(result) == 1
         expected_desc = "7 daily, 4 weekly, 12 monthly, 2 yearly"
         assert result[0]["description"] == expected_desc
 
-    def test_get_configs_with_descriptions_partial_advanced(
+    @pytest.mark.asyncio
+    async def test_get_configs_with_descriptions_partial_advanced(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for partial advanced strategy."""
@@ -512,15 +561,16 @@ class TestPruneService:
         config.keep_monthly = 12
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_configs_with_descriptions()
+        result = await service.get_configs_with_descriptions(db=test_db)
 
         assert len(result) == 1
         expected_desc = "7 daily, 12 monthly"
         assert result[0]["description"] == expected_desc
 
-    def test_get_configs_with_descriptions_no_rules(
+    @pytest.mark.asyncio
+    async def test_get_configs_with_descriptions_no_rules(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for no retention rules."""
@@ -536,45 +586,49 @@ class TestPruneService:
         config.keep_yearly = 0
         config.enabled = True
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_configs_with_descriptions()
+        result = await service.get_configs_with_descriptions(db=test_db)
 
         assert len(result) == 1
         assert result[0]["description"] == "No retention rules"
 
-    def test_get_configs_with_descriptions_error_handling(
-        self, service: PruneService
+    @pytest.mark.asyncio
+    async def test_get_configs_with_descriptions_error_handling(
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test error handling in get_configs_with_descriptions."""
         with patch.object(
             service, "get_prune_configs", side_effect=Exception("Database error")
         ):
-            result = service.get_configs_with_descriptions()
+            result = await service.get_configs_with_descriptions(db=test_db)
             assert result == []
 
-    def test_get_form_data_success(
+    @pytest.mark.asyncio
+    async def test_get_form_data_success(
         self,
         service: PruneService,
         test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test successful form data retrieval."""
-        result = service.get_form_data()
+        result = await service.get_form_data(db=test_db)
 
         assert "repositories" in result
         assert len(result["repositories"]) == 1
         assert result["repositories"][0].name == "test-repo"
 
-    def test_get_form_data_error_handling(
+    @pytest.mark.asyncio
+    async def test_get_form_data_error_handling(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test error handling in get_form_data."""
-        with patch.object(test_db, "query", side_effect=Exception("Database error")):
-            result = service.get_form_data()
+        with patch.object(test_db, "execute", side_effect=Exception("Database error")):
+            result = await service.get_form_data(db=test_db)
             assert result == {"repositories": []}
 
-    def test_prune_config_lifecycle(
+    @pytest.mark.asyncio
+    async def test_prune_config_lifecycle(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test complete prune config lifecycle: create, update, enable/disable, delete."""
@@ -591,7 +645,7 @@ class TestPruneService:
             keep_monthly=0,
             keep_yearly=0,
         )
-        result = service.create_prune_config(config_data)
+        result = await service.create_prune_config(db=test_db, prune_config=config_data)
         success, created_config, _error = (
             result.success,
             result.config,
@@ -603,7 +657,9 @@ class TestPruneService:
 
         # Update
         config_update = PruneConfigUpdate(keep_within_days=60)
-        result = service.update_prune_config(config_id, config_update)
+        result = await service.update_prune_config(
+            db=test_db, config_id=config_id, prune_config_update=config_update
+        )
         success, updated_config, _error = (
             result.success,
             result.config,
@@ -614,7 +670,9 @@ class TestPruneService:
         assert updated_config.keep_within_days == 60
 
         # Disable
-        result = service.disable_prune_config(config_id)
+        result = await service.disable_prune_config(
+            db=test_db, prune_config_id=config_id
+        )
         success, disabled_config, _error = (
             result.success,
             result.config,
@@ -625,20 +683,25 @@ class TestPruneService:
         assert disabled_config.enabled is False
 
         # Enable
-        result = service.enable_prune_config(config_id)
+        result = await service.enable_prune_config(
+            db=test_db, prune_config_id=config_id
+        )
         assert result.success is True
         assert result.config is not None
         assert result.config.enabled is True
 
         # Delete
-        result2 = service.delete_prune_config(config_id)
+        result2 = await service.delete_prune_config(
+            db=test_db, prune_config_id=config_id
+        )
         assert result2 is not None
         assert result2.success is True
         assert result2.config_name is not None
         assert result2.config_name == "lifecycle-test"
 
         # Verify completely removed
-        deleted_config = (
-            test_db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
+        result = await test_db.execute(
+            select(PruneConfig).where(PruneConfig.id == config_id)
         )
+        deleted_config = result.scalar_one_or_none()
         assert deleted_config is None

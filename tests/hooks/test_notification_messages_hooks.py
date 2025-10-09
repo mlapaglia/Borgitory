@@ -26,12 +26,10 @@ class TestNotificationMessagesHookFailures:
         """Set up test dependencies."""
         # Create proper test dependencies using the factory
         mock_subprocess = AsyncMock()
-        mock_db_session = Mock()
         mock_rclone = Mock()
 
         self.dependencies = JobManagerFactory.create_for_testing(
             mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
             mock_rclone_service=mock_rclone,
         )
         self.job_manager = JobManager(dependencies=self.dependencies)

@@ -10,7 +10,6 @@ from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
 from fastapi.testclient import TestClient
 from fastapi.responses import HTMLResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.dependencies import (
@@ -28,7 +27,7 @@ class TestSchedulePatternsAPI:
     """Test the Schedule Patterns API endpoints - HTMX/HTTP behavior"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(self, test_db: AsyncSession) -> Dict[str, Any]:
+    def setup_test_dependencies(self) -> Dict[str, Any]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -37,8 +36,8 @@ class TestSchedulePatternsAPI:
         mock_scheduler_service.remove_schedule.return_value = None
 
         # Create real services with test database
-        schedule_service = ScheduleService(test_db, mock_scheduler_service)
-        configuration_service = ConfigurationService(test_db)
+        schedule_service = ScheduleService(mock_scheduler_service)
+        configuration_service = ConfigurationService()
 
         # Create mock templates service that returns proper HTMLResponse
         mock_templates = Mock()

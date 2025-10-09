@@ -120,7 +120,10 @@ class JobManager:
             self.dependencies.notification_service,
         )
         self.hook_executor = HookTaskExecutor(
-            self.executor, self.output_manager, self.event_broadcaster
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.dependencies.hook_execution_service,
         )
 
     def _setup_callbacks(self) -> None:
