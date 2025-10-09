@@ -214,6 +214,24 @@ class Repository(RepositoryBase):
     }
 
 
+class RepositoryResponse(BaseModel):
+    """Repository response model without sensitive fields like passphrase"""
+
+    id: int = Field(gt=0)
+    name: str
+    path: str
+    encryption_type: EncryptionType
+    created_at: datetime
+    cache_dir: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True,
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+        "extra": "forbid",
+    }
+
+
 class JobBase(BaseModel):
     type: JobType
 

@@ -17,6 +17,7 @@ from borgitory.models.schemas import (
     Repository as RepositorySchema,
     RepositoryCreate,
     RepositoryUpdate,
+    RepositoryResponse,
 )
 from borgitory.dependencies import (
     BorgServiceDep,
@@ -74,7 +75,7 @@ async def create_repository(
     return RepositoryResponseHandler.handle_create_response(request, result)
 
 
-@router.get("/", response_model=List[RepositorySchema])
+@router.get("/", response_model=List[RepositoryResponse])
 async def list_repositories(
     skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
 ) -> List[Repository]:

@@ -255,7 +255,6 @@ class TestRepositoryManagementBusinessLogic:
                 base_command="borg config",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
-                keyfile_path=mock_repository.get_keyfile_path(),
                 additional_args=["--list"],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
@@ -364,7 +363,6 @@ class TestRepositoryManagementBusinessLogic:
                 base_command="borg break-lock",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
-                keyfile_path=mock_repository.get_keyfile_path(),
                 additional_args=[],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )

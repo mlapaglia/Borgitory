@@ -264,16 +264,6 @@ class TestRepositoryStatsHTML:
             "Should have loading message"
         )
 
-    @pytest.mark.integration
-    async def test_full_stats_html_integration(self) -> None:
-        """
-        Integration test that verifies the complete stats HTML generation flow
-        This test requires a test repository to be available
-        """
-        # This would test with actual borg commands if test repo exists
-        # Skip for now since it requires external dependencies
-        pytest.skip("Integration test requires test borg repository")
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

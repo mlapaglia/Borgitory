@@ -5,7 +5,7 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
-from typing import Generator, AsyncGenerator, cast
+from typing import AsyncGenerator, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -15,7 +15,7 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 )
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.jobs.job_models import (
@@ -249,8 +249,8 @@ class TestJobManagerTaskExecution:
     ) -> JobManager:
         """Create job manager with injected mock dependencies"""
 
-        @contextmanager
-        def mock_db_session_factory() -> Generator[AsyncSession, None, None]:
+        @asynccontextmanager
+        async def mock_db_session_factory() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield test_db
             finally:
@@ -374,7 +374,7 @@ class TestJobManagerTaskExecution:
 
         # Mock individual task execution to succeed
         async def mock_backup_task(
-            job: BorgJob, task: BorgJobTask, task_index: int
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
         ) -> bool:
             task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
@@ -382,7 +382,7 @@ class TestJobManagerTaskExecution:
             return True
 
         async def mock_prune_task(
-            job: BorgJob, task: BorgJobTask, task_index: int
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
         ) -> bool:
             task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
@@ -438,7 +438,7 @@ class TestJobManagerTaskExecution:
 
         # Mock backup to fail (critical)
         async def mock_backup_fail(
-            job: BorgJob, task: BorgJobTask, task_index: int
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
         ) -> bool:
             task.status = TaskStatusEnum.FAILED
             task.return_code = 1

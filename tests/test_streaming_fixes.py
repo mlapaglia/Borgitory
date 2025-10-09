@@ -214,8 +214,12 @@ class TestJobRenderServiceUUIDIntegration:
         # Set up the mock job with completed status to trigger database path
         mock_job_with_uuid.status = "completed"
 
-        # Mock database query to return our job
-        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_job_with_uuid
+        # Mock database query to return our job (SQLAlchemy 2.0 execute pattern)
+        mock_unique = Mock()
+        mock_unique.scalar_one_or_none.return_value = mock_job_with_uuid
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_unique
+        mock_db.execute = AsyncMock(return_value=mock_result)
 
         # Mock the converter methods to return realistic data
         from borgitory.services.jobs.job_render_service import JobProgress

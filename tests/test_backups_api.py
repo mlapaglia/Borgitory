@@ -41,7 +41,7 @@ class TestBackupsAPI:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/api/backups/form")
 
@@ -116,7 +116,7 @@ class TestBackupsAPI:
         check_config.verify_data = True
         test_db.add(check_config)
 
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/api/backups/form")
 
@@ -152,7 +152,7 @@ class TestBackupsAPI:
         enabled_prune.keep_yearly = 1
         test_db.add(enabled_prune)
 
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/api/backups/form")
 
@@ -278,7 +278,7 @@ class TestBackupsAPI:
         check_2.check_type = "repository_only"
         check_2.verify_data = False
         test_db.add(check_2)
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/api/backups/form")
 
@@ -371,7 +371,7 @@ class TestBackupsAPI:
         check_config.verify_data = True
         test_db.add(check_config)
 
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get("/api/backups/form")
 
