@@ -78,7 +78,6 @@ def sample_config_update() -> RepositoryCheckConfigUpdate:
 class TestRepositoryCheckConfigsAPI:
     """Test class for API endpoints focusing on HTMX responses."""
 
-    @pytest.mark.asyncio
     async def test_create_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -125,7 +124,6 @@ class TestRepositoryCheckConfigsAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_create_config_failure_htmx_response(
         self,
         mock_request: MagicMock,
@@ -157,7 +155,6 @@ class TestRepositoryCheckConfigsAPI:
             status_code=400,
         )
 
-    @pytest.mark.asyncio
     async def test_create_config_server_error_htmx_response(
         self,
         mock_request: MagicMock,
@@ -237,7 +234,6 @@ class TestRepositoryCheckConfigsAPI:
             {"error_message": "Error loading check policies: Service error"},
         )
 
-    @pytest.mark.asyncio
     async def test_get_form_htmx_response(
         self,
         mock_request: MagicMock,
@@ -262,7 +258,6 @@ class TestRepositoryCheckConfigsAPI:
             mock_form_data,
         )
 
-    @pytest.mark.asyncio
     async def test_get_policy_form_htmx_response(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
@@ -278,7 +273,6 @@ class TestRepositoryCheckConfigsAPI:
             {},
         )
 
-    @pytest.mark.asyncio
     async def test_get_config_edit_form_success(
         self,
         mock_request: MagicMock,
@@ -307,7 +301,6 @@ class TestRepositoryCheckConfigsAPI:
             {"config": mock_config, "is_edit_mode": True},
         )
 
-    @pytest.mark.asyncio
     async def test_get_config_edit_form_not_found(
         self,
         mock_request: MagicMock,
@@ -330,7 +323,6 @@ class TestRepositoryCheckConfigsAPI:
         assert exc_info.value.status_code == 404
         assert "Check policy not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_update_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -365,7 +357,6 @@ class TestRepositoryCheckConfigsAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_update_config_failure_htmx_response(
         self,
         mock_request: MagicMock,
@@ -392,7 +383,6 @@ class TestRepositoryCheckConfigsAPI:
             status_code=404,
         )
 
-    @pytest.mark.asyncio
     async def test_enable_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -427,7 +417,6 @@ class TestRepositoryCheckConfigsAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_disable_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -462,7 +451,6 @@ class TestRepositoryCheckConfigsAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_delete_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -493,7 +481,6 @@ class TestRepositoryCheckConfigsAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_delete_config_failure_htmx_response(
         self,
         mock_request: MagicMock,

@@ -114,7 +114,6 @@ class TestIgnoreLockFunctionality:
         """Mock repository data"""
         return {"path": "/test/repo/path", "passphrase": "test-passphrase"}
 
-    @pytest.mark.asyncio
     async def test_ignore_lock_true_executes_break_lock_command(
         self,
         job_manager: JobManager,
@@ -166,7 +165,6 @@ class TestIgnoreLockFunctionality:
         assert result is True
         assert mock_backup_task_with_ignore_lock.status == TaskStatusEnum.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_ignore_lock_false_skips_break_lock_command(
         self,
         job_manager: JobManager,
@@ -212,7 +210,6 @@ class TestIgnoreLockFunctionality:
         assert result is True
         assert mock_backup_task_without_ignore_lock.status == TaskStatusEnum.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_execute_break_lock_command_construction(
         self, job_manager: JobManager
     ) -> None:
@@ -265,7 +262,6 @@ class TestIgnoreLockFunctionality:
         )
         output_callback.assert_any_call("Successfully released repository lock")
 
-    @pytest.mark.asyncio
     async def test_break_lock_failure_continues_with_backup(
         self,
         job_manager: JobManager,
@@ -318,7 +314,6 @@ class TestIgnoreLockFunctionality:
         warning_found = any("Break-lock failed" in line for line in output_lines)
         assert warning_found, f"Expected break-lock warning in output: {output_lines}"
 
-    @pytest.mark.asyncio
     async def test_break_lock_timeout_handling(self, job_manager: JobManager) -> None:
         """Test that break-lock handles timeout correctly"""
 
@@ -358,7 +353,6 @@ class TestIgnoreLockFunctionality:
             # Verify timeout message was sent to callback
             output_callback.assert_any_call("Break-lock timed out, terminating process")
 
-    @pytest.mark.asyncio
     async def test_break_lock_uses_secure_command_builder(
         self, job_manager: JobManager
     ) -> None:

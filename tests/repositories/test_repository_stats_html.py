@@ -34,7 +34,6 @@ class TestRepositoryStatsHTML:
         db = Mock()
         return db
 
-    @pytest.mark.asyncio
     async def test_stats_html_basic_flow(
         self, mock_repository: Mock, mock_db: Mock
     ) -> None:
@@ -130,7 +129,6 @@ class TestRepositoryStatsHTML:
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
-    @pytest.mark.asyncio
     async def test_stats_html_error_handling(
         self, mock_repository: Mock, mock_db: Mock
     ) -> None:
@@ -185,7 +183,6 @@ class TestRepositoryStatsHTML:
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
-    @pytest.mark.asyncio
     async def test_stats_html_repository_not_found(self, mock_db: Mock) -> None:
         """Test handling of non-existent repository"""
 
@@ -266,7 +263,6 @@ class TestRepositoryStatsHTML:
         )
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_full_stats_html_integration(self) -> None:
         """
         Integration test that verifies the complete stats HTML generation flow

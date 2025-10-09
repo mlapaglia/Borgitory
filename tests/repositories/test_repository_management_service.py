@@ -216,7 +216,6 @@ class TestRepositoryManagementBusinessLogic:
         repo.cache_dir = "/mnt/test/cache/dir"
         return repo
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_unlocked(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -265,7 +264,6 @@ class TestRepositoryManagementBusinessLogic:
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_locked_timeout(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -300,7 +298,6 @@ class TestRepositoryManagementBusinessLogic:
             or "locked" in result["message"].lower()
         )
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_error_with_lock_message(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -333,7 +330,6 @@ class TestRepositoryManagementBusinessLogic:
         assert "locked by another process" in result["message"]
         assert "error" in result
 
-    @pytest.mark.asyncio
     async def test_break_repository_lock_success(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -381,7 +377,6 @@ class TestRepositoryManagementBusinessLogic:
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
-    @pytest.mark.asyncio
     async def test_break_repository_lock_failure(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -413,7 +408,6 @@ class TestRepositoryManagementBusinessLogic:
         assert "failed" in result["message"].lower()
         assert result["error"] == "Permission denied"
 
-    @pytest.mark.asyncio
     async def test_get_repository_info_success(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -483,7 +477,6 @@ class TestRepositoryManagementBusinessLogic:
         assert result["archives_count"] == 2
         assert "repository.id" in result["config"]
 
-    @pytest.mark.asyncio
     async def test_export_repository_key_success(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -517,7 +510,6 @@ class TestRepositoryManagementBusinessLogic:
         assert result["key_data"] == key_data
         assert result["filename"] == "test-repo_key.txt"
 
-    @pytest.mark.asyncio
     async def test_export_repository_key_failure(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:

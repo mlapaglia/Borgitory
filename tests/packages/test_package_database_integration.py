@@ -68,7 +68,6 @@ def package_service_with_db(
     )
 
 
-@pytest.mark.asyncio
 class TestPackageManagerDatabaseIntegration:
     async def test_install_package_saves_to_database(
         self,
@@ -317,7 +316,6 @@ class TestPackageManagerDatabaseIntegration:
         assert mock_command_runner._run_command_mock.call_count == 6
 
 
-@pytest.mark.asyncio
 class TestPackageRestorationService:
     async def test_restore_user_packages_success(self, in_memory_db: Any) -> None:
         """Test successful package restoration on startup"""

@@ -75,7 +75,6 @@ class TestJobDatabaseManager:
         assert manager.async_session_maker is not None
         assert manager.async_session_maker == mock_async_session_maker
 
-    @pytest.mark.asyncio
     async def test_create_database_job_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -95,7 +94,6 @@ class TestJobDatabaseManager:
             mock_async_session.commit.assert_called_once()
             mock_async_session.refresh.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_update_job_status_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -125,7 +123,6 @@ class TestJobDatabaseManager:
             assert mock_job_instance.status == JobStatusEnum.COMPLETED
             mock_async_session.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_job_by_uuid_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -159,7 +156,6 @@ class TestJobDatabaseManager:
             assert result["status"] == JobStatusEnum.COMPLETED
             assert result["output"] == "Job output"
 
-    @pytest.mark.asyncio
     async def test_get_jobs_by_repository_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -200,7 +196,6 @@ class TestJobDatabaseManager:
             assert result[0]["id"] == mock_job1.id
             assert result[1]["id"] == mock_job2.id
 
-    @pytest.mark.asyncio
     async def test_save_job_tasks_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -251,7 +246,6 @@ class TestJobDatabaseManager:
             assert mock_job_instance.completed_tasks == 1
             mock_async_session.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_job_statistics_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -297,7 +291,6 @@ class TestJobDatabaseManager:
             assert JobStatusEnum.COMPLETED in by_status
             assert "backup" in by_type
 
-    @pytest.mark.asyncio
     async def test_get_repository_data_happy_path(
         self,
         job_database_manager: JobDatabaseManager,
@@ -326,7 +319,6 @@ class TestJobDatabaseManager:
             assert result["name"] == "test-repo"
             assert result["path"] == "/path/to/repo"
 
-    @pytest.mark.asyncio
     async def test_error_handling_create_job(
         self,
         job_database_manager: JobDatabaseManager,
@@ -347,7 +339,6 @@ class TestJobDatabaseManager:
             result = await job_database_manager.create_database_job(sample_data)
             assert result is None
 
-    @pytest.mark.asyncio
     async def test_error_handling_update_job_status(
         self,
         job_database_manager: JobDatabaseManager,
@@ -367,7 +358,6 @@ class TestJobDatabaseManager:
             )
             assert result is False
 
-    @pytest.mark.asyncio
     async def test_get_job_statistics_error_handling(
         self,
         job_database_manager: JobDatabaseManager,
@@ -380,7 +370,6 @@ class TestJobDatabaseManager:
 
         assert result == {}
 
-    @pytest.mark.asyncio
     async def test_job_not_found_scenarios(
         self,
         job_database_manager: JobDatabaseManager,
@@ -403,7 +392,6 @@ class TestJobDatabaseManager:
             result = await job_database_manager.save_job_tasks(uuid.uuid4(), [])
             assert result is False
 
-    @pytest.mark.asyncio
     async def test_get_repository_data_not_found(
         self,
         job_database_manager: JobDatabaseManager,
@@ -419,7 +407,6 @@ class TestJobDatabaseManager:
 
             assert result is None
 
-    @pytest.mark.asyncio
     async def test_save_job_tasks_with_dict_output_lines(
         self,
         job_database_manager: JobDatabaseManager,

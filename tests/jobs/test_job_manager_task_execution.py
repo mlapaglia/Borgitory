@@ -179,7 +179,6 @@ class TestJobManagerTaskExecution:
 
         return job_manager
 
-    @pytest.mark.asyncio
     async def test_create_composite_job(
         self, job_manager_with_mocks: JobManager, sample_repository: Repository
     ) -> None:
@@ -225,7 +224,6 @@ class TestJobManagerTaskExecution:
         assert job.tasks[0].task_name == "Backup data"
         assert job.tasks[1].task_type == "prune"
 
-    @pytest.mark.asyncio
     async def test_execute_composite_job_success(
         self, job_manager_with_mocks: JobManager, sample_repository: Repository
     ) -> None:
@@ -275,7 +273,6 @@ class TestJobManagerTaskExecution:
         assert task1.status == "completed"
         assert task2.status == "completed"
 
-    @pytest.mark.asyncio
     async def test_execute_composite_job_critical_failure(
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
@@ -397,7 +394,6 @@ class TestJobManagerTaskExecution:
             assert db_job.status == JobStatusEnum.FAILED
             assert db_job.finished_at is not None
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -455,7 +451,6 @@ class TestJobManagerTaskExecution:
         assert task.return_code == 0
         # Task execution should complete successfully
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_success_with_proper_di(
         self,
         job_manager_with_mocks: JobManager,
@@ -522,7 +517,6 @@ class TestJobManagerTaskExecution:
         mock_job_executor.start_process.assert_called_once()
         mock_job_executor.monitor_process_output.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_failure(
         self,
         job_manager_with_mocks: JobManager,
@@ -576,7 +570,6 @@ class TestJobManagerTaskExecution:
         assert task.error is not None
         assert "Backup failed" in task.error
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_with_dry_run(
         self,
         job_manager_with_secure_command_mock: JobManager,
@@ -639,7 +632,6 @@ class TestJobManagerTaskExecution:
         # The --dry-run flag is verified in the logs - we can see it in the "Final additional_args" log line
         # This test verifies that the dry_run parameter is properly processed and the task completes successfully
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -691,7 +683,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_check_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -740,7 +731,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -791,7 +781,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_notification_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -865,7 +854,6 @@ class TestJobManagerTaskExecution:
         # Verify notification service was called
         mock_notification_service.send_notification.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_notification_task_no_config(
         self, job_manager_with_mocks: JobManager
     ) -> None:
@@ -897,7 +885,6 @@ class TestJobManagerTaskExecution:
         assert task.error is not None
         assert "No notification configuration" in task.error
 
-    @pytest.mark.asyncio
     async def test_execute_task_unknown_type(
         self, job_manager_with_mocks: JobManager
     ) -> None:

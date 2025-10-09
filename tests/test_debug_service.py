@@ -95,7 +95,6 @@ def mock_db_session() -> MagicMock:
 class TestDebugService:
     """Test the DebugService class"""
 
-    @pytest.mark.asyncio
     async def test_get_debug_info_all_sections_success(
         self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
@@ -180,7 +179,6 @@ class TestDebugService:
             assert result.environment == env_info
             assert result.job_manager == job_manager_info
 
-    @pytest.mark.asyncio
     async def test_get_debug_info_handles_section_failures(
         self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
@@ -248,7 +246,6 @@ class TestDebugService:
             assert result.environment == env_info
             assert result.job_manager == job_manager_info
 
-    @pytest.mark.asyncio
     async def test_get_system_info(self, debug_service: DebugService) -> None:
         """Test system info collection"""
         with (
@@ -274,7 +271,6 @@ class TestDebugService:
             assert result.python_version == "Python 3.9.0"
             assert result.python_executable == "/usr/bin/python"
 
-    @pytest.mark.asyncio
     async def test_get_application_info(
         self, debug_service: DebugService, mock_environment: MockEnvironment
     ) -> None:
@@ -295,7 +291,6 @@ class TestDebugService:
             assert result.working_directory == "/test/dir"
             assert result.startup_time == "2023-01-01T12:00:00"
 
-    @pytest.mark.asyncio
     async def test_get_application_info_debug_mode_true(
         self, debug_service: DebugService, mock_environment: MockEnvironment
     ) -> None:
@@ -394,7 +389,6 @@ class TestDebugService:
         assert result.error != ""
         assert result.database_accessible is False
 
-    @pytest.mark.asyncio
     async def test_get_tool_versions_success(self, debug_service: DebugService) -> None:
         """Test successful tool version detection"""
 
@@ -422,7 +416,6 @@ class TestDebugService:
             assert result["rclone"].version == "rclone v1.58.0"
             assert result["rclone"].accessible is True
 
-    @pytest.mark.asyncio
     async def test_get_tool_versions_command_failures(
         self, debug_service: DebugService
     ) -> None:
@@ -580,7 +573,6 @@ class TestDebugService:
             error=stderr if not success and stderr else None,
         )
 
-    @pytest.mark.asyncio
     async def test_get_wsl_info_not_windows(self, debug_service: DebugService) -> None:
         """Test WSL info when not running on Windows"""
         # Mock environment to return non-Windows OS
@@ -593,7 +585,6 @@ class TestDebugService:
             assert result.wsl_available is False
             assert result.error == "Not running on Windows - WSL not applicable"
 
-    @pytest.mark.asyncio
     async def test_get_wsl_info_windows_no_wsl(
         self, debug_service: DebugService
     ) -> None:
@@ -621,7 +612,6 @@ class TestDebugService:
                 assert result.wsl_available is False
                 assert "WSL not available" in result.error
 
-    @pytest.mark.asyncio
     async def test_get_wsl_info_os_release_failure(
         self, debug_service: DebugService
     ) -> None:
@@ -654,7 +644,6 @@ class TestDebugService:
                 assert result.wsl_version == "WSL 2"
                 assert result.default_distribution == "Unknown Linux Distribution"
 
-    @pytest.mark.asyncio
     async def test_get_wsl_info_mount_access_failure(
         self, debug_service: DebugService
     ) -> None:
@@ -687,7 +676,6 @@ class TestDebugService:
                 assert result.wsl_path_accessible is False
                 assert len(result.mount_points) == 0
 
-    @pytest.mark.asyncio
     async def test_get_wsl_info_command_executor_exception(
         self, debug_service: DebugService
     ) -> None:
@@ -708,7 +696,6 @@ class TestDebugService:
                 assert result.wsl_available is False
                 assert "WSL command not found" in result.error
 
-    @pytest.mark.asyncio
     async def test_get_wsl_info_unexpected_exception(
         self, debug_service: DebugService
     ) -> None:

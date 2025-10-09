@@ -100,7 +100,6 @@ class TestRcloneServiceBasics:
 class TestRcloneServiceS3Operations:
     """Test S3-related operations."""
 
-    @pytest.mark.asyncio
     async def test_test_s3_connection_success(
         self, rclone_service: RcloneService, mock_command_executor: Mock
     ) -> None:
@@ -126,7 +125,6 @@ class TestRcloneServiceS3Operations:
         # The method calls execute_command multiple times (read test + write test)
         assert mock_command_executor.execute_command.call_count >= 1
 
-    @pytest.mark.asyncio
     async def test_test_s3_connection_bucket_not_found(
         self, rclone_service: RcloneService, mock_command_executor: Mock
     ) -> None:
@@ -151,7 +149,6 @@ class TestRcloneServiceS3Operations:
         assert result.get("status") == "failed"
         assert "does not exist" in result.get("message", "")
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_s3_calls_executor(
         self,
         rclone_service: RcloneService,
@@ -200,7 +197,6 @@ class TestRcloneServiceS3Operations:
 class TestRcloneServiceSFTPOperations:
     """Test SFTP-related operations."""
 
-    @pytest.mark.asyncio
     async def test_test_sftp_connection_success(
         self, rclone_service: RcloneService, mock_command_executor: Mock
     ) -> None:
@@ -225,7 +221,6 @@ class TestRcloneServiceSFTPOperations:
         assert result.get("status") == "success"
         assert "connection successful" in result.get("message", "").lower()
 
-    @pytest.mark.asyncio
     async def test_test_sftp_connection_auth_failed(
         self, rclone_service: RcloneService, mock_command_executor: Mock
     ) -> None:
@@ -252,7 +247,6 @@ class TestRcloneServiceSFTPOperations:
         message = result.get("message", "").lower()
         assert "ssh" in message or "authentication" in message
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_sftp_success(
         self,
         rclone_service: RcloneService,
@@ -298,7 +292,6 @@ class TestRcloneServiceSFTPOperations:
         assert len(results) > 0
         assert results[0]["type"] == "started"
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_sftp_with_private_key(
         self,
         rclone_service: RcloneService,
@@ -344,7 +337,6 @@ class TestRcloneServiceSFTPOperations:
         assert len(results) > 0
         assert results[0]["type"] == "started"
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_sftp_exception_handling(
         self,
         rclone_service: RcloneService,
@@ -373,7 +365,6 @@ class TestRcloneServiceSFTPOperations:
 class TestRcloneServiceSMBOperations:
     """Test SMB-related operations."""
 
-    @pytest.mark.asyncio
     async def test_test_smb_connection_success(
         self, rclone_service: RcloneService, mock_command_executor: Mock
     ) -> None:
@@ -421,7 +412,6 @@ class TestRcloneServiceSMBOperations:
 class TestRcloneServiceSyncRepository:
     """Test the generic sync_repository method."""
 
-    @pytest.mark.asyncio
     async def test_sync_repository_s3_success(
         self,
         rclone_service: RcloneService,
@@ -473,7 +463,6 @@ class TestRcloneServiceSyncRepository:
         assert result.get("success") is True
         assert "stats" in result
 
-    @pytest.mark.asyncio
     async def test_sync_repository_sftp_success(
         self,
         rclone_service: RcloneService,
@@ -528,7 +517,6 @@ class TestRcloneServiceSyncRepository:
         assert result.get("success") is True
         assert "stats" in result
 
-    @pytest.mark.asyncio
     async def test_sync_repository_s3_missing_required_fields(
         self,
         rclone_service: RcloneService,
@@ -550,7 +538,6 @@ class TestRcloneServiceSyncRepository:
         error_msg = result.get("error", "")
         assert error_msg and "Missing required S3 configuration" in error_msg
 
-    @pytest.mark.asyncio
     async def test_sync_repository_sftp_missing_required_fields(
         self,
         rclone_service: RcloneService,
@@ -572,7 +559,6 @@ class TestRcloneServiceSyncRepository:
         error_msg = result.get("error", "")
         assert error_msg and "Missing required SFTP configuration" in error_msg
 
-    @pytest.mark.asyncio
     async def test_sync_repository_sftp_missing_auth(
         self,
         rclone_service: RcloneService,
@@ -598,7 +584,6 @@ class TestRcloneServiceSyncRepository:
             error_msg and "Either password or private_key must be provided" in error_msg
         )
 
-    @pytest.mark.asyncio
     async def test_sync_repository_unsupported_provider(
         self,
         rclone_service: RcloneService,
@@ -618,7 +603,6 @@ class TestRcloneServiceSyncRepository:
         error_msg = result.get("error", "")
         assert error_msg and "Unsupported cloud provider: unsupported" in error_msg
 
-    @pytest.mark.asyncio
     async def test_sync_repository_s3_sync_failure(
         self,
         rclone_service: RcloneService,
@@ -653,7 +637,6 @@ class TestRcloneServiceSyncRepository:
         error_msg = result.get("error", "")
         assert error_msg and "Rclone process failed with return code 1" in error_msg
 
-    @pytest.mark.asyncio
     async def test_sync_repository_exception_handling(
         self,
         rclone_service: RcloneService,
@@ -694,7 +677,6 @@ class TestRcloneServiceGenericDispatchers:
         assert hasattr(rclone_service, "test_provider_connection")
         assert callable(getattr(rclone_service, "test_provider_connection"))
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_provider_sftp_success(
         self,
         rclone_service: RcloneService,
@@ -741,7 +723,6 @@ class TestRcloneServiceGenericDispatchers:
         assert len(results) > 0
         assert results[0]["type"] == "started"
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_provider_s3_success(
         self,
         rclone_service: RcloneService,
@@ -787,7 +768,6 @@ class TestRcloneServiceGenericDispatchers:
         assert len(results) > 0
         assert results[0]["type"] == "started"
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_provider_missing_required_params(
         self,
         rclone_service: RcloneService,
@@ -802,7 +782,6 @@ class TestRcloneServiceGenericDispatchers:
             ):
                 pass
 
-    @pytest.mark.asyncio
     async def test_test_provider_connection_sftp(
         self, rclone_service: RcloneService
     ) -> None:
@@ -826,7 +805,6 @@ class TestRcloneServiceGenericDispatchers:
             mock_sftp.assert_called_once()
             assert result.get("status") == "success"
 
-    @pytest.mark.asyncio
     async def test_sync_repository_to_provider_unsupported(
         self, rclone_service: RcloneService, mock_repository: Mock
     ) -> None:
@@ -837,7 +815,6 @@ class TestRcloneServiceGenericDispatchers:
             ):
                 pass
 
-    @pytest.mark.asyncio
     async def test_test_provider_connection_unsupported(
         self, rclone_service: RcloneService
     ) -> None:
@@ -849,7 +826,6 @@ class TestRcloneServiceGenericDispatchers:
 class TestRcloneServiceErrorHandling:
     """Test error handling scenarios."""
 
-    @pytest.mark.asyncio
     async def test_connection_test_exception_handling(
         self, rclone_service: RcloneService, mock_command_executor: Mock
     ) -> None:
@@ -866,7 +842,6 @@ class TestRcloneServiceErrorHandling:
         assert result.get("status") == "error"
         assert "exception" in result.get("message", "").lower()
 
-    @pytest.mark.asyncio
     async def test_sync_operation_exception_handling(
         self,
         rclone_service: RcloneService,

@@ -182,7 +182,6 @@ class TestRepositoryStatsService:
             nfiles=1000,
         )
 
-    @pytest.mark.asyncio
     async def test_get_repository_statistics_success(self) -> None:
         """Test successful repository statistics gathering"""
         # Set up mock data
@@ -275,7 +274,6 @@ class TestRepositoryStatsService:
                 self.mock_repository, self.mock_db
             )
 
-    @pytest.mark.asyncio
     async def test_get_repository_statistics_no_archives(self) -> None:
         """Test when repository has no archives"""
         self.mock_executor.set_archive_list([])
@@ -286,7 +284,6 @@ class TestRepositoryStatsService:
                 self.mock_repository, self.mock_db
             )
 
-    @pytest.mark.asyncio
     async def test_get_repository_statistics_archive_info_failure(self) -> None:
         """Test when archive info retrieval fails"""
         archives = ["backup-2024-01-01"]
@@ -299,7 +296,6 @@ class TestRepositoryStatsService:
                 self.mock_repository, self.mock_db
             )
 
-    @pytest.mark.asyncio
     async def test_get_repository_statistics_with_progress_callback(self) -> None:
         """Test statistics gathering with progress callback"""
         archives = ["backup-2024-01-01"]
@@ -326,7 +322,6 @@ class TestRepositoryStatsService:
         assert any("Initializing" in call[0] for call in progress_calls)
         assert any(call[1] == 100 for call in progress_calls)  # Should reach 100%
 
-    @pytest.mark.asyncio
     async def test_get_repository_statistics_exception_handling(self) -> None:
         """Test exception handling in statistics gathering"""
         self.mock_executor.set_exception(True, "Test exception")
@@ -394,7 +389,6 @@ class TestRepositoryStatsService:
         assert summary["total_original_size_gb"] == 0.0
         assert summary["overall_compression_ratio"] == 0.0
 
-    @pytest.mark.asyncio
     async def test_get_archive_list(self) -> None:
         """Test _get_archive_list method"""
         expected_archives = ["backup-1", "backup-2", "backup-3"]
@@ -404,7 +398,6 @@ class TestRepositoryStatsService:
 
         assert result == expected_archives
 
-    @pytest.mark.asyncio
     async def test_get_archive_info(self) -> None:
         """Test _get_archive_info method"""
         archive_name = "backup-test"
@@ -420,7 +413,6 @@ class TestRepositoryStatsService:
         assert result["original_size"] == expected_info["original_size"]
         assert result["compressed_size"] == expected_info["compressed_size"]
 
-    @pytest.mark.asyncio
     async def test_get_archive_info_not_found(self) -> None:
         """Test _get_archive_info when archive is not found"""
         # Don't set any archive info
@@ -431,7 +423,6 @@ class TestRepositoryStatsService:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_archive_info_exception(self) -> None:
         """Test _get_archive_info exception handling"""
         self.mock_executor.set_exception(True, "Archive info exception")
@@ -459,7 +450,6 @@ class TestRepositoryStatsServiceIntegration:
 
         self.mock_db = Mock(spec=Session)
 
-    @pytest.mark.asyncio
     async def test_full_statistics_workflow(self) -> None:
         """Test the complete statistics gathering workflow"""
         # Set up a realistic scenario with multiple archives
@@ -542,7 +532,6 @@ class TestRepositoryStatsServiceIntegration:
         # Space saved should be positive
         assert summary["space_saved_gb"] > 0
 
-    @pytest.mark.asyncio
     async def test_get_execution_time_stats(self) -> None:
         """Test execution time statistics calculation"""
         from datetime import datetime
@@ -590,7 +579,6 @@ class TestRepositoryStatsServiceIntegration:
         assert prune_stats["total_executions"] == 1
         assert prune_stats["average_duration_minutes"] == 15.0
 
-    @pytest.mark.asyncio
     async def test_get_execution_time_stats_exception(self) -> None:
         """Test execution time stats exception handling"""
         self.mock_db.query.side_effect = Exception("Database error")
@@ -635,7 +623,6 @@ class TestRepositoryStatsServiceIntegration:
         assert chart_data["labels"] == []
         assert chart_data["datasets"] == []
 
-    @pytest.mark.asyncio
     async def test_get_success_failure_stats(self) -> None:
         """Test success/failure statistics calculation"""
         from unittest.mock import MagicMock
@@ -718,7 +705,6 @@ class TestRepositoryStatsServiceIntegration:
         assert chart_data["labels"] == []
         assert chart_data["datasets"] == []
 
-    @pytest.mark.asyncio
     async def test_get_timeline_success_failure_data(self) -> None:
         """Test timeline success/failure data calculation"""
         from unittest.mock import MagicMock
@@ -783,7 +769,6 @@ class TestRepositoryStatsServiceIntegration:
         assert len(size_chart["labels"]) == 2
         assert len(size_chart["datasets"]) <= 10  # Limited to top 10
 
-    @pytest.mark.asyncio
     async def test_get_file_type_stats_integration(self) -> None:
         """Test _get_file_type_stats method with mocked command execution"""
         archives = ["backup-2024-01-01", "backup-2024-01-02"]

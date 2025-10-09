@@ -26,7 +26,6 @@ class TestStreamingErrorHandling:
     def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
-    @pytest.mark.asyncio
     async def test_task_streaming_nonexistent_job(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -57,7 +56,6 @@ class TestStreamingErrorHandling:
             assert len(events) >= 1
             assert f"Job {job_id} not found" in events[0]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_job_with_mock_tasks(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -82,7 +80,6 @@ class TestStreamingErrorHandling:
         assert len(events) >= 1
         assert "object of type 'Mock' has no len()" in events[0]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_invalid_task_order(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -107,7 +104,6 @@ class TestStreamingErrorHandling:
         assert len(events) >= 1
         assert f"Task {task_order} not found" in events[0]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_handles_timeout(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -141,7 +137,6 @@ class TestStreamingErrorHandling:
         assert len(events) >= 1
         assert any("heartbeat" in event for event in events)
 
-    @pytest.mark.asyncio
     async def test_database_streaming_connection_error(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -237,7 +232,6 @@ class TestEventFiltering:
     def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
-    @pytest.mark.asyncio
     async def test_event_filtering_correct_job_and_task(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:

@@ -98,7 +98,6 @@ class TestRepositoryService:
             file_service=mock_file_service,
         )
 
-    @pytest.mark.asyncio
     async def test_create_repository_success(
         self,
         repository_service: RepositoryService,
@@ -149,7 +148,6 @@ class TestRepositoryService:
             mock_db_session.add.assert_called_once()
             mock_db_session.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_repository_name_already_exists(
         self, repository_service: RepositoryService, mock_db_session: Mock
     ) -> None:
@@ -184,7 +182,6 @@ class TestRepositoryService:
         assert result.validation_errors[0].field == "name"
         assert "already exists" in result.validation_errors[0].message
 
-    @pytest.mark.asyncio
     async def test_create_repository_borg_initialization_fails(
         self,
         repository_service: RepositoryService,
@@ -221,7 +218,6 @@ class TestRepositoryService:
             "writable location" in result.error_message
         )  # Tests user-friendly message
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_accessible(
         self,
         repository_service: RepositoryService,
@@ -255,7 +251,6 @@ class TestRepositoryService:
         assert result["message"] == "Repository is accessible"
         mock_command_executor.execute_command.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_locked(
         self,
         repository_service: RepositoryService,
@@ -289,7 +284,6 @@ class TestRepositoryService:
         assert result["message"] == "Repository is locked by another process"
         assert "Failed to create/acquire the lock" in result["error"]
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_timeout(
         self,
         repository_service: RepositoryService,
@@ -322,7 +316,6 @@ class TestRepositoryService:
         assert result["accessible"] is False
         assert result["message"] == "Repository check timed out (possibly locked)"
 
-    @pytest.mark.asyncio
     async def test_break_repository_lock_success(
         self,
         repository_service: RepositoryService,
@@ -356,7 +349,6 @@ class TestRepositoryService:
         assert result["message"] == "Repository lock successfully removed"
         mock_command_executor.execute_command.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_repository_info_success(
         self,
         repository_service: RepositoryService,
@@ -429,7 +421,6 @@ class TestRepositoryService:
 
     # Import Repository Tests
 
-    @pytest.mark.asyncio
     async def test_import_repository_success_without_keyfile(
         self,
         repository_service: RepositoryService,
@@ -474,7 +465,6 @@ class TestRepositoryService:
         assert saved_repo.path == "/mnt/backup/existing-repo"
         assert saved_repo.get_passphrase() == "secret123"
 
-    @pytest.mark.asyncio
     async def test_import_repository_success_with_keyfile_upload(
         self,
         repository_service: RepositoryService,
@@ -535,7 +525,6 @@ class TestRepositoryService:
             call_args[1]["keyfile_path"] == "/test/keyfiles/imported-repo_test.key_uuid"
         )
 
-    @pytest.mark.asyncio
     async def test_import_repository_success_with_keyfile_content(
         self,
         repository_service: RepositoryService,
@@ -581,7 +570,6 @@ class TestRepositoryService:
         assert saved_repo.encryption_type == EncryptionType.KEYFILE
         assert saved_repo.get_keyfile_content() == "keyfile content as text"
 
-    @pytest.mark.asyncio
     async def test_import_repository_name_already_exists(
         self,
         repository_service: RepositoryService,
@@ -614,7 +602,6 @@ class TestRepositoryService:
         assert result.validation_errors[0].field == "name"
         assert "already exists" in result.validation_errors[0].message
 
-    @pytest.mark.asyncio
     async def test_import_repository_path_already_exists(
         self,
         repository_service: RepositoryService,
@@ -648,7 +635,6 @@ class TestRepositoryService:
         assert "already exists" in result.validation_errors[0].message
         assert "different-repo" in result.validation_errors[0].message
 
-    @pytest.mark.asyncio
     async def test_import_repository_keyfile_save_fails(
         self,
         repository_service: RepositoryService,
@@ -682,7 +668,6 @@ class TestRepositoryService:
         assert result.error_message is not None
         assert "Failed to import repository" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_import_repository_verification_fails(
         self,
         repository_service: RepositoryService,
@@ -715,7 +700,6 @@ class TestRepositoryService:
         )
         assert saved_repo is None
 
-    @pytest.mark.asyncio
     async def test_import_repository_with_cache_dir(
         self,
         repository_service: RepositoryService,
@@ -754,7 +738,6 @@ class TestRepositoryService:
         assert saved_repo is not None
         assert saved_repo.cache_dir == "/custom/cache/dir"
 
-    @pytest.mark.asyncio
     async def test_import_repository_exception_handling(
         self,
         repository_service: RepositoryService,
@@ -790,7 +773,6 @@ class TestRepositoryService:
         )
         assert saved_repo is None
 
-    @pytest.mark.asyncio
     async def test_import_repository_archive_listing_exception(
         self,
         repository_service: RepositoryService,
@@ -830,7 +812,6 @@ class TestRepositoryService:
 
     # List Archives Tests
 
-    @pytest.mark.asyncio
     async def test_list_archives_success_with_multiple_archives(
         self,
         repository_service: RepositoryService,
@@ -911,7 +892,6 @@ class TestRepositoryService:
 
         mock_borg_service.list_archives.assert_called_once_with(repository)
 
-    @pytest.mark.asyncio
     async def test_list_archives_success_with_no_archives(
         self,
         repository_service: RepositoryService,
@@ -947,7 +927,6 @@ class TestRepositoryService:
 
         mock_borg_service.list_archives.assert_called_once_with(repository)
 
-    @pytest.mark.asyncio
     async def test_list_archives_repository_not_found(
         self,
         repository_service: RepositoryService,
@@ -965,7 +944,6 @@ class TestRepositoryService:
         assert len(result.recent_archives) == 0
         assert result.error_message == "Repository not found"
 
-    @pytest.mark.asyncio
     async def test_list_archives_borg_service_exception(
         self,
         repository_service: RepositoryService,
@@ -999,7 +977,6 @@ class TestRepositoryService:
 
         mock_borg_service.list_archives.assert_called_once_with(repository)
 
-    @pytest.mark.asyncio
     async def test_list_archives_archive_size_formatting(
         self,
         repository_service: RepositoryService,
@@ -1070,7 +1047,6 @@ class TestRepositoryService:
         assert result.archives[2].size_info == "1.0 GB"  # 1 GB
         assert result.archives[3].size_info == "1.0 TB"  # 1 TB
 
-    @pytest.mark.asyncio
     async def test_list_archives_archive_with_no_size(
         self,
         repository_service: RepositoryService,
@@ -1116,7 +1092,6 @@ class TestRepositoryService:
         assert archive_info.size_info is None  # No size info should be set
         assert archive_info.stats is None  # No stats should be set
 
-    @pytest.mark.asyncio
     async def test_list_archives_recent_archives_limit(
         self,
         repository_service: RepositoryService,
@@ -1164,7 +1139,6 @@ class TestRepositoryService:
         actual_recent_names = [arch.name for arch in result.recent_archives]
         assert actual_recent_names == expected_recent_names
 
-    @pytest.mark.asyncio
     async def test_list_archives_archive_time_formatting(
         self,
         repository_service: RepositoryService,
@@ -1209,7 +1183,6 @@ class TestRepositoryService:
         assert archive_info.formatted_time is not None
         assert archive_info.formatted_time != archive_info.time  # Should be formatted
 
-    @pytest.mark.asyncio
     async def test_list_archives_archive_invalid_time(
         self,
         repository_service: RepositoryService,
@@ -1257,7 +1230,6 @@ class TestRepositoryService:
 
     # Get Directories Tests
 
-    @pytest.mark.asyncio
     async def test_get_directories_success_with_directories_only(
         self,
         repository_service: RepositoryService,
@@ -1322,7 +1294,6 @@ class TestRepositoryService:
             assert result.directories == ["dir1", "dir2", "dir3"]
             assert result.error_message is None
 
-    @pytest.mark.asyncio
     async def test_get_directories_success_with_files_included(
         self,
         repository_service: RepositoryService,
@@ -1387,7 +1358,6 @@ class TestRepositoryService:
             assert result.directories == ["dir1", "file1.txt", "file2.log"]
             assert result.error_message is None
 
-    @pytest.mark.asyncio
     async def test_get_directories_success_with_max_items_limit(
         self,
         repository_service: RepositoryService,
@@ -1453,7 +1423,6 @@ class TestRepositoryService:
             assert result.directories == ["dir1", "dir2"]  # First 2 items
             assert result.error_message is None
 
-    @pytest.mark.asyncio
     async def test_get_directories_path_not_exists(
         self,
         repository_service: RepositoryService,
@@ -1482,7 +1451,6 @@ class TestRepositoryService:
             assert result.directories == []
             assert result.error_message is None
 
-    @pytest.mark.asyncio
     async def test_get_directories_path_not_directory(
         self,
         repository_service: RepositoryService,
@@ -1517,7 +1485,6 @@ class TestRepositoryService:
             assert result.directories == []
             assert result.error_message is None
 
-    @pytest.mark.asyncio
     async def test_get_directories_exception_handling(
         self,
         repository_service: RepositoryService,
@@ -1561,7 +1528,6 @@ class TestRepositoryService:
 
     # Get Archive Contents Tests
 
-    @pytest.mark.asyncio
     async def test_get_archive_contents_success(
         self,
         repository_service: RepositoryService,
@@ -1656,7 +1622,6 @@ class TestRepositoryService:
             repository, "test-archive", "documents"
         )
 
-    @pytest.mark.asyncio
     async def test_get_archive_contents_success_root_path(
         self,
         repository_service: RepositoryService,
@@ -1719,7 +1684,6 @@ class TestRepositoryService:
             repository, "test-archive", ""
         )
 
-    @pytest.mark.asyncio
     async def test_get_archive_contents_success_nested_path(
         self,
         repository_service: RepositoryService,
@@ -1774,7 +1738,6 @@ class TestRepositoryService:
             repository, "test-archive", "documents/work/project1"
         )
 
-    @pytest.mark.asyncio
     async def test_get_archive_contents_repository_not_found(
         self,
         repository_service: RepositoryService,
@@ -1801,7 +1764,6 @@ class TestRepositoryService:
         assert result.breadcrumb_parts == []
         assert result.error_message == "Repository not found"
 
-    @pytest.mark.asyncio
     async def test_get_archive_contents_borg_service_exception(
         self,
         repository_service: RepositoryService,
@@ -1851,7 +1813,6 @@ class TestRepositoryService:
             repository, "nonexistent-archive", "documents"
         )
 
-    @pytest.mark.asyncio
     async def test_get_archive_contents_empty_archive(
         self,
         repository_service: RepositoryService,

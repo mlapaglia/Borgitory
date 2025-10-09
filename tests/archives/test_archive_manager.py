@@ -56,7 +56,6 @@ class TestArchiveManager:
         assert manager.job_executor == mock_job_executor
         assert manager.command_executor == mock_command_executor
 
-    @pytest.mark.asyncio
     async def test_parse_borg_list_output(self, manager: ArchiveManager) -> None:
         """Test parsing borg list JSON output"""
         json_output = """{"type": "d", "mode": "drwxr-xr-x", "uid": 1000, "gid": 1000, "user": "user", "group": "user", "size": 0, "mtime": "2023-01-01T00:00:00Z", "path": "test_dir"}
@@ -177,7 +176,6 @@ class TestArchiveManager:
         assert result[1].name == "dir2"  # directory
         assert result[2].name == "file1.txt"  # file
 
-    @pytest.mark.asyncio
     async def test_extract_file_stream_success(
         self, manager: ArchiveManager, mock_repository: MagicMock
     ) -> None:
@@ -216,7 +214,6 @@ class TestArchiveManager:
 
             assert isinstance(response, StreamingResponse)
 
-    @pytest.mark.asyncio
     async def test_extract_file_stream_error(
         self, manager: ArchiveManager, mock_repository: MagicMock
     ) -> None:

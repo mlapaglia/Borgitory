@@ -167,7 +167,6 @@ def path_service_docker(
 class TestPathServiceBasicPaths:
     """Test basic path operations."""
 
-    @pytest.mark.asyncio
     async def test_get_data_dir_linux(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -195,7 +194,6 @@ class TestPathServiceBasicPaths:
             "/home/user/.local/share/borgitory",
         ] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_get_data_dir_windows(
         self, path_service_windows: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -223,7 +221,6 @@ class TestPathServiceBasicPaths:
             assert result == expected_path
             assert ["mkdir", "-p", expected_path] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_get_temp_dir_linux(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -246,7 +243,6 @@ class TestPathServiceBasicPaths:
         assert result == "/tmp/borgitory"
         assert ["mkdir", "-p", "/tmp/borgitory"] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_get_cache_dir_docker(
         self, path_service_docker: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -269,7 +265,6 @@ class TestPathServiceBasicPaths:
         assert result == "/cache/borgitory"
         assert ["mkdir", "-p", "/cache/borgitory"] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_get_keyfiles_dir(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -309,7 +304,6 @@ class TestPathServiceBasicPaths:
             "/home/user/.local/share/borgitory/keyfiles",
         ] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_get_mount_base_dir(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -402,7 +396,6 @@ class TestSecureJoin:
 class TestFilesystemOperations:
     """Test filesystem operation methods."""
 
-    @pytest.mark.asyncio
     async def test_path_exists_true(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -425,7 +418,6 @@ class TestFilesystemOperations:
         assert result is True
         assert ["test", "-e", "/some/path"] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_path_exists_false(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -447,7 +439,6 @@ class TestFilesystemOperations:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_is_directory_true(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -469,7 +460,6 @@ class TestFilesystemOperations:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_is_directory_false(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -491,7 +481,6 @@ class TestFilesystemOperations:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_ensure_directory_success(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -514,7 +503,6 @@ class TestFilesystemOperations:
 
         assert ["mkdir", "-p", "/new/directory"] in mock_executor.commands_executed
 
-    @pytest.mark.asyncio
     async def test_ensure_directory_failure(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -535,7 +523,6 @@ class TestFilesystemOperations:
         with pytest.raises(OSError, match="Failed to create directory"):
             await path_service_linux.ensure_directory("/protected/directory")
 
-    @pytest.mark.asyncio
     async def test_ensure_directory_empty_path(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -549,7 +536,6 @@ class TestFilesystemOperations:
 class TestListDirectory:
     """Test directory listing functionality."""
 
-    @pytest.mark.asyncio
     async def test_list_directory_basic(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -616,7 +602,6 @@ drwxr-xr-x 2 user user 4096 Jan  1 12:00 subdir2
         assert result[1].name == "subdir2"
         assert result[1].path == "/test/path/subdir2"
 
-    @pytest.mark.asyncio
     async def test_list_directory_with_files(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -679,7 +664,6 @@ drwxr-xr-x 2 user user 4096 Jan  1 12:00 subdir
         assert result[0].name == "subdir"
         assert result[1].name == "file.txt"
 
-    @pytest.mark.asyncio
     async def test_list_directory_skips_hidden_files(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -741,7 +725,6 @@ drwxr-xr-x 2 user user 4096 Jan  1 12:00 visible_dir"""
         assert len(result) == 1
         assert result[0].name == "visible_dir"
 
-    @pytest.mark.asyncio
     async def test_list_directory_failure(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:
@@ -767,7 +750,6 @@ drwxr-xr-x 2 user user 4096 Jan  1 12:00 visible_dir"""
 class TestBorgDetection:
     """Test Borg repository and cache detection."""
 
-    @pytest.mark.asyncio
     async def test_batch_check_borg_repositories(
         self, path_service_linux: PathService, mock_executor: MockCommandExecutor
     ) -> None:

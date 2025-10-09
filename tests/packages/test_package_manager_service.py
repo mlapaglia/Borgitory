@@ -39,7 +39,6 @@ def package_service(mock_command_runner: MockCommandRunner) -> PackageManagerSer
 
 
 class TestPackageManagerService:
-    @pytest.mark.asyncio
     async def test_search_packages_empty_cache(
         self,
         package_service: PackageManagerService,
@@ -71,7 +70,6 @@ class TestPackageManagerService:
         # Should have called both apt-get update and apt-cache search
         assert mock_command_runner._run_command_mock.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_get_package_info_success(
         self,
         package_service: PackageManagerService,
@@ -106,7 +104,6 @@ Section: web
         assert result.section == "web"
         assert result.installed is False
 
-    @pytest.mark.asyncio
     async def test_get_package_info_not_found(
         self,
         package_service: PackageManagerService,
@@ -125,7 +122,6 @@ Section: web
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_install_packages_success(
         self,
         package_service: PackageManagerService,
@@ -170,7 +166,6 @@ Section: web
         # Now expects 4 calls: update, install, apt-cache show, dpkg -l
         assert mock_command_runner._run_command_mock.call_count == 4
 
-    @pytest.mark.asyncio
     async def test_install_packages_failure(
         self,
         package_service: PackageManagerService,
@@ -202,7 +197,6 @@ Section: web
         assert "Installation failed" in message
         assert "Unable to locate package" in message
 
-    @pytest.mark.asyncio
     async def test_remove_packages_success(
         self,
         package_service: PackageManagerService,
@@ -222,7 +216,6 @@ Section: web
         assert success is True
         assert "Successfully removed: curl" in message
 
-    @pytest.mark.asyncio
     async def test_list_installed_packages(
         self,
         package_service: PackageManagerService,
@@ -243,7 +236,6 @@ Section: web
         assert packages[1].name == "jq"
         assert packages[1].version == "1.6-2.1ubuntu3"
 
-    @pytest.mark.asyncio
     async def test_validate_package_names_valid(
         self, package_service: PackageManagerService
     ) -> None:
@@ -252,7 +244,6 @@ Section: web
         result = package_service._validate_package_names(valid_packages)
         assert result == valid_packages
 
-    @pytest.mark.asyncio
     async def test_validate_package_names_invalid(
         self, package_service: PackageManagerService
     ) -> None:

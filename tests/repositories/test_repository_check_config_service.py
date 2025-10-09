@@ -53,7 +53,6 @@ async def sample_config(test_db: AsyncSession):
 class TestRepositoryCheckConfigService:
     """Test class for RepositoryCheckConfigService business logic."""
 
-    @pytest.mark.asyncio
     async def test_get_all_configs_empty(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -61,7 +60,6 @@ class TestRepositoryCheckConfigService:
         result = await service.get_all_configs(db=test_db)
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_get_all_configs_with_data(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -85,7 +83,6 @@ class TestRepositoryCheckConfigService:
         assert "config-1" in names
         assert "config-2" in names
 
-    @pytest.mark.asyncio
     async def test_get_all_configs_ordered_by_name(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -103,7 +100,6 @@ class TestRepositoryCheckConfigService:
         names = [c.name for c in result]
         assert names == ["a-config", "m-config", "z-config"]
 
-    @pytest.mark.asyncio
     async def test_get_enabled_configs_only(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -123,7 +119,6 @@ class TestRepositoryCheckConfigService:
         assert result[0].name == "enabled-config"
         assert result[0].enabled is True
 
-    @pytest.mark.asyncio
     async def test_get_config_by_id_success(
         self,
         service: RepositoryCheckConfigService,
@@ -136,7 +131,6 @@ class TestRepositoryCheckConfigService:
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    @pytest.mark.asyncio
     async def test_get_config_by_id_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -144,7 +138,6 @@ class TestRepositoryCheckConfigService:
         result = await service.get_config_by_id(db=test_db, config_id=999)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_config_by_name_success(
         self,
         service: RepositoryCheckConfigService,
@@ -157,7 +150,6 @@ class TestRepositoryCheckConfigService:
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    @pytest.mark.asyncio
     async def test_get_config_by_name_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -165,7 +157,6 @@ class TestRepositoryCheckConfigService:
         result = await service.get_config_by_name(db=test_db, name="non-existent")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_create_config_success(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -211,7 +202,6 @@ class TestRepositoryCheckConfigService:
         assert saved_config is not None
         assert saved_config.check_type == "repository_only"
 
-    @pytest.mark.asyncio
     async def test_create_config_duplicate_name(
         self,
         service: RepositoryCheckConfigService,
@@ -230,7 +220,6 @@ class TestRepositoryCheckConfigService:
         assert error is not None
         assert "already exists" in error
 
-    @pytest.mark.asyncio
     async def test_create_config_minimal_data(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -247,7 +236,6 @@ class TestRepositoryCheckConfigService:
         assert config.verify_data is False  # Default
         assert config.enabled is True  # Default
 
-    @pytest.mark.asyncio
     async def test_update_config_success(
         self,
         service: RepositoryCheckConfigService,
@@ -276,7 +264,6 @@ class TestRepositoryCheckConfigService:
         # Unchanged fields should remain the same
         assert updated_config.name == "test-config"
 
-    @pytest.mark.asyncio
     async def test_update_config_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -289,7 +276,6 @@ class TestRepositoryCheckConfigService:
         assert config is None
         assert error is not None and "not found" in error
 
-    @pytest.mark.asyncio
     async def test_update_config_name_conflict(
         self, service: RepositoryCheckConfigService, test_db, sample_config
     ) -> None:
@@ -307,7 +293,6 @@ class TestRepositoryCheckConfigService:
         assert config is None
         assert error is not None and "already exists" in error
 
-    @pytest.mark.asyncio
     async def test_update_config_same_name_allowed(
         self,
         service: RepositoryCheckConfigService,
@@ -327,7 +312,6 @@ class TestRepositoryCheckConfigService:
         assert config.name == "test-config"
         assert config.description == "Updated"
 
-    @pytest.mark.asyncio
     async def test_enable_config_success(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -354,7 +338,6 @@ class TestRepositoryCheckConfigService:
         await test_db.refresh(config)
         assert config.enabled is True
 
-    @pytest.mark.asyncio
     async def test_enable_config_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -367,7 +350,6 @@ class TestRepositoryCheckConfigService:
         assert success_msg is None
         assert error is not None and "not found" in error
 
-    @pytest.mark.asyncio
     async def test_disable_config_success(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -394,7 +376,6 @@ class TestRepositoryCheckConfigService:
         await test_db.refresh(config)
         assert config.enabled is False
 
-    @pytest.mark.asyncio
     async def test_disable_config_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -407,7 +388,6 @@ class TestRepositoryCheckConfigService:
         assert success_msg is None
         assert error is not None and "not found" in error
 
-    @pytest.mark.asyncio
     async def test_delete_config_success(
         self, service: RepositoryCheckConfigService, test_db, sample_config
     ) -> None:
@@ -430,7 +410,6 @@ class TestRepositoryCheckConfigService:
         deleted_config = result.scalar_one_or_none()
         assert deleted_config is None
 
-    @pytest.mark.asyncio
     async def test_delete_config_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -441,7 +420,6 @@ class TestRepositoryCheckConfigService:
         assert name is None
         assert error is not None and "not found" in error
 
-    @pytest.mark.asyncio
     async def test_get_form_data_success(
         self, service: RepositoryCheckConfigService, test_db, sample_repository
     ) -> None:
@@ -470,7 +448,6 @@ class TestRepositoryCheckConfigService:
         assert len(result["check_configs"]) == 1
         assert result["check_configs"][0].name == "enabled-config"
 
-    @pytest.mark.asyncio
     async def test_get_form_data_empty_database(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -482,7 +459,6 @@ class TestRepositoryCheckConfigService:
         assert result["repositories"] == []
         assert result["check_configs"] == []
 
-    @pytest.mark.asyncio
     async def test_config_lifecycle(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:

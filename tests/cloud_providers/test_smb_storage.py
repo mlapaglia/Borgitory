@@ -168,7 +168,6 @@ class TestSMBStorage:
     ) -> SMBStorage:
         return SMBStorage(storage_config, mock_rclone_service)
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(
         self, storage: SMBStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -193,7 +192,6 @@ class TestSMBStorage:
             kerberos_ccache=None,
         )
 
-    @pytest.mark.asyncio
     async def test_test_connection_failure(
         self, storage: SMBStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -205,7 +203,6 @@ class TestSMBStorage:
         result = await storage.test_connection()
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_upload_repository_success(
         self, storage: SMBStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -237,7 +234,6 @@ class TestSMBStorage:
         assert any(event.type.value == "started" for event in progress_events)
         assert any(event.type.value == "completed" for event in progress_events)
 
-    @pytest.mark.asyncio
     async def test_upload_repository_failure(
         self, storage: SMBStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -351,7 +347,6 @@ class TestSMBStorageAdvancedOptions:
         assert config.case_insensitive is False
         assert config.kerberos_ccache == "FILE:/path/to/ccache"
 
-    @pytest.mark.asyncio
     async def test_upload_with_advanced_options(
         self, mock_rclone_service: AsyncMock
     ) -> None:

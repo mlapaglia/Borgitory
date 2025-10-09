@@ -207,7 +207,6 @@ class TestJobManager:
         assert hasattr(manager, "config")
         assert manager.config.max_concurrent_backups == 5
 
-    @pytest.mark.asyncio
     async def test_initialize(self, job_manager: JobManager) -> None:
         """Test async initialization"""
         await job_manager.initialize()
@@ -216,7 +215,6 @@ class TestJobManager:
         # Test that initialization completes without error
         assert job_manager.dependencies is not None
 
-    @pytest.mark.asyncio
     async def test_shutdown(self, job_manager: JobManager) -> None:
         """Test graceful shutdown"""
         # Initialize first
@@ -271,7 +269,6 @@ class TestJobManager:
         assert repo.name == "test-repo"
         assert repo.path == "/tmp/test-repo"
 
-    @pytest.mark.asyncio
     @patch("uuid.uuid4")
     async def test_start_borg_command_non_backup(
         self, mock_uuid: Mock, job_manager: JobManager
@@ -299,7 +296,6 @@ class TestJobManager:
         assert job.tasks[0].status == TaskStatusEnum.RUNNING
         mock_run.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("uuid.uuid4")
     async def test_start_borg_command_backup(
         self, mock_uuid: Mock, job_manager: JobManager
@@ -328,7 +324,6 @@ class TestJobManager:
         assert hasattr(job_manager, "dependencies")
         assert job_manager.dependencies is not None
 
-    @pytest.mark.asyncio
     async def test_get_queue_stats(self, job_manager: JobManager) -> None:
         """Test getting queue statistics"""
         # Initialize the job manager to create the queue
@@ -413,7 +408,6 @@ class TestJobManager:
         # Test that the event broadcaster has the expected interface
         assert hasattr(job_manager.dependencies.event_broadcaster, "subscribe_client")
 
-    @pytest.mark.asyncio
     async def test_stream_all_job_updates(self, job_manager: JobManager) -> None:
         """Test streaming all job updates"""
         # Test that the streaming function exists and returns an async generator
@@ -423,7 +417,6 @@ class TestJobManager:
         # Clean up
         await stream_gen.aclose()
 
-    @pytest.mark.asyncio
     async def test_cancel_job(self, job_manager: JobManager) -> None:
         """Test cancelling a running job"""
         # Set up a running job
@@ -436,13 +429,11 @@ class TestJobManager:
         await job_manager.cancel_job(job.id)
         # Result depends on implementation - interface test
 
-    @pytest.mark.asyncio
     async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
         result = await job_manager.cancel_job(uuid.uuid4())
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_execute_composite_task_success(
         self, job_manager: JobManager
     ) -> None:
@@ -515,7 +506,6 @@ class TestJobManager:
             # Verify events were broadcast
             assert mock_broadcaster.broadcast_event.call_count >= 1
 
-    @pytest.mark.asyncio
     async def test_execute_composite_task_failure(
         self, job_manager: JobManager
     ) -> None:
@@ -574,7 +564,6 @@ class TestJobManager:
                 ["borg", "list", "invalid-repo"], None
             )
 
-    @pytest.mark.asyncio
     async def test_execute_composite_task_exception(
         self, job_manager: JobManager
     ) -> None:

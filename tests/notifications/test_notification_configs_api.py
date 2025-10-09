@@ -3,7 +3,6 @@ Tests for notification API endpoints - HTMX response format testing only
 Business logic tests are in test_notification_config_service.py
 """
 
-import pytest
 from httpx import AsyncClient
 from unittest.mock import patch
 
@@ -48,7 +47,6 @@ class TestNotificationConfigsAPIHTMX:
         assert pushover_info.label == "Pushover"
         assert hasattr(pushover_info, "description")
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_pushover(
         self, async_client: AsyncClient
     ) -> None:
@@ -64,7 +62,6 @@ class TestNotificationConfigsAPIHTMX:
         assert len(content) > 0
         assert "user_key" in content  # Should contain pushover-specific fields
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_discord(self, async_client: AsyncClient) -> None:
         """Test getting provider fields for Discord returns HTML."""
         response = await async_client.get(
@@ -77,7 +74,6 @@ class TestNotificationConfigsAPIHTMX:
         content = response.text
         assert len(content) > 0
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_no_provider(
         self, async_client: AsyncClient
     ) -> None:
@@ -87,7 +83,6 @@ class TestNotificationConfigsAPIHTMX:
         assert response.status_code == 200
         assert response.text == ""
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_unknown_provider(
         self, async_client: AsyncClient
     ) -> None:
@@ -100,7 +95,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "text/html" in response.headers["content-type"]
         assert "No template found" in response.text
 
-    @pytest.mark.asyncio
     async def test_create_config_html_response(self, async_client: AsyncClient) -> None:
         """Test config creation returns HTML response."""
         form_data = {
@@ -117,7 +111,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_create_config_validation_error(
         self, async_client: AsyncClient
     ) -> None:
@@ -140,7 +133,6 @@ class TestNotificationConfigsAPIHTMX:
             or "validation" in content.lower()
         )
 
-    @pytest.mark.asyncio
     async def test_enable_config_html_response(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -159,7 +151,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_disable_config_html_response(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -178,7 +169,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_test_config_html_response(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -201,7 +191,6 @@ class TestNotificationConfigsAPIHTMX:
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_edit_form_html_response(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -222,7 +211,6 @@ class TestNotificationConfigsAPIHTMX:
         assert len(content) > 0
         assert config.name in content
 
-    @pytest.mark.asyncio
     async def test_update_config_html_response(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -250,7 +238,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_delete_config_html_response(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -269,7 +256,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_get_notification_form_html_response(
         self, async_client: AsyncClient
     ) -> None:
@@ -283,7 +269,6 @@ class TestNotificationConfigsAPIHTMX:
         assert len(content) > 0
         assert "notification" in content.lower()
 
-    @pytest.mark.asyncio
     async def test_config_not_found_responses(self, async_client: AsyncClient) -> None:
         """Test various endpoints with non-existent config ID."""
         non_existent_id = 99999

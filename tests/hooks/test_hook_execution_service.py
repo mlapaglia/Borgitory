@@ -53,7 +53,6 @@ class TestHookExecutionService:
         assert service.command_runner == mock_runner
         assert service.output_handler == mock_handler
 
-    @pytest.mark.asyncio
     async def test_execute_hooks_empty_list(self) -> None:
         """Test executing empty hooks list returns empty results."""
         mock_runner = MockCommandRunner()
@@ -66,7 +65,6 @@ class TestHookExecutionService:
         assert summary.critical_failure is False
         mock_runner._run_command_mock.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_execute_single_successful_hook(self) -> None:
         """Test executing a single successful hook."""
         mock_runner = MockCommandRunner()
@@ -95,7 +93,6 @@ class TestHookExecutionService:
         assert call_args[1]["command"] == ["/bin/bash", "-c", "echo 'Hello World'"]
         assert call_args[1]["timeout"] == 300
 
-    @pytest.mark.asyncio
     async def test_execute_hook_with_custom_shell(self) -> None:
         """Test executing hook with custom shell."""
         mock_runner = MockCommandRunner()
@@ -115,7 +112,6 @@ class TestHookExecutionService:
         assert call_args[1]["command"] == ["/bin/sh", "-c", "ls -la"]
         assert call_args[1]["timeout"] == 60
 
-    @pytest.mark.asyncio
     async def test_execute_hook_with_environment_vars(self) -> None:
         """Test executing hook with environment variables."""
         mock_runner = MockCommandRunner()
@@ -138,7 +134,6 @@ class TestHookExecutionService:
         assert "TEST_VAR" in env
         assert env["TEST_VAR"] == "test_value"
 
-    @pytest.mark.asyncio
     async def test_execute_hook_with_context(self) -> None:
         """Test executing hook with additional context variables."""
         mock_runner = MockCommandRunner()
@@ -164,7 +159,6 @@ class TestHookExecutionService:
         assert env["BORGITORY_TASK_INDEX"] == "2"
         assert env["BORGITORY_JOB_TYPE"] == "scheduled"
 
-    @pytest.mark.asyncio
     async def test_execute_failed_hook(self) -> None:
         """Test executing a failed hook."""
         mock_runner = MockCommandRunner()
@@ -188,7 +182,6 @@ class TestHookExecutionService:
         assert result.return_code == 1
         assert result.error == "Command failed"
 
-    @pytest.mark.asyncio
     async def test_execute_multiple_hooks_continue_on_failure(self) -> None:
         """Test executing multiple hooks with continue_on_failure=True."""
         mock_runner = MockCommandRunner()
@@ -216,7 +209,6 @@ class TestHookExecutionService:
         assert summary.results[1].success is True
         assert mock_runner._run_command_mock.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_execute_multiple_hooks_stop_on_failure(self) -> None:
         """Test executing multiple hooks with continue_on_failure=False."""
         mock_runner = MockCommandRunner()
@@ -237,7 +229,6 @@ class TestHookExecutionService:
         assert summary.results[0].success is False
         assert mock_runner._run_command_mock.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_execute_hook_with_output_logging(self) -> None:
         """Test hook execution with output logging."""
         mock_runner = MockCommandRunner()
@@ -267,7 +258,6 @@ class TestHookExecutionService:
             "Logging Hook", "Error output", True
         )
 
-    @pytest.mark.asyncio
     async def test_execute_hook_without_output_logging(self) -> None:
         """Test hook execution without output logging."""
         mock_runner = MockCommandRunner()

@@ -2,7 +2,6 @@
 Tests for auth HTMX functionality
 """
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +11,6 @@ from borgitory.models.database import User
 class TestAuthHTMX:
     """Test class for auth HTMX functionality."""
 
-    @pytest.mark.asyncio
     async def test_register_htmx_success(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -35,7 +33,6 @@ class TestAuthHTMX:
         assert user is not None
         assert user.username == "testuser"
 
-    @pytest.mark.asyncio
     async def test_register_htmx_validation_error(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -53,7 +50,6 @@ class TestAuthHTMX:
         # Check for error message
         assert "Username must be at least 3 characters" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_htmx_success(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -78,7 +74,6 @@ class TestAuthHTMX:
         assert "Login successful! Redirecting..." in response.text
         assert response.headers.get("HX-Redirect") == "/repositories"
 
-    @pytest.mark.asyncio
     async def test_login_htmx_invalid_credentials(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -96,7 +91,6 @@ class TestAuthHTMX:
         # Check for error message
         assert "Invalid username or password" in response.text
 
-    @pytest.mark.asyncio
     async def test_check_users_no_users_returns_register_form(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -112,7 +106,6 @@ class TestAuthHTMX:
         assert 'id="register-form"' in response.text
         assert 'action="/auth/register"' in response.text
 
-    @pytest.mark.asyncio
     async def test_check_users_with_users_returns_login_form(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:

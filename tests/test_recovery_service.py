@@ -62,7 +62,6 @@ class TestRecoveryServiceBasics:
         )
         assert service.command_executor is mock_command_executor
 
-    @pytest.mark.asyncio
     async def test_recover_stale_jobs(self, recovery_service: RecoveryService) -> None:
         """Test the main recovery entry point."""
         with patch.object(
@@ -75,7 +74,6 @@ class TestRecoveryServiceBasics:
 class TestRecoveryServiceDatabaseRecovery:
     """Test database job record recovery."""
 
-    @pytest.mark.asyncio
     async def test_recover_database_job_records_no_interrupted_jobs(
         self, recovery_service: RecoveryService
     ) -> None:
@@ -99,7 +97,6 @@ class TestRecoveryServiceDatabaseRecovery:
         # Verify execute was called
         mock_db.execute.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_recover_database_job_records_with_interrupted_jobs(
         self, recovery_service: RecoveryService, mock_repository: Mock
     ) -> None:
@@ -163,7 +160,6 @@ class TestRecoveryServiceDatabaseRecovery:
             # Verify repository lock was released
             mock_release.assert_called_once_with(mock_repository)
 
-    @pytest.mark.asyncio
     async def test_recover_database_job_records_non_backup_job(
         self, recovery_service: RecoveryService
     ) -> None:
@@ -201,7 +197,6 @@ class TestRecoveryServiceDatabaseRecovery:
             # Verify repository lock was NOT released (not a backup job)
             mock_release.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_recover_database_job_records_exception_handling(
         self, recovery_service: RecoveryService
     ) -> None:
@@ -216,7 +211,6 @@ class TestRecoveryServiceDatabaseRecovery:
 class TestRecoveryServiceLockRelease:
     """Test repository lock release functionality."""
 
-    @pytest.mark.asyncio
     async def test_release_repository_lock_success(
         self,
         recovery_service: RecoveryService,
@@ -250,7 +244,6 @@ class TestRecoveryServiceLockRelease:
             assert call_args[1]["command"] == ["borg", "break-lock", "/test/repo/path"]
             assert "BORG_PASSPHRASE" in call_args[1]["env"]
 
-    @pytest.mark.asyncio
     async def test_release_repository_lock_command_failure(
         self,
         recovery_service: RecoveryService,
@@ -279,7 +272,6 @@ class TestRecoveryServiceLockRelease:
             # Verify the command executor was called
             mock_command_executor.create_subprocess.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_release_repository_lock_timeout(
         self,
         recovery_service: RecoveryService,
@@ -308,7 +300,6 @@ class TestRecoveryServiceLockRelease:
             # Verify process was killed
             mock_process.kill.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_release_repository_lock_exception(
         self,
         recovery_service: RecoveryService,
@@ -335,7 +326,6 @@ class TestRecoveryServiceLockRelease:
 class TestRecoveryServiceIntegration:
     """Test integration scenarios."""
 
-    @pytest.mark.asyncio
     async def test_full_recovery_workflow(
         self,
         recovery_service: RecoveryService,

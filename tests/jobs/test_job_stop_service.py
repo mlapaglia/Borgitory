@@ -3,7 +3,6 @@ Tests for job stop functionality at the service layer
 Tests business logic directly without mocking
 """
 
-import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +24,6 @@ class TestJobStopService:
         self.mock_job_manager = AsyncMock()
         self.job_service = JobService(self.mock_db, self.mock_job_manager)
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_success(self) -> None:
         """Test stopping a composite job successfully"""
         # Arrange
@@ -51,7 +49,6 @@ class TestJobStopService:
         assert result.current_task_killed is True
         self.mock_job_manager.stop_job.assert_called_once_with(job_id)
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_not_found(self) -> None:
         """Test stopping non-existent composite job"""
         # Arrange
@@ -73,7 +70,6 @@ class TestJobStopService:
         assert result.error == "Job not found"
         assert result.error_code == "JOB_NOT_FOUND"
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_invalid_status(self) -> None:
         """Test stopping composite job in invalid status"""
         # Arrange
@@ -95,7 +91,6 @@ class TestJobStopService:
         assert "Cannot stop job in status: completed" in result.error
         assert result.error_code == "INVALID_STATUS"
 
-    @pytest.mark.asyncio
     async def test_stop_database_job_success(self, test_db: AsyncSession) -> None:
         """Test stopping a database job successfully"""
         # Arrange - Create real database job
@@ -140,7 +135,6 @@ class TestJobStopService:
         # Note: Database updates are handled by the job manager, not the job service
         # The job service only orchestrates the call to the job manager
 
-    @pytest.mark.asyncio
     async def test_stop_database_job_invalid_status(
         self, test_db: AsyncSession
     ) -> None:
@@ -182,7 +176,6 @@ class TestJobStopService:
         assert "Cannot stop job in status: completed" in result.error
         assert result.error_code == "INVALID_STATUS"
 
-    @pytest.mark.asyncio
     async def test_stop_job_not_found_anywhere(self, test_db: AsyncSession) -> None:
         """Test stopping job that doesn't exist in manager or database"""
         # Arrange
@@ -205,7 +198,6 @@ class TestJobStopService:
         assert result.error == "Job not found"
         assert result.error_code == "JOB_NOT_FOUND"
 
-    @pytest.mark.asyncio
     async def test_stop_job_no_tasks_skipped(self) -> None:
         """Test stopping job with no remaining tasks"""
         # Arrange
@@ -228,7 +220,6 @@ class TestJobStopService:
         assert result.tasks_skipped == 0
         assert result.current_task_killed is True
 
-    @pytest.mark.asyncio
     async def test_stop_job_database_exception(self, test_db: AsyncSession) -> None:
         """Test handling database exceptions during job stop"""
         # Arrange - Create job but simulate database error

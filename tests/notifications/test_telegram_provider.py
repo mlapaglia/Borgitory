@@ -463,7 +463,6 @@ class TestTelegramProvider:
 
     # ===== SEND_NOTIFICATION TESTS =====
 
-    @pytest.mark.asyncio
     async def test_send_notification_success(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -504,7 +503,6 @@ class TestTelegramProvider:
         assert "text" in payload
         assert payload["parse_mode"] == telegram_config.parse_mode
 
-    @pytest.mark.asyncio
     async def test_send_notification_api_error(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -530,7 +528,6 @@ class TestTelegramProvider:
         assert result.error == "Bad Request: chat not found"
         assert "response" in result.metadata
 
-    @pytest.mark.asyncio
     async def test_send_notification_http_error(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -551,7 +548,6 @@ class TestTelegramProvider:
         assert result.error == "Unauthorized"
         assert result.metadata["status_code"] == 401
 
-    @pytest.mark.asyncio
     async def test_send_notification_json_parse_error_but_200(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -573,7 +569,6 @@ class TestTelegramProvider:
         assert result.error is None
         assert "response" in result.metadata
 
-    @pytest.mark.asyncio
     async def test_send_notification_network_exception(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -591,7 +586,6 @@ class TestTelegramProvider:
         assert result.error == "Network error"
         assert result.metadata == {}
 
-    @pytest.mark.asyncio
     async def test_send_notification_payload_construction(
         self, mock_http_client, sample_message
     ):
@@ -619,7 +613,6 @@ class TestTelegramProvider:
         assert "parse_mode" not in payload
         assert payload["disable_notification"] is True
 
-    @pytest.mark.asyncio
     async def test_send_notification_empty_parse_mode(
         self, mock_http_client, sample_message
     ):
@@ -645,7 +638,6 @@ class TestTelegramProvider:
         payload = call_args[1]["json"]
         assert "parse_mode" not in payload
 
-    @pytest.mark.asyncio
     async def test_send_notification_with_metadata(
         self, telegram_config, mock_http_client
     ):
@@ -684,7 +676,6 @@ class TestTelegramProvider:
         assert "Backup Size" in message_text  # metadata keys are formatted
         assert "2.5 GB" in message_text
 
-    @pytest.mark.asyncio
     async def test_send_notification_different_notification_types(
         self, telegram_config, mock_http_client
     ):
@@ -722,7 +713,6 @@ class TestTelegramProvider:
             message_text = payload["text"]
             assert expected_emoji in message_text
 
-    @pytest.mark.asyncio
     async def test_send_notification_api_url_construction(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -744,7 +734,6 @@ class TestTelegramProvider:
         call_args = mock_http_client.post.call_args
         assert call_args[0][0] == expected_url
 
-    @pytest.mark.asyncio
     async def test_send_notification_unknown_api_error(
         self, telegram_config, mock_http_client, sample_message
     ):
@@ -767,7 +756,6 @@ class TestTelegramProvider:
 
     # ===== TEST_CONNECTION TESTS =====
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(self, telegram_config, mock_http_client):
         """Test successful connection test"""
         # Setup mock responses for both getMe and test notification
@@ -821,7 +809,6 @@ class TestTelegramProvider:
         assert "Borgitory Test" in test_payload["text"]
         assert "test notification" in test_payload["text"]
 
-    @pytest.mark.asyncio
     async def test_test_connection_getme_http_error(
         self, telegram_config, mock_http_client
     ):
@@ -840,7 +827,6 @@ class TestTelegramProvider:
         # Verify only getMe was called (test notification should not be attempted)
         assert mock_http_client.post.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_test_connection_getme_api_error(
         self, telegram_config, mock_http_client
     ):
@@ -862,7 +848,6 @@ class TestTelegramProvider:
         # Verify only getMe was called
         assert mock_http_client.post.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_test_connection_getme_success_but_notification_fails(
         self, telegram_config, mock_http_client
     ):
@@ -895,7 +880,6 @@ class TestTelegramProvider:
         # Verify both calls were made
         assert mock_http_client.post.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_test_connection_network_exception_on_getme(
         self, telegram_config, mock_http_client
     ):
@@ -909,7 +893,6 @@ class TestTelegramProvider:
         # Verify result
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_test_connection_network_exception_on_test_notification(
         self, telegram_config, mock_http_client
     ):
@@ -933,7 +916,6 @@ class TestTelegramProvider:
         # Verify both calls were attempted
         assert mock_http_client.post.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_test_connection_getme_json_parse_error(
         self, telegram_config, mock_http_client
     ):
@@ -950,7 +932,6 @@ class TestTelegramProvider:
         # Verify result
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_test_connection_uses_correct_test_message(
         self, telegram_config, mock_http_client
     ):
@@ -991,7 +972,6 @@ class TestTelegramProvider:
         if telegram_config.parse_mode and telegram_config.parse_mode != "None":
             assert test_payload["parse_mode"] == telegram_config.parse_mode
 
-    @pytest.mark.asyncio
     async def test_test_connection_with_different_configs(self, mock_http_client):
         """Test connection test works with different configuration options"""
         configs_to_test = [

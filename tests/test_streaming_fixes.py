@@ -60,7 +60,6 @@ class TestJobStreamingFixes:
         job.tasks = [task1, task2]
         return job
 
-    @pytest.mark.asyncio
     async def test_task_streaming_sends_individual_lines(
         self,
         job_stream_service: JobStreamService,
@@ -100,7 +99,6 @@ class TestJobStreamingFixes:
         assert "event: output" in events[2]
         assert "<div>Backup completed</div>" in events[2]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_handles_new_output_events(
         self,
         job_stream_service: JobStreamService,
@@ -144,7 +142,6 @@ class TestJobStreamingFixes:
         assert "event: output" in new_event
         assert "<div>New output line</div>" in new_event
 
-    @pytest.mark.asyncio
     async def test_completed_task_streaming_from_database(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -377,14 +374,12 @@ class TestBackwardCompatibility:
 class TestStreamingIntegration:
     """Integration tests for streaming functionality"""
 
-    @pytest.mark.asyncio
     async def test_complete_task_streaming_workflow(self) -> None:
         """Test complete workflow from job creation to streaming completion"""
         # This would be a more comprehensive integration test
         # that tests the entire streaming pipeline
         pass  # Implementation would require more setup
 
-    @pytest.mark.asyncio
     async def test_database_to_memory_job_transition(self) -> None:
         """Test transition from database job to memory job during streaming"""
         # Test the handoff between completed jobs in database

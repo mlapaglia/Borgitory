@@ -300,7 +300,6 @@ class TestJobManagerTaskExecution:
 
         return job_manager
 
-    @pytest.mark.asyncio
     async def test_create_composite_job(
         self, job_manager_with_mocks: JobManager, sample_repository: Repository
     ) -> None:
@@ -346,7 +345,6 @@ class TestJobManagerTaskExecution:
         assert job.tasks[0].task_name == "Backup data"
         assert job.tasks[1].task_type == "prune"
 
-    @pytest.mark.asyncio
     async def test_execute_composite_job_success(
         self, job_manager_with_mocks: JobManager, sample_repository: Repository
     ) -> None:
@@ -396,7 +394,6 @@ class TestJobManagerTaskExecution:
         assert task1.status == "completed"
         assert task2.status == "completed"
 
-    @pytest.mark.asyncio
     async def test_execute_composite_job_critical_failure(
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
@@ -519,7 +516,6 @@ class TestJobManagerTaskExecution:
             assert db_job.status == JobStatusEnum.FAILED
             assert db_job.finished_at is not None
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -577,7 +573,6 @@ class TestJobManagerTaskExecution:
         assert task.return_code == 0
         # Task execution should complete successfully
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_success_with_proper_di(
         self,
         job_manager_with_mocks: JobManager,
@@ -644,7 +639,6 @@ class TestJobManagerTaskExecution:
         mock_job_executor.start_process.assert_called_once()
         mock_job_executor.monitor_process_output.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_failure(
         self,
         job_manager_with_mocks: JobManager,
@@ -698,7 +692,6 @@ class TestJobManagerTaskExecution:
         assert task.error is not None
         assert "Backup failed" in task.error
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_with_dry_run(
         self,
         job_manager_with_secure_command_mock: JobManager,
@@ -761,7 +754,6 @@ class TestJobManagerTaskExecution:
         # The --dry-run flag is verified in the logs - we can see it in the "Final additional_args" log line
         # This test verifies that the dry_run parameter is properly processed and the task completes successfully
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -813,7 +805,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_check_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -862,7 +853,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -913,7 +903,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_notification_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -987,7 +976,6 @@ class TestJobManagerTaskExecution:
         # Verify notification service was called
         mock_notification_service.send_notification.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_notification_task_no_config(
         self, job_manager_with_mocks: JobManager
     ) -> None:
@@ -1099,7 +1087,6 @@ class TestJobManagerDatabaseIntegration:
 
         return manager
 
-    @pytest.mark.asyncio
     async def test_get_repository_data_success(
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
@@ -1115,7 +1102,6 @@ class TestJobManagerDatabaseIntegration:
         assert result["path"] == "/tmp/test-repo"
         assert result["passphrase"] == "test-passphrase"
 
-    @pytest.mark.asyncio
     async def test_get_repository_data_not_found(
         self, job_manager_with_db: JobManager
     ) -> None:
@@ -1152,7 +1138,6 @@ class TestJobManagerStreamingAndUtility:
         )
         return job_manager
 
-    @pytest.mark.asyncio
     async def test_stream_job_output(self, job_manager: JobManager) -> None:
         """Test streaming job output"""
 
@@ -1170,7 +1155,6 @@ class TestJobManagerStreamingAndUtility:
         assert output_list[0]["line"] == "output line 1"
         assert output_list[1]["progress"]["percent"] == 50  # type: ignore[index]
 
-    @pytest.mark.asyncio
     async def test_stream_job_output_no_manager(self) -> None:
         """Test streaming output when no output manager"""
         manager = JobManager()
@@ -1220,7 +1204,6 @@ class TestJobManagerStreamingAndUtility:
         assert jobs[job2_id] is job2
         assert jobs is not job_manager.jobs  # Should return copy
 
-    @pytest.mark.asyncio
     async def test_get_job_output_stream(self, job_manager: JobManager) -> None:
         """Test getting job output stream data"""
         job_id = uuid.uuid4()
@@ -1245,7 +1228,6 @@ class TestJobManagerStreamingAndUtility:
         assert result.progress["percent"] == 75
         assert result.total_lines == 2
 
-    @pytest.mark.asyncio
     async def test_get_job_output_stream_no_output(
         self, job_manager: JobManager
     ) -> None:
@@ -1270,7 +1252,6 @@ class TestJobManagerStreamingAndUtility:
         count = job_manager.get_active_jobs_count()
         assert count == 3  # 2 running + 1 queued
 
-    @pytest.mark.asyncio
     async def test_cancel_job_success(self, job_manager: JobManager) -> None:
         """Test cancelling a job successfully"""
         job = Mock(status="running")
@@ -1288,7 +1269,6 @@ class TestJobManagerStreamingAndUtility:
         assert job.completed_at is not None
         assert job_id not in job_manager._processes
 
-    @pytest.mark.asyncio
     async def test_cancel_job_not_cancellable(self, job_manager: JobManager) -> None:
         """Test cancelling job in non-cancellable state"""
         job = Mock(status="completed")
@@ -1298,7 +1278,6 @@ class TestJobManagerStreamingAndUtility:
         result = await job_manager.cancel_job(job_id)
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
         result = await job_manager.cancel_job(uuid.uuid4())

@@ -2,7 +2,6 @@
 Tests for repositories API endpoints
 """
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +11,6 @@ from borgitory.models.database import Repository
 class TestRepositoriesAPI:
     """Test class for repositories API endpoints."""
 
-    @pytest.mark.asyncio
     async def test_list_repositories_empty(self, async_client: AsyncClient) -> None:
         """Test listing repositories when empty."""
         response = await async_client.get("/api/repositories/")
@@ -20,7 +18,6 @@ class TestRepositoriesAPI:
         assert response.status_code == 200
         assert response.json() == []
 
-    @pytest.mark.asyncio
     async def test_list_repositories_with_data(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -46,7 +43,6 @@ class TestRepositoriesAPI:
         assert response_data[0]["name"] == "repo-1"
         assert response_data[1]["name"] == "repo-2"
 
-    @pytest.mark.asyncio
     async def test_list_repositories_pagination(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:

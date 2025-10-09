@@ -528,7 +528,6 @@ class TestJobRenderServiceCoverage:
         # Verify error template was used
         mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
 
-    @pytest.mark.asyncio
     async def test_stream_current_jobs_html(
         self, mock_templates: Mock, mock_job_manager: Mock
     ) -> None:
@@ -559,7 +558,6 @@ class TestJobRenderServiceCoverage:
         assert len(results) >= 1
         assert all("data:" in chunk for chunk in results)
 
-    @pytest.mark.asyncio
     async def test_stream_current_jobs_html_error_handling(
         self, mock_templates: Mock, mock_job_manager: Mock
     ) -> None:

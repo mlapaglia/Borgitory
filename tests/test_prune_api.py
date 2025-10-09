@@ -74,7 +74,6 @@ def sample_config_update() -> PruneConfigUpdate:
 class TestPruneAPI:
     """Test class for API endpoints focusing on HTMX responses."""
 
-    @pytest.mark.asyncio
     async def test_get_prune_form_success(
         self,
         mock_request: MagicMock,
@@ -99,7 +98,6 @@ class TestPruneAPI:
             mock_form_data,
         )
 
-    @pytest.mark.asyncio
     async def test_get_policy_form_success(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
@@ -115,7 +113,6 @@ class TestPruneAPI:
             {},
         )
 
-    @pytest.mark.asyncio
     async def test_get_strategy_fields_success(
         self, mock_request: MagicMock, mock_templates: MagicMock
     ) -> None:
@@ -131,7 +128,6 @@ class TestPruneAPI:
             {"strategy": "advanced"},
         )
 
-    @pytest.mark.asyncio
     async def test_create_prune_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -168,7 +164,6 @@ class TestPruneAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "pruneConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_create_prune_config_failure_htmx_response(
         self,
         mock_request: MagicMock,
@@ -241,7 +236,6 @@ class TestPruneAPI:
         # Verify error template response
         mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
 
-    @pytest.mark.asyncio
     async def test_enable_prune_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -275,7 +269,6 @@ class TestPruneAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "pruneConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_enable_prune_config_not_found_htmx_response(
         self,
         mock_request: MagicMock,
@@ -302,7 +295,6 @@ class TestPruneAPI:
             status_code=404,
         )
 
-    @pytest.mark.asyncio
     async def test_disable_prune_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -336,7 +328,6 @@ class TestPruneAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "pruneConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_disable_prune_config_not_found_htmx_response(
         self,
         mock_request: MagicMock,
@@ -363,7 +354,6 @@ class TestPruneAPI:
             status_code=404,
         )
 
-    @pytest.mark.asyncio
     async def test_get_prune_config_edit_form_success(
         self,
         mock_request: MagicMock,
@@ -391,7 +381,6 @@ class TestPruneAPI:
             },
         )
 
-    @pytest.mark.asyncio
     async def test_get_prune_config_edit_form_not_found(
         self,
         mock_request: MagicMock,
@@ -412,7 +401,6 @@ class TestPruneAPI:
         assert exc_info.value.status_code == 404
         assert "Prune configuration not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_update_prune_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -449,7 +437,6 @@ class TestPruneAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "pruneConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_update_prune_config_failure_htmx_response(
         self,
         mock_request: MagicMock,
@@ -479,7 +466,6 @@ class TestPruneAPI:
             status_code=404,
         )
 
-    @pytest.mark.asyncio
     async def test_delete_prune_config_success_htmx_response(
         self,
         mock_request: MagicMock,
@@ -512,7 +498,6 @@ class TestPruneAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "pruneConfigUpdate"
 
-    @pytest.mark.asyncio
     async def test_delete_prune_config_failure_htmx_response(
         self,
         mock_request: MagicMock,

@@ -499,7 +499,6 @@ class TestCloudSyncService:
             name="test-sftp",
         )
 
-    @pytest.mark.asyncio
     async def test_execute_sync_success(
         self,
         service: CloudSyncService,
@@ -539,7 +538,6 @@ class TestCloudSyncService:
         mock_syncer_class.assert_called_once()
         mock_syncer.sync_repository.assert_called_once_with(repository_path, "backups/")
 
-    @pytest.mark.asyncio
     async def test_execute_sync_with_output_callback(
         self,
         service: CloudSyncService,
@@ -568,7 +566,6 @@ class TestCloudSyncService:
         mock_syncer_class.assert_called_once()
         # The handler should have been passed to the syncer constructor
 
-    @pytest.mark.asyncio
     async def test_execute_sync_storage_creation_failure(
         self,
         service: CloudSyncService,
@@ -587,7 +584,6 @@ class TestCloudSyncService:
         assert "Failed to execute sync" in result.error
         assert "Invalid configuration" in result.error
 
-    @pytest.mark.asyncio
     async def test_execute_sync_syncer_failure(
         self,
         service: CloudSyncService,
@@ -612,7 +608,6 @@ class TestCloudSyncService:
         assert "Failed to execute sync" in result.error
         assert "Sync failed" in result.error
 
-    @pytest.mark.asyncio
     async def test_execute_sync_with_callback_on_error(
         self,
         service: CloudSyncService,
@@ -634,7 +629,6 @@ class TestCloudSyncService:
         assert result.success is False
         assert any("Storage error" in msg for msg in output_messages)
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(
         self,
         service: CloudSyncService,
@@ -651,7 +645,6 @@ class TestCloudSyncService:
         assert result is True
         mock_storage.test_connection.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_test_connection_failure(
         self,
         service: CloudSyncService,
@@ -667,7 +660,6 @@ class TestCloudSyncService:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_test_connection_exception(
         self,
         service: CloudSyncService,
@@ -803,7 +795,6 @@ class TestCloudSyncService:
         assert service_with_defaults._encryption_service is not None
         assert isinstance(service_with_defaults._encryption_service, EncryptionService)
 
-    @pytest.mark.asyncio
     async def test_execute_sync_different_providers(
         self, service: CloudSyncService, mock_storage_factory: Mock
     ) -> None:

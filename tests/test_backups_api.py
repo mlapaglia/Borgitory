@@ -2,7 +2,6 @@
 Tests for backups API endpoints
 """
 
-import pytest
 import json
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +18,6 @@ from borgitory.models.database import (
 class TestBackupsAPI:
     """Test class for backups API endpoints."""
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_empty_database(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -33,7 +31,6 @@ class TestBackupsAPI:
         content = response.text
         assert "Select Repository..." in content  # Default option should be present
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_with_repository(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -54,7 +51,6 @@ class TestBackupsAPI:
         content = response.text
         assert "test-repo" in content
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_with_all_configs(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -130,7 +126,6 @@ class TestBackupsAPI:
         content = response.text
         assert "test-repo" in content
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_only_enabled_configs(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -163,7 +158,6 @@ class TestBackupsAPI:
 
         assert response.status_code == 200
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_mixed_enabled_disabled(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -293,7 +287,6 @@ class TestBackupsAPI:
 
         # Verify response is valid HTML and endpoint handles mixed scenarios correctly
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_database_error_handling(
         self, async_client: AsyncClient
     ) -> None:
@@ -306,7 +299,6 @@ class TestBackupsAPI:
         # (The exact behavior depends on error handling in the template)
         assert response.status_code in [200, 500]  # Either success or handled error
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_response_headers(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -320,7 +312,6 @@ class TestBackupsAPI:
         content = response.text
         assert len(content) > 0  # Should have some content
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_template_context(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -391,7 +382,6 @@ class TestBackupsAPI:
         content = response.text
         assert len(content) > 0
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_invalid_route(
         self, async_client: AsyncClient
     ) -> None:
@@ -400,7 +390,6 @@ class TestBackupsAPI:
 
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
     async def test_get_backup_form_method_not_allowed(
         self, async_client: AsyncClient
     ) -> None:

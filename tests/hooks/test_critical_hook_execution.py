@@ -2,7 +2,6 @@
 Tests for HookExecutionService critical failure and early exit logic.
 """
 
-import pytest
 import uuid
 from typing import Dict, List, Optional, Any
 from unittest.mock import AsyncMock
@@ -54,7 +53,6 @@ class TestHookExecutionServiceCriticalFailure:
             command_runner=self.mock_runner, output_handler=self.mock_output_handler
         )
 
-    @pytest.mark.asyncio
     async def test_critical_hook_failure_stops_execution(self) -> None:
         """Test that critical hook failure stops remaining hook execution."""
         # Setup hooks - first critical, second non-critical
@@ -95,7 +93,6 @@ class TestHookExecutionServiceCriticalFailure:
         # Verify only first command was called
         assert self.mock_runner._run_command_mock.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_non_critical_hook_failure_continues_execution(self) -> None:
         """Test that non-critical hook failure allows remaining hooks to execute."""
         # Setup hooks - first non-critical, second non-critical
@@ -132,7 +129,6 @@ class TestHookExecutionServiceCriticalFailure:
         # Verify both commands were called
         assert self.mock_runner._run_command_mock.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_critical_hook_success_continues_execution(self) -> None:
         """Test that critical hook success allows remaining hooks to execute."""
         # Setup hooks - first critical (succeeds), second normal
@@ -168,7 +164,6 @@ class TestHookExecutionServiceCriticalFailure:
         # Verify both commands were called
         assert self.mock_runner._run_command_mock.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_multiple_critical_hooks_first_fails(self) -> None:
         """Test multiple critical hooks where first one fails."""
         # Setup hooks - both critical
@@ -201,7 +196,6 @@ class TestHookExecutionServiceCriticalFailure:
         # Verify only first command was called
         assert self.mock_runner._run_command_mock.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_continue_on_failure_with_non_critical_hook(self) -> None:
         """Test continue_on_failure=False with non-critical hook stops execution."""
         # Setup hooks - first non-critical with continue_on_failure=False
@@ -240,7 +234,6 @@ class TestHookExecutionServiceCriticalFailure:
         # Verify only first command was called
         assert self.mock_runner._run_command_mock.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_empty_hooks_list(self) -> None:
         """Test executing empty hooks list returns successful summary."""
         summary = await self.service.execute_hooks(
@@ -264,7 +257,6 @@ class TestHookExecutionServicePostHookConditional:
         self.mock_runner = MockCommandRunner()
         self.service = HookExecutionService(command_runner=self.mock_runner)
 
-    @pytest.mark.asyncio
     async def test_post_hook_runs_on_job_success(self) -> None:
         """Test post-hook runs when job succeeded and run_on_job_failure=False."""
         hooks = [
@@ -287,7 +279,6 @@ class TestHookExecutionServicePostHookConditional:
         assert summary.results[0].hook_name == "success only hook"
         assert self.mock_runner._run_command_mock.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_post_hook_skipped_on_job_failure(self) -> None:
         """Test post-hook skipped when job failed and run_on_job_failure=False."""
         hooks = [
@@ -306,7 +297,6 @@ class TestHookExecutionServicePostHookConditional:
         assert summary.all_successful is True  # No hooks ran, so "successful"
         assert self.mock_runner._run_command_mock.call_count == 0
 
-    @pytest.mark.asyncio
     async def test_post_hook_runs_on_job_failure_when_configured(self) -> None:
         """Test post-hook runs when job failed and run_on_job_failure=True."""
         hooks = [
@@ -329,7 +319,6 @@ class TestHookExecutionServicePostHookConditional:
         assert summary.results[0].hook_name == "failure cleanup hook"
         assert self.mock_runner._run_command_mock.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_mixed_post_hooks_on_job_failure(self) -> None:
         """Test mixed post-hooks where some run on failure, others don't."""
         hooks = [
@@ -363,7 +352,6 @@ class TestHookExecutionServicePostHookConditional:
 
         assert self.mock_runner._run_command_mock.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_pre_hooks_ignore_job_failed_parameter(self) -> None:
         """Test pre-hooks always execute regardless of job_failed parameter."""
         hooks = [HookConfig(name="pre hook", command="pre", run_on_job_failure=False)]

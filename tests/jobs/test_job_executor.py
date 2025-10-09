@@ -21,7 +21,6 @@ class TestJobExecutor:
         self.mock_command_executor.create_subprocess = self.mock_subprocess
         self.executor = JobExecutor(command_executor=self.mock_command_executor)
 
-    @pytest.mark.asyncio
     async def test_start_process_success(self) -> None:
         """Test successful process start"""
 
@@ -37,7 +36,6 @@ class TestJobExecutor:
         assert process == mock_process
         self.mock_subprocess.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_start_process_failure(self) -> None:
         """Test process start failure"""
 
@@ -52,7 +50,6 @@ class TestJobExecutor:
         with pytest.raises(Exception, match="Process start failed"):
             await self.executor.start_process(command)
 
-    @pytest.mark.asyncio
     async def test_monitor_process_output_success(self) -> None:
         """Test successful process output monitoring"""
 
@@ -85,7 +82,6 @@ class TestJobExecutor:
         assert output_lines == ["line1", "line2"]
         assert result.error is None
 
-    @pytest.mark.asyncio
     async def test_monitor_process_output_with_error(self) -> None:
         """Test process output monitoring with error"""
 
@@ -138,7 +134,6 @@ class TestJobExecutor:
         # Should not raise exception, just return empty dict
         assert progress == {}
 
-    @pytest.mark.asyncio
     async def test_terminate_process_graceful(self) -> None:
         """Test graceful process termination"""
 
@@ -154,7 +149,6 @@ class TestJobExecutor:
         mock_process.terminate.assert_called_once()
         mock_process.wait.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_terminate_process_force_kill(self) -> None:
         """Test force killing process after timeout"""
 
@@ -172,7 +166,6 @@ class TestJobExecutor:
         mock_process.terminate.assert_called_once()
         mock_process.kill.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_terminate_process_already_terminated(self) -> None:
         """Test terminating already finished process"""
 
@@ -188,7 +181,6 @@ class TestJobExecutor:
         mock_process.terminate.assert_not_called()
         mock_process.kill.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_terminate_process_error(self) -> None:
         """Test error during process termination"""
 

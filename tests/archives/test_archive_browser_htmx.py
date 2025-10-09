@@ -2,7 +2,6 @@
 Tests for archive browser HTMX functionality
 """
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import Mock, AsyncMock
@@ -16,7 +15,6 @@ from borgitory.services.borg_service import BorgService
 class TestArchiveBrowserHTMX:
     """Test class for archive browser HTMX functionality."""
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_success(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -76,7 +74,6 @@ class TestArchiveBrowserHTMX:
             if get_repository_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_service]
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_empty(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -125,7 +122,6 @@ class TestArchiveBrowserHTMX:
             if get_repository_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_service]
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_error(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -173,7 +169,6 @@ class TestArchiveBrowserHTMX:
             if get_repository_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_service]
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_not_found(
         self, async_client: AsyncClient
     ) -> None:
@@ -214,7 +209,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_success(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -283,7 +277,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_with_path(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -333,7 +326,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_empty_directory(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -367,7 +359,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_error(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -404,7 +395,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_not_found(
         self, async_client: AsyncClient
     ) -> None:
@@ -416,7 +406,6 @@ class TestArchiveBrowserHTMX:
 
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
     async def test_file_size_formatting(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -486,7 +475,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_repository_selector(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -524,7 +512,6 @@ class TestArchiveBrowserHTMX:
         assert 'id="refresh-archives-btn"' in response.text
         assert "hx-include" in response.text
 
-    @pytest.mark.asyncio
     async def test_archive_repository_selector_with_preselection(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -570,7 +557,6 @@ class TestArchiveBrowserHTMX:
         assert "repo-1" in content
         assert "repo-2" in content
 
-    @pytest.mark.asyncio
     async def test_archive_repository_selector_htmx_triggers(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -600,7 +586,6 @@ class TestArchiveBrowserHTMX:
         content = response.text
         assert 'hx-trigger="change, load"' in content
 
-    @pytest.mark.asyncio
     async def test_archives_list_endpoint_form_data(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -648,7 +633,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_htmx_navigation_attributes(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
@@ -702,7 +686,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_breadcrumb_navigation_paths(
         self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:

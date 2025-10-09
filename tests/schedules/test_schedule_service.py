@@ -58,7 +58,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Invalid cron expression" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_get_schedule_by_id_success(
         self,
         service: ScheduleService,
@@ -80,7 +79,6 @@ class TestScheduleService:
         assert result.name == "test-schedule"
         assert result.id == schedule.id
 
-    @pytest.mark.asyncio
     async def test_get_schedule_by_id_not_found(
         self, service: ScheduleService, test_db: AsyncSession
     ) -> None:
@@ -88,7 +86,6 @@ class TestScheduleService:
         result = await service.get_schedule_by_id(999, test_db)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_schedules_empty(
         self, service: ScheduleService, test_db: AsyncSession
     ) -> None:
@@ -96,7 +93,6 @@ class TestScheduleService:
         result = await service.get_schedules(test_db)
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_get_schedules_with_data(
         self,
         service: ScheduleService,
@@ -125,7 +121,6 @@ class TestScheduleService:
         assert "schedule-1" in names
         assert "schedule-2" in names
 
-    @pytest.mark.asyncio
     async def test_get_schedules_with_pagination(
         self,
         service: ScheduleService,
@@ -145,7 +140,6 @@ class TestScheduleService:
         result = await service.get_schedules(test_db, skip=2, limit=2)
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_get_all_schedules(
         self,
         service: ScheduleService,
@@ -165,7 +159,6 @@ class TestScheduleService:
         assert len(result) == 1
         assert result[0].name == "test-schedule"
 
-    @pytest.mark.asyncio
     async def test_create_schedule_success(
         self,
         service: ScheduleService,
@@ -200,7 +193,6 @@ class TestScheduleService:
         # Verify scheduler was called
         mock_scheduler_service.add_schedule.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_schedule_repository_not_found(
         self, service: ScheduleService, test_db: AsyncSession
     ) -> None:
@@ -218,7 +210,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Repository not found" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_create_schedule_invalid_cron(
         self,
         service: ScheduleService,
@@ -239,7 +230,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Invalid cron expression" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_create_schedule_scheduler_failure(
         self,
         service: ScheduleService,
@@ -270,7 +260,6 @@ class TestScheduleService:
         saved_schedule = result_query.scalar_one_or_none()
         assert saved_schedule is None
 
-    @pytest.mark.asyncio
     async def test_update_schedule_success(
         self,
         service: ScheduleService,
@@ -303,7 +292,6 @@ class TestScheduleService:
         # Verify scheduler was updated
         mock_scheduler_service.update_schedule.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_update_schedule_not_found(
         self, service: ScheduleService, test_db: AsyncSession
     ) -> None:
@@ -315,7 +303,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Schedule not found" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_toggle_schedule_enable(
         self,
         service: ScheduleService,
@@ -344,7 +331,6 @@ class TestScheduleService:
         # Verify scheduler was updated
         mock_scheduler_service.update_schedule.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_toggle_schedule_disable(
         self,
         service: ScheduleService,
@@ -373,7 +359,6 @@ class TestScheduleService:
         # Verify scheduler was updated
         mock_scheduler_service.update_schedule.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_toggle_schedule_not_found(
         self, service: ScheduleService, test_db: AsyncSession
     ) -> None:
@@ -385,7 +370,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Schedule not found" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_toggle_schedule_scheduler_error(
         self,
         service: ScheduleService,
@@ -415,7 +399,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Failed to update schedule" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_delete_schedule_success(
         self,
         service: ScheduleService,
@@ -450,7 +433,6 @@ class TestScheduleService:
         # Verify scheduler was called
         mock_scheduler_service.remove_schedule.assert_called_once_with(schedule_id)
 
-    @pytest.mark.asyncio
     async def test_delete_schedule_not_found(
         self, service: ScheduleService, test_db: AsyncSession
     ) -> None:
@@ -462,7 +444,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Schedule not found" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_delete_schedule_scheduler_error(
         self,
         service: ScheduleService,
@@ -491,7 +472,6 @@ class TestScheduleService:
         assert result.error_message is not None
         assert "Failed to remove schedule from scheduler" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_schedule_lifecycle(
         self,
         service: ScheduleService,

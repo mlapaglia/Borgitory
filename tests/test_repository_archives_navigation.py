@@ -37,7 +37,6 @@ def mock_current_user(test_db: AsyncSession) -> Generator[User, None, None]:
 class TestRepositoryArchivesNavigation:
     """Test class for repository archives navigation functionality."""
 
-    @pytest.mark.asyncio
     async def test_repository_list_contains_view_archives_button(
         self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
@@ -73,7 +72,6 @@ class TestRepositoryArchivesNavigation:
         assert f'"preselect_repo": "{repo1.id}"' in content
         assert f'"preselect_repo": "{repo2.id}"' in content
 
-    @pytest.mark.asyncio
     async def test_view_archives_button_navigation_flow(
         self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
@@ -100,7 +98,6 @@ class TestRepositoryArchivesNavigation:
         # Check that the preselect_repo parameter is passed to the selector
         assert f"preselect_repo={repo.id}" in content
 
-    @pytest.mark.asyncio
     async def test_archives_tab_selector_with_preselected_repository(
         self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
@@ -144,7 +141,6 @@ class TestRepositoryArchivesNavigation:
         # Check that HTMX triggers include load for auto-triggering
         assert 'hx-trigger="change, load"' in content
 
-    @pytest.mark.asyncio
     async def test_archives_selector_without_preselection(
         self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
@@ -175,7 +171,6 @@ class TestRepositoryArchivesNavigation:
         assert 'hx-trigger="change"' in content
         assert 'hx-trigger="change, load"' not in content
 
-    @pytest.mark.asyncio
     async def test_view_archives_button_with_nonexistent_repository(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -200,7 +195,6 @@ class TestRepositoryArchivesNavigation:
         assert "selected" not in content
         assert "Select a repository to view archives..." in content
 
-    @pytest.mark.asyncio
     async def test_empty_repository_list_archives_buttons(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -214,7 +208,6 @@ class TestRepositoryArchivesNavigation:
         assert "No repositories configured" in content
         assert "View Archives" not in content
 
-    @pytest.mark.asyncio
     async def test_archives_tab_oob_navigation_update(
         self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:

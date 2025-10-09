@@ -207,7 +207,6 @@ class TestArchiveManagerCaching:
         assert stats["valid_entries"] == 1
         assert stats["expired_entries"] == 0
 
-    @pytest.mark.asyncio
     async def test_list_archive_directory_contents_cache_hit(
         self, manager: ArchiveManager, mock_repository: MagicMock
     ) -> None:
@@ -256,7 +255,6 @@ class TestArchiveManagerCaching:
         # Results should be the same
         assert len(result1) == len(result2)
 
-    @pytest.mark.asyncio
     async def test_list_archive_directory_contents_cache_miss(
         self, manager: ArchiveManager, mock_repository: MagicMock
     ) -> None:

@@ -107,7 +107,6 @@ class TestManualRunAPScheduler:
         test_db.refresh(schedule)
         return schedule
 
-    @pytest.mark.asyncio
     async def test_scheduler_service_run_schedule_once_success(
         self, scheduler_service: SchedulerService
     ) -> None:
@@ -134,7 +133,6 @@ class TestManualRunAPScheduler:
         finally:
             await scheduler_service.stop()
 
-    @pytest.mark.asyncio
     async def test_scheduler_service_run_schedule_once_scheduler_not_running(
         self, scheduler_service: SchedulerService
     ) -> None:
@@ -146,7 +144,6 @@ class TestManualRunAPScheduler:
         with pytest.raises(RuntimeError, match="Scheduler is not running"):
             await scheduler_service.run_schedule_once(schedule_id, schedule_name)
 
-    @pytest.mark.asyncio
     async def test_scheduler_service_run_schedule_once_unique_job_ids(
         self, scheduler_service: SchedulerService
     ) -> None:
@@ -179,7 +176,6 @@ class TestManualRunAPScheduler:
         finally:
             await scheduler_service.stop()
 
-    @pytest.mark.asyncio
     async def test_schedule_service_run_schedule_manually_success(
         self,
         schedule_service: ScheduleService,
@@ -202,7 +198,6 @@ class TestManualRunAPScheduler:
             test_schedule.id, test_schedule.name
         )
 
-    @pytest.mark.asyncio
     async def test_schedule_service_run_schedule_manually_not_found(
         self, schedule_service: ScheduleService, mock_scheduler_service: AsyncMock
     ) -> None:
@@ -217,7 +212,6 @@ class TestManualRunAPScheduler:
         # Verify scheduler service was not called
         mock_scheduler_service.run_schedule_once.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_schedule_service_run_schedule_manually_scheduler_error(
         self,
         schedule_service: ScheduleService,
@@ -294,7 +288,6 @@ class TestManualRunAPScheduler:
         finally:
             app.dependency_overrides.clear()
 
-    @pytest.mark.asyncio
     async def test_scheduler_service_job_execution_flow(
         self, scheduler_service: SchedulerService
     ) -> None:
@@ -335,7 +328,6 @@ class TestManualRunAPScheduler:
         finally:
             await scheduler_service.stop()
 
-    @pytest.mark.asyncio
     async def test_scheduler_service_job_cleanup(
         self, scheduler_service: SchedulerService
     ) -> None:
@@ -370,7 +362,6 @@ class TestManualRunAPScheduler:
         finally:
             await scheduler_service.stop()
 
-    @pytest.mark.asyncio
     async def test_scheduler_service_with_mock_dependencies(self) -> None:
         """Test scheduler service with properly mocked dependencies (no patching)"""
         # Create a mock job manager that tracks calls

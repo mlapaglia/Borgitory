@@ -36,7 +36,6 @@ async def sample_repository(test_db: AsyncSession) -> Repository:
 class TestPruneService:
     """Test class for PruneService business logic."""
 
-    @pytest.mark.asyncio
     async def test_get_prune_configs_empty(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -44,7 +43,6 @@ class TestPruneService:
         result = await service.get_prune_configs(db=test_db)
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_get_prune_configs_with_data(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -82,7 +80,6 @@ class TestPruneService:
         assert "config-1" in names
         assert "config-2" in names
 
-    @pytest.mark.asyncio
     async def test_get_prune_configs_with_pagination(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -106,7 +103,6 @@ class TestPruneService:
         result = await service.get_prune_configs(db=test_db, skip=2, limit=2)
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_get_prune_config_by_id_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -132,7 +128,6 @@ class TestPruneService:
         assert result.name == "test-config"
         assert result.id == config.id
 
-    @pytest.mark.asyncio
     async def test_get_prune_config_by_id_not_found(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -142,7 +137,6 @@ class TestPruneService:
         ):
             await service.get_prune_config_by_id(db=test_db, config_id=999)
 
-    @pytest.mark.asyncio
     async def test_create_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -179,7 +173,6 @@ class TestPruneService:
         assert saved_config is not None
         assert saved_config.strategy == PruneStrategy.SIMPLE
 
-    @pytest.mark.asyncio
     async def test_create_prune_config_duplicate_name(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -219,7 +212,6 @@ class TestPruneService:
         assert error is not None
         assert "A prune policy with this name already exists" in error
 
-    @pytest.mark.asyncio
     async def test_create_prune_config_database_error(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -248,7 +240,6 @@ class TestPruneService:
             assert error is not None
             assert "Failed to create prune configuration" in error
 
-    @pytest.mark.asyncio
     async def test_update_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -287,7 +278,6 @@ class TestPruneService:
         assert updated_config.name == "updated-config"
         assert updated_config.keep_within_days == 60
 
-    @pytest.mark.asyncio
     async def test_update_prune_config_not_found(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -304,7 +294,6 @@ class TestPruneService:
         assert error is not None
         assert "Prune configuration not found" in error
 
-    @pytest.mark.asyncio
     async def test_update_prune_config_duplicate_name(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -348,7 +337,6 @@ class TestPruneService:
         assert error is not None
         assert "A prune policy with this name already exists" in error
 
-    @pytest.mark.asyncio
     async def test_enable_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -383,7 +371,6 @@ class TestPruneService:
         assert updated_config is not None
         assert updated_config.enabled is True
 
-    @pytest.mark.asyncio
     async def test_enable_prune_config_not_found(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -395,7 +382,6 @@ class TestPruneService:
         assert result.error_message is not None
         assert "Prune configuration not found" in result.error_message
 
-    @pytest.mark.asyncio
     async def test_disable_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -430,7 +416,6 @@ class TestPruneService:
         assert updated_config is not None
         assert updated_config.enabled is False
 
-    @pytest.mark.asyncio
     async def test_disable_prune_config_not_found(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -443,7 +428,6 @@ class TestPruneService:
         assert error is not None
         assert "Prune configuration not found" in error
 
-    @pytest.mark.asyncio
     async def test_delete_prune_config_success(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -485,7 +469,6 @@ class TestPruneService:
         deleted_config = result.scalar_one_or_none()
         assert deleted_config is None
 
-    @pytest.mark.asyncio
     async def test_delete_prune_config_not_found(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -502,7 +485,6 @@ class TestPruneService:
         assert error is not None
         assert "Prune configuration not found" in error
 
-    @pytest.mark.asyncio
     async def test_get_configs_with_descriptions_simple_strategy(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -527,7 +509,6 @@ class TestPruneService:
         assert len(result) == 1
         assert result[0]["description"] == "Keep archives within 30 days"
 
-    @pytest.mark.asyncio
     async def test_get_configs_with_descriptions_advanced_strategy(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -549,7 +530,6 @@ class TestPruneService:
         expected_desc = "7 daily, 4 weekly, 12 monthly, 2 yearly"
         assert result[0]["description"] == expected_desc
 
-    @pytest.mark.asyncio
     async def test_get_configs_with_descriptions_partial_advanced(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -569,7 +549,6 @@ class TestPruneService:
         expected_desc = "7 daily, 12 monthly"
         assert result[0]["description"] == expected_desc
 
-    @pytest.mark.asyncio
     async def test_get_configs_with_descriptions_no_rules(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -593,7 +572,6 @@ class TestPruneService:
         assert len(result) == 1
         assert result[0]["description"] == "No retention rules"
 
-    @pytest.mark.asyncio
     async def test_get_configs_with_descriptions_error_handling(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -604,7 +582,6 @@ class TestPruneService:
             result = await service.get_configs_with_descriptions(db=test_db)
             assert result == []
 
-    @pytest.mark.asyncio
     async def test_get_form_data_success(
         self,
         service: PruneService,
@@ -618,7 +595,6 @@ class TestPruneService:
         assert len(result["repositories"]) == 1
         assert result["repositories"][0].name == "test-repo"
 
-    @pytest.mark.asyncio
     async def test_get_form_data_error_handling(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:
@@ -627,7 +603,6 @@ class TestPruneService:
             result = await service.get_form_data(db=test_db)
             assert result == {"repositories": []}
 
-    @pytest.mark.asyncio
     async def test_prune_config_lifecycle(
         self, service: PruneService, test_db: AsyncSession
     ) -> None:

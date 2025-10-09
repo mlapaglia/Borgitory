@@ -5,7 +5,6 @@ Tests for JobStreamService class - Server-Sent Events functionality
 import asyncio
 import json
 import uuid
-import pytest
 from typing import AsyncGenerator
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime, UTC
@@ -25,7 +24,6 @@ class TestJobStreamService:
         self.mock_job_manager = Mock()
         self.stream_service = JobStreamService(job_manager=self.mock_job_manager)
 
-    @pytest.mark.asyncio
     async def test_stream_all_jobs_empty(self) -> None:
         """Test streaming all jobs when no jobs exist."""
         # Mock empty job manager
@@ -59,7 +57,6 @@ class TestJobStreamService:
         assert "event: jobs_update" in events[0]
         assert '"jobs": []' in events[0]
 
-    @pytest.mark.asyncio
     async def test_stream_all_jobs_with_composite_jobs(self) -> None:
         """Test streaming all jobs with composite jobs (all jobs are now composite)."""
         # Create mock composite job
@@ -106,7 +103,6 @@ class TestJobStreamService:
         # Check job status update
         assert "event: job_status_changed" in events[1]
 
-    @pytest.mark.asyncio
     async def test_stream_all_jobs_error_handling(self) -> None:
         """Test error handling in all jobs streaming."""
         self.mock_job_manager.jobs = {}
@@ -132,7 +128,6 @@ class TestJobStreamService:
         assert '"type": "error"' in events[1]
         assert "Test streaming error" in events[1]
 
-    @pytest.mark.asyncio
     async def test_stream_job_output_composite_job_basic(self) -> None:
         """Test streaming output for a composite job (all jobs are now composite)."""
         job_id = uuid.uuid4()
@@ -181,7 +176,6 @@ class TestJobStreamService:
         first_event = events[0]
         assert "initial_state" in first_event or "error" in first_event
 
-    @pytest.mark.asyncio
     async def test_stream_job_output_composite_job(self) -> None:
         """Test streaming output for a composite job."""
         job_id = uuid.uuid4()
@@ -292,7 +286,6 @@ class TestJobStreamService:
         # Verify unsubscribe was called
         self.mock_job_manager.unsubscribe_from_events.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_stream_job_output_composite_job_error(self) -> None:
         """Test error handling in composite job streaming."""
         job_id = uuid.uuid4()
@@ -329,7 +322,6 @@ class TestJobStreamService:
         assert error_data["type"] == "error"
         assert "Queue error" in error_data["message"]
 
-    @pytest.mark.asyncio
     async def test_stream_job_output_nonexistent_job(self) -> None:
         """Test streaming output for a job that doesn't exist."""
         job_id = uuid.uuid4()

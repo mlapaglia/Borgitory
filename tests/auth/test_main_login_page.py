@@ -40,7 +40,6 @@ async def authenticated_user(
 class TestLoginPageEndpoint:
     """Test class for login_page endpoint in main.py."""
 
-    @pytest.mark.asyncio
     async def test_login_page_no_user_no_next_param(
         self, async_client: AsyncClient
     ) -> None:
@@ -55,7 +54,6 @@ class TestLoginPageEndpoint:
         # Should have default next parameter in HTMX call
         assert "/auth/check-users?next=/repositories" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_no_user_with_next_param(
         self, async_client: AsyncClient
     ) -> None:
@@ -67,7 +65,6 @@ class TestLoginPageEndpoint:
         # Should contain the next parameter in HTMX call
         assert "/auth/check-users?next=/backups" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_no_user_with_url_encoded_next(
         self, async_client: AsyncClient
     ) -> None:
@@ -78,7 +75,6 @@ class TestLoginPageEndpoint:
         # Should properly handle URL encoded parameter
         assert "/auth/check-users?next=/cloud-sync" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_authenticated_user_redirects_default(
         self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
@@ -87,7 +83,6 @@ class TestLoginPageEndpoint:
         assert response.status_code == 302
         assert response.headers["location"] == "/repositories"
 
-    @pytest.mark.asyncio
     async def test_login_page_authenticated_user_redirects_to_next(
         self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
@@ -98,7 +93,6 @@ class TestLoginPageEndpoint:
         assert response.status_code == 302
         assert response.headers["location"] == "/schedules"
 
-    @pytest.mark.asyncio
     async def test_login_page_malicious_external_next_param_sanitized(
         self, async_client: AsyncClient
     ) -> None:
@@ -108,7 +102,6 @@ class TestLoginPageEndpoint:
         # Should fall back to default /repositories for external URLs
         assert "/auth/check-users?next=/repositories" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_malicious_scheme_next_param_sanitized(
         self, async_client: AsyncClient
     ) -> None:
@@ -118,7 +111,6 @@ class TestLoginPageEndpoint:
         # Should fall back to default /repositories for URLs with schemes
         assert "/auth/check-users?next=/repositories" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_backslash_in_next_param_cleaned(
         self, async_client: AsyncClient
     ) -> None:
@@ -128,7 +120,6 @@ class TestLoginPageEndpoint:
         # Should remove backslashes
         assert "/auth/check-users?next=/archives..evil" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_authenticated_user_with_malicious_next_redirects_safely(
         self, async_client: AsyncClient, authenticated_user: User
     ) -> None:
@@ -140,7 +131,6 @@ class TestLoginPageEndpoint:
         # Should redirect to safe default instead of malicious URL
         assert response.headers["location"] == "/repositories"
 
-    @pytest.mark.asyncio
     async def test_login_page_empty_next_param_uses_default(
         self, async_client: AsyncClient
     ) -> None:
@@ -150,7 +140,6 @@ class TestLoginPageEndpoint:
         # Empty string gets passed through, not replaced with default
         assert "/auth/check-users?next=" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_valid_internal_next_param(
         self, async_client: AsyncClient
     ) -> None:
@@ -160,7 +149,6 @@ class TestLoginPageEndpoint:
         # Should preserve valid internal URL
         assert "/auth/check-users?next=/debug" in response.text
 
-    @pytest.mark.asyncio
     async def test_login_page_authenticated_user_preserves_valid_next(
         self, async_client: AsyncClient, authenticated_user: User
     ) -> None:

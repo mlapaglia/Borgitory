@@ -2,6 +2,7 @@
 Tests for TaskDefinitionBuilder - Centralized task definition creation
 """
 
+from typing import Any
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,7 +136,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_prune_task_from_config_simple_strategy(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -163,7 +163,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_prune_task_from_config_advanced_strategy(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -197,7 +196,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_prune_task_from_config_not_found(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
@@ -278,7 +276,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_check_task_from_config(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -310,7 +307,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_check_task_from_config_not_found(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
@@ -402,7 +398,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_notification_task(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -424,7 +419,6 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
-    @pytest.mark.asyncio
     async def test_build_notification_task_not_found(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
@@ -437,7 +431,6 @@ class TestTaskDefinitionBuilder:
 
         assert task is None
 
-    @pytest.mark.asyncio
     async def test_build_task_list_comprehensive(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -449,7 +442,7 @@ class TestTaskDefinitionBuilder:
         """Test building comprehensive task list with all task types"""
 
         # Setup mock execute to return different configs based on the call
-        def mock_execute_side_effect(*args, **kwargs):
+        def mock_execute_side_effect(*args: Any, **kwargs: Any) -> MagicMock:
             mock_result = MagicMock()
             # Check which config is being requested by inspecting the statement
             # This is a simplified approach - in real tests you might want more sophisticated matching
@@ -500,7 +493,6 @@ class TestTaskDefinitionBuilder:
         assert backup_task.parameters["source_path"] == "/custom"
         assert backup_task.parameters["compression"] == "lz4"
 
-    @pytest.mark.asyncio
     async def test_build_task_list_minimal(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncMock
     ) -> None:
@@ -513,7 +505,6 @@ class TestTaskDefinitionBuilder:
         assert tasks[0].type == TaskTypeEnum.BACKUP
         assert tasks[0].name == "Backup test-repo"
 
-    @pytest.mark.asyncio
     async def test_build_task_list_no_backup(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -539,7 +530,6 @@ class TestTaskDefinitionBuilder:
         assert TaskTypeEnum.PRUNE in task_types
         assert TaskTypeEnum.CLOUD_SYNC in task_types
 
-    @pytest.mark.asyncio
     async def test_build_task_list_prune_request_over_config(
         self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
     ) -> None:
@@ -563,7 +553,6 @@ class TestTaskDefinitionBuilder:
         assert prune_task.parameters["dry_run"] is True
         assert prune_task.parameters["keep_within"] == "14d"
 
-    @pytest.mark.asyncio
     async def test_build_task_list_check_request_over_config(
         self, task_builder: TaskDefinitionBuilder, mock_db: MagicMock
     ) -> None:

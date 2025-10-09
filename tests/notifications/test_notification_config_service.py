@@ -56,7 +56,6 @@ async def sample_config(
 class TestNotificationConfigService:
     """Test class for NotificationConfigService business logic."""
 
-    @pytest.mark.asyncio
     async def test_get_all_configs_empty(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -64,7 +63,6 @@ class TestNotificationConfigService:
         result = await service.get_all_configs(db=test_db)
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_get_all_configs_with_data(
         self,
         service: NotificationConfigService,
@@ -98,7 +96,6 @@ class TestNotificationConfigService:
         assert "config-1" in names
         assert "config-2" in names
 
-    @pytest.mark.asyncio
     async def test_get_all_configs_pagination(
         self,
         service: NotificationConfigService,
@@ -124,7 +121,6 @@ class TestNotificationConfigService:
         result = await service.get_all_configs(db=test_db, skip=2, limit=2)
         assert len(result) == 2
 
-    @pytest.mark.asyncio
     async def test_get_config_by_id_success(
         self,
         service: NotificationConfigService,
@@ -137,7 +133,6 @@ class TestNotificationConfigService:
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    @pytest.mark.asyncio
     async def test_get_config_by_id_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -145,7 +140,6 @@ class TestNotificationConfigService:
         result = await service.get_config_by_id(db=test_db, config_id=999)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_supported_providers(
         self, service: NotificationConfigService
     ) -> None:
@@ -164,7 +158,6 @@ class TestNotificationConfigService:
         assert "pushover" in provider_values
         assert "discord" in provider_values
 
-    @pytest.mark.asyncio
     async def test_create_config_success(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -191,7 +184,6 @@ class TestNotificationConfigService:
         assert saved_config is not None
         assert saved_config.provider == "pushover"
 
-    @pytest.mark.asyncio
     async def test_create_config_duplicate_name(
         self,
         service: NotificationConfigService,
@@ -213,7 +205,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 400
         assert "already exists" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_create_config_invalid_provider_config(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -229,7 +220,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 400
         assert "Invalid configuration" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_update_config_success(
         self,
         service: NotificationConfigService,
@@ -255,7 +245,6 @@ class TestNotificationConfigService:
         await test_db.refresh(updated_config)
         assert updated_config.name == "updated-config"
 
-    @pytest.mark.asyncio
     async def test_update_config_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -275,7 +264,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_enable_config_success(
         self,
         service: NotificationConfigService,
@@ -306,7 +294,6 @@ class TestNotificationConfigService:
         await test_db.refresh(config)
         assert config.enabled is True
 
-    @pytest.mark.asyncio
     async def test_enable_config_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -317,7 +304,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_disable_config_success(
         self,
         service: NotificationConfigService,
@@ -348,7 +334,6 @@ class TestNotificationConfigService:
         await test_db.refresh(config)
         assert config.enabled is False
 
-    @pytest.mark.asyncio
     async def test_disable_config_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -359,7 +344,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_delete_config_success(
         self,
         service: NotificationConfigService,
@@ -384,7 +368,6 @@ class TestNotificationConfigService:
         deleted_config = result.scalar_one_or_none()
         assert deleted_config is None
 
-    @pytest.mark.asyncio
     async def test_delete_config_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -395,7 +378,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_get_config_with_decrypted_data_success(
         self,
         service: NotificationConfigService,
@@ -416,7 +398,6 @@ class TestNotificationConfigService:
         assert decrypted_config["user_key"].startswith("test-user")
         assert decrypted_config["app_token"].startswith("test-token")
 
-    @pytest.mark.asyncio
     async def test_get_config_with_decrypted_data_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -427,7 +408,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_test_config_success(
         self,
         service: NotificationConfigService,
@@ -448,7 +428,6 @@ class TestNotificationConfigService:
             # Expected in test environment without real credentials
             pass
 
-    @pytest.mark.asyncio
     async def test_test_config_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
@@ -459,7 +438,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_test_config_disabled(
         self,
         service: NotificationConfigService,
@@ -486,7 +464,6 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 400
         assert "disabled" in str(exc_info.value.detail)
 
-    @pytest.mark.asyncio
     async def test_config_lifecycle(
         self,
         service: NotificationConfigService,
