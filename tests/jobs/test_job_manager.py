@@ -3,7 +3,8 @@ import uuid
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.services.jobs.job_manager import JobManager
@@ -256,7 +257,7 @@ class TestJobManager:
         assert job.status == JobStatusEnum.RUNNING
 
     def test_repository_integration(
-        self, sample_repository: Repository, test_db: Session
+        self, sample_repository: Repository, test_db: AsyncSession
     ) -> None:
         """Test repository database integration"""
         repo = (

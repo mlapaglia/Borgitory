@@ -4,7 +4,7 @@ Tests for repositories API endpoints
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import Repository
 
@@ -22,7 +22,7 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_list_repositories_with_data(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test listing repositories with data."""
         # Create test repositories
@@ -48,7 +48,7 @@ class TestRepositoriesAPI:
 
     @pytest.mark.asyncio
     async def test_list_repositories_pagination(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test listing repositories with pagination."""
         # Create multiple repositories

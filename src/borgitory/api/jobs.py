@@ -313,7 +313,7 @@ async def toggle_job_details(
     # Toggle the expand_details state - if currently false, expand it
     expand_details = expanded == "false"
 
-    template_job = render_svc.get_job_for_template(job_id, db, expand_details)
+    template_job = await render_svc.get_job_for_template(job_id, db, expand_details)
     if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -334,7 +334,7 @@ async def get_job_details_static(
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get static job details (used when job completes)"""
-    template_job = render_svc.get_job_for_template(job_id, db)
+    template_job = await render_svc.get_job_for_template(job_id, db)
     if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 

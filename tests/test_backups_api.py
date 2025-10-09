@@ -5,7 +5,7 @@ Tests for backups API endpoints
 import pytest
 import json
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import (
     Repository,
@@ -21,7 +21,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_empty_database(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting backup form when database is empty."""
         response = await async_client.get("/api/backups/form")
@@ -35,7 +35,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_with_repository(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting backup form with a repository in database."""
         # Create test repository
@@ -56,7 +56,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_with_all_configs(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting backup form with all configuration types present."""
         # Create test repository
@@ -132,7 +132,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_only_enabled_configs(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that only enabled configs are returned in the form."""
         # Create disabled prune config
@@ -165,7 +165,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_mixed_enabled_disabled(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test form generation with mix of enabled and disabled configurations."""
         # Create multiple configs of each type with different enabled states
@@ -308,7 +308,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_response_headers(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that backup form endpoint returns correct response headers."""
         response = await async_client.get("/api/backups/form")
@@ -322,7 +322,7 @@ class TestBackupsAPI:
 
     @pytest.mark.asyncio
     async def test_get_backup_form_template_context(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that all expected context variables are available to template."""
         # Create one of each config type

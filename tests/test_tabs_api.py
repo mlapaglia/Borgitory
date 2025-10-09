@@ -6,7 +6,7 @@ import pytest
 from typing import Any, Generator
 from unittest.mock import Mock
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.api.auth import get_current_user
@@ -15,7 +15,7 @@ from borgitory.dependencies import get_provider_registry
 
 
 @pytest.fixture
-def mock_current_user(test_db: Session) -> Generator[User, None, None]:
+def mock_current_user(test_db: AsyncSession) -> Generator[User, None, None]:
     """Create a mock current user for testing."""
     test_user = User()
     test_user.username = "testuser"

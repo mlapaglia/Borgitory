@@ -5,7 +5,7 @@ Tests for ScheduleService - Business logic tests
 import pytest
 from unittest.mock import AsyncMock
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.services.scheduling.schedule_service import ScheduleService
 from borgitory.models.database import Schedule, Repository
@@ -22,13 +22,15 @@ def mock_scheduler_service() -> AsyncMock:
 
 
 @pytest.fixture
-def service(test_db: Session, mock_scheduler_service: AsyncMock) -> ScheduleService:
+def service(
+    test_db: AsyncSession, mock_scheduler_service: AsyncMock
+) -> ScheduleService:
     """ScheduleService instance with real database session."""
     return ScheduleService(test_db, mock_scheduler_service)
 
 
 @pytest.fixture
-def sample_repository(test_db: Session) -> Repository:
+def sample_repository(test_db: AsyncSession) -> Repository:
     """Create a sample repository for testing."""
     repository = Repository()
     repository.name = "test-repo"
@@ -58,7 +60,10 @@ class TestScheduleService:
         assert "Invalid cron expression" in result.error_message
 
     def test_get_schedule_by_id_success(
-        self, service: ScheduleService, test_db: Session, sample_repository: Repository
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedule by ID successfully."""
         schedule = Schedule()
@@ -86,7 +91,10 @@ class TestScheduleService:
         assert result == []
 
     def test_get_schedules_with_data(
-        self, service: ScheduleService, test_db: Session, sample_repository: Repository
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedules with data."""
         schedule1 = Schedule()
@@ -111,7 +119,10 @@ class TestScheduleService:
         assert "schedule-2" in names
 
     def test_get_schedules_with_pagination(
-        self, service: ScheduleService, test_db: Session, sample_repository: Repository
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
     ) -> None:
         """Test getting schedules with pagination."""
         for i in range(5):
@@ -127,7 +138,10 @@ class TestScheduleService:
         assert len(result) == 2
 
     def test_get_all_schedules(
-        self, service: ScheduleService, test_db: Session, sample_repository: Repository
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
     ) -> None:
         """Test getting all schedules."""
         schedule = Schedule()
@@ -146,7 +160,7 @@ class TestScheduleService:
     async def test_create_schedule_success(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -213,7 +227,7 @@ class TestScheduleService:
     async def test_create_schedule_scheduler_failure(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -242,7 +256,7 @@ class TestScheduleService:
     async def test_update_schedule_success(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -285,7 +299,7 @@ class TestScheduleService:
     async def test_toggle_schedule_enable(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -314,7 +328,7 @@ class TestScheduleService:
     async def test_toggle_schedule_disable(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -353,7 +367,7 @@ class TestScheduleService:
     async def test_toggle_schedule_scheduler_error(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -383,7 +397,7 @@ class TestScheduleService:
     async def test_delete_schedule_success(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -427,7 +441,7 @@ class TestScheduleService:
     async def test_delete_schedule_scheduler_error(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:
@@ -456,7 +470,7 @@ class TestScheduleService:
     async def test_schedule_lifecycle(
         self,
         service: ScheduleService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
         mock_scheduler_service: AsyncMock,
     ) -> None:

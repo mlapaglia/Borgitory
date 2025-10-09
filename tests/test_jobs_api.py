@@ -6,12 +6,13 @@ import pytest
 import uuid
 from typing import Generator
 from unittest.mock import Mock, AsyncMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 
 from borgitory.main import app
 from borgitory.models.database import Repository, Job
@@ -39,7 +40,7 @@ class TestJobsAPI:
     """Test class for jobs API endpoints."""
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session) -> Repository:
+    def sample_repository(self, test_db: AsyncSession) -> Repository:
         """Create a sample repository for testing."""
         repo = Repository()
         repo.name = "test-repo"
@@ -52,7 +53,7 @@ class TestJobsAPI:
 
     @pytest.fixture
     def sample_database_job(
-        self, test_db: Session, sample_repository: Repository
+        self, test_db: AsyncSession, sample_repository: Repository
     ) -> Job:
         """Create a sample database job for testing."""
         job = Job()

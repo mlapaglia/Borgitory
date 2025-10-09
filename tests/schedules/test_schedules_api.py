@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.models.database import (
@@ -31,7 +31,7 @@ class TestSchedulesAPI:
 
     @pytest.fixture(scope="function")
     def setup_test_dependencies(
-        self, test_db: Session
+        self, test_db: AsyncSession
     ) -> Generator[dict[str, Any], None, None]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
@@ -64,7 +64,7 @@ class TestSchedulesAPI:
         app.dependency_overrides.clear()
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session) -> Repository:
+    def sample_repository(self, test_db: AsyncSession) -> Repository:
         """Create a sample repository for testing."""
         repository = Repository()
         repository.name = "test-repo"
@@ -78,7 +78,7 @@ class TestSchedulesAPI:
     def test_get_schedules_form(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test getting schedules form returns HTML template."""
@@ -128,7 +128,7 @@ class TestSchedulesAPI:
     def test_create_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test successful schedule creation returns success template."""
@@ -155,7 +155,7 @@ class TestSchedulesAPI:
         assert created_schedule.repository_id == sample_repository.id
 
     def test_create_schedule_repository_not_found(
-        self, setup_test_dependencies: dict[str, Any], test_db: Session
+        self, setup_test_dependencies: dict[str, Any], test_db: AsyncSession
     ) -> None:
         """Test schedule creation with non-existent repository returns error template."""
         schedule_data = {
@@ -175,7 +175,7 @@ class TestSchedulesAPI:
     def test_create_schedule_invalid_cron(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test schedule creation with invalid cron expression returns error template."""
@@ -196,7 +196,7 @@ class TestSchedulesAPI:
     def test_get_schedules_html(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test getting schedules as HTML."""
@@ -226,7 +226,7 @@ class TestSchedulesAPI:
     def test_get_schedules_html_pagination(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test getting schedules with pagination parameters."""
@@ -300,7 +300,7 @@ class TestSchedulesAPI:
     def test_list_schedules(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test listing schedules."""
@@ -324,7 +324,7 @@ class TestSchedulesAPI:
     def test_get_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test getting specific schedule successfully."""
@@ -343,7 +343,7 @@ class TestSchedulesAPI:
     def test_get_schedule_edit_form(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test getting schedule edit form."""
@@ -366,7 +366,7 @@ class TestSchedulesAPI:
     def test_update_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test successful schedule update."""
@@ -398,7 +398,7 @@ class TestSchedulesAPI:
     def test_toggle_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test successfully toggling schedule."""
@@ -437,7 +437,7 @@ class TestSchedulesAPI:
     def test_delete_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
     ) -> None:
         """Test successfully deleting schedule."""

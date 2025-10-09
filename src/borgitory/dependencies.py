@@ -16,11 +16,12 @@ import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from borgitory.factories.service_factory import CloudProviderServiceFactory
 from borgitory.models.database import async_session_maker
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.models.enums import EncryptionType
 from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
-from borgitory.services.notifications.registry import get_metadata
+from borgitory.services.cloud_providers.registry import get_metadata
 from borgitory.services.path.path_configuration_service import PathConfigurationService
 
 if TYPE_CHECKING:
@@ -126,7 +127,6 @@ if TYPE_CHECKING:
         JobManagerProtocol,
     )
     from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
-    from borgitory.factories.service_factory import CloudProviderServiceFactory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -903,7 +903,7 @@ def get_cloud_provider_service_factory(
     rclone_service: RcloneService = Depends(get_rclone_service),
     storage_factory: StorageFactory = Depends(get_storage_factory),
     encryption_service: EncryptionService = Depends(get_encryption_service),
-) -> "CloudProviderServiceFactory":
+) -> CloudProviderServiceFactory:
     """
     Provide CloudProviderServiceFactory with proper FastAPI dependency injection.
 
@@ -924,9 +924,7 @@ def get_cloud_provider_service_factory(
 
 
 def get_cloud_sync_service(
-    factory: "CloudProviderServiceFactory" = Depends(
-        get_cloud_provider_service_factory
-    ),
+    factory: CloudProviderServiceFactory = Depends(get_cloud_provider_service_factory),
 ) -> "CloudSyncConfigServiceProtocol":
     """
     Provide a CloudSyncConfigService instance using factory pattern with proper DI.

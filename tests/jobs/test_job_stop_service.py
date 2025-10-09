@@ -6,6 +6,7 @@ Tests business logic directly without mocking
 import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_service import JobService
@@ -95,7 +96,7 @@ class TestJobStopService:
         assert result.error_code == "INVALID_STATUS"
 
     @pytest.mark.asyncio
-    async def test_stop_database_job_success(self, test_db: Session) -> None:
+    async def test_stop_database_job_success(self, test_db: AsyncSession) -> None:
         """Test stopping a database job successfully"""
         # Arrange - Create real database job
         repository = Repository()
@@ -140,7 +141,9 @@ class TestJobStopService:
         # The job service only orchestrates the call to the job manager
 
     @pytest.mark.asyncio
-    async def test_stop_database_job_invalid_status(self, test_db: Session) -> None:
+    async def test_stop_database_job_invalid_status(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test stopping database job in invalid status"""
         # Arrange - Create completed database job
         repository = Repository()
@@ -180,7 +183,7 @@ class TestJobStopService:
         assert result.error_code == "INVALID_STATUS"
 
     @pytest.mark.asyncio
-    async def test_stop_job_not_found_anywhere(self, test_db: Session) -> None:
+    async def test_stop_job_not_found_anywhere(self, test_db: AsyncSession) -> None:
         """Test stopping job that doesn't exist in manager or database"""
         # Arrange
         job_service = JobService(test_db, self.mock_job_manager)
@@ -226,7 +229,7 @@ class TestJobStopService:
         assert result.current_task_killed is True
 
     @pytest.mark.asyncio
-    async def test_stop_job_database_exception(self, test_db: Session) -> None:
+    async def test_stop_job_database_exception(self, test_db: AsyncSession) -> None:
         """Test handling database exceptions during job stop"""
         # Arrange - Create job but simulate database error
         repository = Repository()

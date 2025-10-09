@@ -5,7 +5,7 @@ Tests for PruneService - Business logic tests
 import pytest
 from unittest.mock import patch
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.services.prune_service import PruneService
 from borgitory.models.database import PruneConfig, Repository
@@ -13,13 +13,13 @@ from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate, Prune
 
 
 @pytest.fixture
-def service(test_db: Session) -> PruneService:
+def service(test_db: AsyncSession) -> PruneService:
     """PruneService instance with real database session."""
     return PruneService(test_db)
 
 
 @pytest.fixture
-def sample_repository(test_db: Session) -> Repository:
+def sample_repository(test_db: AsyncSession) -> Repository:
     """Create a sample repository for testing."""
     repository = Repository()
     repository.name = "test-repo"
@@ -41,7 +41,7 @@ class TestPruneService:
         assert result == []
 
     def test_get_prune_configs_with_data(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting prune configs with data."""
         config1 = PruneConfig()
@@ -78,7 +78,7 @@ class TestPruneService:
         assert "config-2" in names
 
     def test_get_prune_configs_with_pagination(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting prune configs with pagination."""
         for i in range(5):
@@ -101,7 +101,7 @@ class TestPruneService:
         assert len(result) == 2
 
     def test_get_prune_config_by_id_success(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting prune config by ID successfully."""
         config = PruneConfig()
@@ -133,7 +133,7 @@ class TestPruneService:
             service.get_prune_config_by_id(999)
 
     def test_create_prune_config_success(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successful prune config creation."""
         config_data = PruneConfigCreate(
@@ -168,7 +168,7 @@ class TestPruneService:
         assert saved_config.strategy == PruneStrategy.SIMPLE
 
     def test_create_prune_config_duplicate_name(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test prune config creation with duplicate name."""
         existing_config = PruneConfig()
@@ -207,7 +207,7 @@ class TestPruneService:
         assert "A prune policy with this name already exists" in error
 
     def test_create_prune_config_database_error(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test prune config creation with database error."""
         config_data = PruneConfigCreate(
@@ -233,7 +233,7 @@ class TestPruneService:
             assert "Failed to create prune configuration" in error
 
     def test_update_prune_config_success(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successful prune config update."""
         config = PruneConfig()
@@ -281,7 +281,7 @@ class TestPruneService:
         assert "Prune configuration not found" in error
 
     def test_update_prune_config_duplicate_name(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test updating prune config with duplicate name."""
         config1 = PruneConfig()
@@ -322,7 +322,7 @@ class TestPruneService:
         assert "A prune policy with this name already exists" in error
 
     def test_enable_prune_config_success(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successfully enabling prune config."""
         config = PruneConfig()
@@ -363,7 +363,7 @@ class TestPruneService:
         assert "Prune configuration not found" in result.error_message
 
     def test_disable_prune_config_success(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successfully disabling prune config."""
         config = PruneConfig()
@@ -405,7 +405,7 @@ class TestPruneService:
         assert "Prune configuration not found" in error
 
     def test_delete_prune_config_success(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test successful prune config deletion."""
         config = PruneConfig()
@@ -457,7 +457,7 @@ class TestPruneService:
         assert "Prune configuration not found" in error
 
     def test_get_configs_with_descriptions_simple_strategy(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for simple strategy."""
         config = PruneConfig()
@@ -481,7 +481,7 @@ class TestPruneService:
         assert result[0]["description"] == "Keep archives within 30 days"
 
     def test_get_configs_with_descriptions_advanced_strategy(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for advanced strategy."""
         config = PruneConfig()
@@ -502,7 +502,7 @@ class TestPruneService:
         assert result[0]["description"] == expected_desc
 
     def test_get_configs_with_descriptions_partial_advanced(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for partial advanced strategy."""
         config = PruneConfig()
@@ -521,7 +521,7 @@ class TestPruneService:
         assert result[0]["description"] == expected_desc
 
     def test_get_configs_with_descriptions_no_rules(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test getting configs with descriptions for no retention rules."""
         config = PruneConfig()
@@ -554,7 +554,10 @@ class TestPruneService:
             assert result == []
 
     def test_get_form_data_success(
-        self, service: PruneService, test_db: Session, sample_repository: Repository
+        self,
+        service: PruneService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
     ) -> None:
         """Test successful form data retrieval."""
         result = service.get_form_data()
@@ -564,7 +567,7 @@ class TestPruneService:
         assert result["repositories"][0].name == "test-repo"
 
     def test_get_form_data_error_handling(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test error handling in get_form_data."""
         with patch.object(test_db, "query", side_effect=Exception("Database error")):
@@ -572,7 +575,7 @@ class TestPruneService:
             assert result == {"repositories": []}
 
     def test_prune_config_lifecycle(
-        self, service: PruneService, test_db: Session
+        self, service: PruneService, test_db: AsyncSession
     ) -> None:
         """Test complete prune config lifecycle: create, update, enable/disable, delete."""
         # Create

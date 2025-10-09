@@ -5,8 +5,9 @@ Tests that endpoints return proper HTML responses for HTMX integration.
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 from unittest.mock import Mock, AsyncMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.models.database import Repository
@@ -32,7 +33,7 @@ class TestRepositoryManagementAPI:
         return mock
 
     @pytest.fixture
-    def test_repository(self, test_db: Session) -> Repository:
+    def test_repository(self, test_db: AsyncSession) -> Repository:
         """Create test repository in database."""
         repo = Repository()
         repo.name = "test-repo"

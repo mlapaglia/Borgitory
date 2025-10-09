@@ -6,7 +6,7 @@ import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.models.database import Schedule, Repository
@@ -74,13 +74,13 @@ class TestManualRunAPScheduler:
 
     @pytest.fixture
     def schedule_service(
-        self, test_db: Session, mock_scheduler_service: AsyncMock
+        self, test_db: AsyncSession, mock_scheduler_service: AsyncMock
     ) -> ScheduleService:
         """Create schedule service with mocked scheduler service"""
         return ScheduleService(test_db, mock_scheduler_service)
 
     @pytest.fixture
-    def test_repository(self, test_db: Session) -> Repository:
+    def test_repository(self, test_db: AsyncSession) -> Repository:
         """Create test repository"""
         repo = Repository()
         repo.name = "test_repo"
@@ -92,7 +92,9 @@ class TestManualRunAPScheduler:
         return repo
 
     @pytest.fixture
-    def test_schedule(self, test_db: Session, test_repository: Repository) -> Schedule:
+    def test_schedule(
+        self, test_db: AsyncSession, test_repository: Repository
+    ) -> Schedule:
         """Create test schedule"""
         schedule = Schedule()
         schedule.name = "Test Schedule"
@@ -244,7 +246,7 @@ class TestManualRunAPScheduler:
         )
 
     def test_manual_run_api_endpoint_success(
-        self, test_db: Session, test_schedule: Schedule
+        self, test_db: AsyncSession, test_schedule: Schedule
     ) -> None:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
@@ -269,7 +271,7 @@ class TestManualRunAPScheduler:
             app.dependency_overrides.clear()
 
     def test_manual_run_api_endpoint_scheduler_error(
-        self, test_db: Session, test_schedule: Schedule
+        self, test_db: AsyncSession, test_schedule: Schedule
     ) -> None:
         """Test the API endpoint with scheduler service error"""
         # Setup dependency override

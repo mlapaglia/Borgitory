@@ -4,7 +4,7 @@ Tests for auth HTMX functionality
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import User
 
@@ -14,7 +14,7 @@ class TestAuthHTMX:
 
     @pytest.mark.asyncio
     async def test_register_htmx_success(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test registration via HTMX returns HTML template."""
         # Make HTMX request
@@ -37,7 +37,7 @@ class TestAuthHTMX:
 
     @pytest.mark.asyncio
     async def test_register_htmx_validation_error(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test registration validation error via HTMX."""
         # Make HTMX request with invalid data
@@ -55,7 +55,7 @@ class TestAuthHTMX:
 
     @pytest.mark.asyncio
     async def test_login_htmx_success(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test login via HTMX returns HTML template."""
         # Create a test user
@@ -80,7 +80,7 @@ class TestAuthHTMX:
 
     @pytest.mark.asyncio
     async def test_login_htmx_invalid_credentials(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test login with invalid credentials via HTMX."""
         # Make HTMX request with invalid credentials
@@ -98,7 +98,7 @@ class TestAuthHTMX:
 
     @pytest.mark.asyncio
     async def test_check_users_no_users_returns_register_form(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test check-users endpoint returns register form when no users exist."""
         response = await async_client.get("/auth/check-users")
@@ -114,7 +114,7 @@ class TestAuthHTMX:
 
     @pytest.mark.asyncio
     async def test_check_users_with_users_returns_login_form(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test check-users endpoint returns login form when users exist."""
         # Create a test user

@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from borgitory.main import app
 from borgitory.models.database import Repository, User
@@ -39,7 +40,7 @@ class TestScheduleCreationAPI:
 
     @pytest.fixture(scope="function")
     def setup_dependencies(
-        self, test_db: Session
+        self, test_db: AsyncSession
     ) -> Generator[Dict[str, Any], None, None]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service

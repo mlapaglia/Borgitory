@@ -304,7 +304,7 @@ class ArchiveManager:
 
         borg_command = create_borg_command(
             base_command=base_command,
-            repository_path=repository.path,
+            repository_path="",
             passphrase=repository.get_passphrase(),
             additional_args=additional_args,
         )

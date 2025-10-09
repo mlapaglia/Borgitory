@@ -80,7 +80,6 @@ async def get_repository_statistics_html(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        # Generate statistics (no timeout for now)
         stats = await stats_svc.get_repository_statistics(repository, db)
 
         return templates.TemplateResponse(
@@ -89,13 +88,11 @@ async def get_repository_statistics_html(
             {"repository": repository, "stats": stats},
         )
     except ValueError as e:
-        # Handle validation errors (e.g., no archives found)
         return HTMLResponse(
             content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{str(e)}</p>",
             status_code=400,
         )
     except Exception:
-        # Handle other errors - log exception for diagnostics, return only generic info to user
         logging.exception(
             "Exception occurred while generating repository statistics HTML (repository_id=%s)",
             repository_id,

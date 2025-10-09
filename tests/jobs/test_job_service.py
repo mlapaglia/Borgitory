@@ -5,9 +5,10 @@ Tests for JobService business logic - Database operations and service methods
 import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.utils.datetime_utils import now_utc
 
-from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_service import JobService
 from borgitory.models.job_results import (
@@ -49,7 +50,7 @@ class TestJobService:
         )
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_simple(self, test_db: Session) -> None:
+    async def test_create_backup_job_simple(self, test_db: AsyncSession) -> None:
         """Test creating a simple backup job without additional tasks."""
         # Create test repository
         repository = Repository()
@@ -91,7 +92,7 @@ class TestJobService:
         assert call_args.kwargs["task_definitions"][0].type == "backup"
 
     @pytest.mark.asyncio
-    async def test_create_backup_job_with_prune(self, test_db: Session) -> None:
+    async def test_create_backup_job_with_prune(self, test_db: AsyncSession) -> None:
         """Test creating a backup job with prune task."""
         # Create test data
         repository = Repository()
@@ -141,7 +142,7 @@ class TestJobService:
 
     @pytest.mark.asyncio
     async def test_create_backup_job_repository_not_found(
-        self, test_db: Session
+        self, test_db: AsyncSession
     ) -> None:
         """Test backup job creation with non-existent repository."""
         backup_request = BackupRequest(
@@ -165,7 +166,9 @@ class TestJobService:
         assert "Repository not found" in result.error
 
     @pytest.mark.asyncio
-    async def test_create_prune_job_simple_strategy(self, test_db: Session) -> None:
+    async def test_create_prune_job_simple_strategy(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test creating a prune job with simple retention strategy."""
         repository = Repository()
         repository.name = "test-repo"
@@ -210,7 +213,9 @@ class TestJobService:
         assert task_def.parameters["keep_within"] == "7d"
 
     @pytest.mark.asyncio
-    async def test_create_prune_job_advanced_strategy(self, test_db: Session) -> None:
+    async def test_create_prune_job_advanced_strategy(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test creating a prune job with advanced retention strategy."""
         repository = Repository()
         repository.name = "test-repo"
@@ -256,7 +261,7 @@ class TestJobService:
         assert task_def.parameters["keep_yearly"] == 1
 
     @pytest.mark.asyncio
-    async def test_create_check_job_with_config(self, test_db: Session) -> None:
+    async def test_create_check_job_with_config(self, test_db: AsyncSession) -> None:
         """Test creating a check job with existing check policy."""
         repository = Repository()
         repository.name = "test-repo"
@@ -303,7 +308,9 @@ class TestJobService:
         assert task_def.parameters["save_space"] is True
 
     @pytest.mark.asyncio
-    async def test_create_check_job_custom_parameters(self, test_db: Session) -> None:
+    async def test_create_check_job_custom_parameters(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test creating a check job with custom parameters."""
         repository = Repository()
         repository.name = "test-repo"
@@ -344,7 +351,7 @@ class TestJobService:
         assert task_def.parameters["repair_mode"] is False
         assert task_def.parameters["first_n_archives"] == 10
 
-    def test_list_jobs_database_only(self, test_db: Session) -> None:
+    def test_list_jobs_database_only(self, test_db: AsyncSession) -> None:
         """Test listing jobs from database only."""
         # Create test jobs
         repository = Repository()
@@ -379,7 +386,7 @@ class TestJobService:
         assert "prune" in job_types
         assert all(job["source"] == "database" for job in jobs)
 
-    def test_list_jobs_with_jobmanager(self, test_db: Session) -> None:
+    def test_list_jobs_with_jobmanager(self, test_db: AsyncSession) -> None:
         """Test listing jobs including JobManager jobs."""
         # Create mock JobManager job
         mock_borg_job = Mock()
@@ -401,7 +408,7 @@ class TestJobService:
         assert jm_job["type"] == JobType.BACKUP  # Inferred from "create" command
         assert jm_job["status"] == "running"
 
-    def test_get_job_from_database(self, test_db: Session) -> None:
+    def test_get_job_from_database(self, test_db: AsyncSession) -> None:
         """Test getting a job from database by ID."""
         repository = Repository()
         repository.name = "test-repo"
@@ -428,7 +435,7 @@ class TestJobService:
         assert result["source"] == "database"
         assert result["repository_name"] == "test-repo"
 
-    def test_get_job_from_jobmanager(self, test_db: Session) -> None:
+    def test_get_job_from_jobmanager(self, test_db: AsyncSession) -> None:
         """Test getting a job from JobManager by UUID."""
         from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
         from datetime import datetime
@@ -449,7 +456,7 @@ class TestJobService:
         assert result["status"] == JobStatusEnum.RUNNING
         assert result["source"] == "jobmanager"
 
-    def test_get_job_not_found(self, test_db: Session) -> None:
+    def test_get_job_not_found(self, test_db: AsyncSession) -> None:
         """Test getting a non-existent job."""
         self.mock_job_manager.get_job_status.return_value = None
         # Override mock db with real test_db for this test
@@ -487,7 +494,7 @@ class TestJobService:
         self.mock_job_manager.get_job_status.assert_called_once_with(job_id)
 
     @pytest.mark.asyncio
-    async def test_cancel_job_jobmanager(self, test_db: Session) -> None:
+    async def test_cancel_job_jobmanager(self, test_db: AsyncSession) -> None:
         """Test cancelling a JobManager job."""
         self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
 
@@ -498,7 +505,7 @@ class TestJobService:
         self.mock_job_manager.cancel_job.assert_called_once_with(job_id)
 
     @pytest.mark.asyncio
-    async def test_cancel_job_database(self, test_db: Session) -> None:
+    async def test_cancel_job_database(self, test_db: AsyncSession) -> None:
         """Test cancelling a database job."""
         repository = Repository()
         repository.name = "test-repo"

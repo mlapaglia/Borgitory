@@ -388,7 +388,7 @@ class JobRenderService:
                 .options(joinedload(Job.repository), joinedload(Job.tasks))
                 .where(Job.id == job_id)
             )
-            db_job = result.scalar_one_or_none()
+            db_job = result.unique().scalar_one_or_none()
 
             if db_job and db_job.status in [
                 JobStatusEnum.COMPLETED,
@@ -444,7 +444,7 @@ class JobRenderService:
                 .order_by(Job.started_at.desc())
                 .limit(20)
             )
-            db_jobs = list(result.scalars().all())
+            db_jobs = list(result.unique().scalars().all())
 
             if not db_jobs:
                 return self.templates.get_template(

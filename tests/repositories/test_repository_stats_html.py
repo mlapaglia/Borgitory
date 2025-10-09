@@ -8,11 +8,11 @@ from unittest.mock import Mock
 from httpx import AsyncClient, ASGITransport
 
 from borgitory.main import app
-from borgitory.models.database import Repository, get_db
+from borgitory.models.database import Repository
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
 )
-from borgitory.dependencies import get_repository_stats_service
+from borgitory.dependencies import get_db, get_repository_stats_service
 
 
 class TestRepositoryStatsHTML:

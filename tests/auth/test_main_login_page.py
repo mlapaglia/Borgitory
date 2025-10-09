@@ -4,23 +4,24 @@ Tests for the main.py login_page endpoint
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import User
 
 
 @pytest.fixture
 async def authenticated_user(
-    test_db: Session, async_client: AsyncClient
+    test_db: AsyncSession, async_client: AsyncClient
 ) -> AsyncGenerator[User, None]:
     """Create a real user and return auth cookie for testing."""
     test_user = User()
     test_user.username = "loginpagetest"
     test_user.set_password("testpass123")
     test_db.add(test_user)
-    test_db.commit()
-    test_db.refresh(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
 
     # Login to get auth cookie
     response = await async_client.post(

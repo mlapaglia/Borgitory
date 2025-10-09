@@ -5,8 +5,9 @@ Business logic tests are in test_notification_config_service.py
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 from unittest.mock import patch
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import NotificationConfig
 from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -141,7 +142,7 @@ class TestNotificationConfigsAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_enable_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config enable returns HTML response."""
         config = create_pushover_notification_config(
@@ -160,7 +161,7 @@ class TestNotificationConfigsAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_disable_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config disable returns HTML response."""
         config = create_pushover_notification_config(
@@ -179,7 +180,7 @@ class TestNotificationConfigsAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_test_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config test returns HTML response."""
         config = create_pushover_notification_config(
@@ -202,7 +203,7 @@ class TestNotificationConfigsAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_get_edit_form_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting edit form returns HTML."""
         config = create_pushover_notification_config(
@@ -223,7 +224,7 @@ class TestNotificationConfigsAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_update_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config update returns HTML response."""
         config = create_pushover_notification_config(
@@ -251,7 +252,7 @@ class TestNotificationConfigsAPIHTMX:
 
     @pytest.mark.asyncio
     async def test_delete_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config deletion returns HTML response."""
         config = create_pushover_notification_config(

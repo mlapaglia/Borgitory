@@ -3,7 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
-from sqlalchemy.orm import Session
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.models.database import User
@@ -25,7 +26,7 @@ class TestCronDescriptionHTMXAPI:
         return mock
 
     @pytest.fixture
-    def setup_auth(self, test_db: Session) -> User:
+    def setup_auth(self, test_db: AsyncSession) -> User:
         """Set up authentication for tests."""
         # Create a test user
         user = User()

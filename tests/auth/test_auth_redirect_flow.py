@@ -4,7 +4,7 @@ Test for auth redirect flow - debugging the login redirect issue
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import User
 
@@ -14,7 +14,7 @@ class TestAuthRedirectFlow:
 
     @pytest.mark.asyncio
     async def test_login_htmx_flow(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test the complete HTMX login flow with cookie authentication."""
         # Create a test user
@@ -68,7 +68,7 @@ class TestAuthRedirectFlow:
 
     @pytest.mark.asyncio
     async def test_login_sets_cookie_correctly(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that login sets the cookie with correct attributes via HTMX."""
         # Create a test user

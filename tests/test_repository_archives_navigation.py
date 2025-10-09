@@ -7,8 +7,9 @@ and ensures it properly navigates to the archives tab with preselected repositor
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 from typing import Any, Generator
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.api.auth import get_current_user
@@ -16,7 +17,7 @@ from borgitory.models.database import User, Repository
 
 
 @pytest.fixture
-def mock_current_user(test_db: Session) -> Generator[User, None, None]:
+def mock_current_user(test_db: AsyncSession) -> Generator[User, None, None]:
     """Create a mock current user for testing."""
     test_user = User()
     test_user.username = "testuser"
@@ -38,7 +39,7 @@ class TestRepositoryArchivesNavigation:
 
     @pytest.mark.asyncio
     async def test_repository_list_contains_view_archives_button(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that repository list contains properly configured View Archives buttons."""
         # Create test repositories
@@ -74,7 +75,7 @@ class TestRepositoryArchivesNavigation:
 
     @pytest.mark.asyncio
     async def test_view_archives_button_navigation_flow(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test the complete navigation flow when clicking View Archives."""
         # Create test repository
@@ -101,7 +102,7 @@ class TestRepositoryArchivesNavigation:
 
     @pytest.mark.asyncio
     async def test_archives_tab_selector_with_preselected_repository(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that the archives selector correctly handles preselected repository."""
         # Create test repositories
@@ -145,7 +146,7 @@ class TestRepositoryArchivesNavigation:
 
     @pytest.mark.asyncio
     async def test_archives_selector_without_preselection(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that archives selector works normally without preselection."""
         # Create test repository
@@ -215,7 +216,7 @@ class TestRepositoryArchivesNavigation:
 
     @pytest.mark.asyncio
     async def test_archives_tab_oob_navigation_update(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that archives tab includes out-of-band navigation update."""
         # Create test repository

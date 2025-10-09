@@ -6,6 +6,8 @@ import pytest
 import uuid
 import asyncio
 from typing import Generator, AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
@@ -181,7 +183,7 @@ class TestJobManagerTaskExecution:
     @pytest.fixture
     def job_manager_with_db(
         self,
-        test_db: Session,
+        test_db: AsyncSession,
         mock_output_manager: Mock,
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
@@ -238,7 +240,7 @@ class TestJobManagerTaskExecution:
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
         mock_notification_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> JobManager:
         """Create job manager with injected mock dependencies"""
 
@@ -916,7 +918,7 @@ class TestJobManagerTaskExecution:
         self,
         job_manager_with_mocks: JobManager,
         mock_notification_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful notification task execution"""
         # Create a notification configuration in the database
@@ -1066,7 +1068,7 @@ class TestJobManagerDatabaseIntegration:
     @pytest.fixture
     def job_manager_with_db(
         self,
-        test_db: Session,
+        test_db: AsyncSession,
         mock_output_manager: Mock,
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,

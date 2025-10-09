@@ -3,7 +3,7 @@ Tests for RepositoryCheckConfigService - Business logic tests
 """
 
 import pytest
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
 )
@@ -11,13 +11,13 @@ from borgitory.models.database import RepositoryCheckConfig, Repository
 
 
 @pytest.fixture
-def service(test_db: Session):
+def service(test_db: AsyncSession):
     """RepositoryCheckConfigService instance with real database session."""
     return RepositoryCheckConfigService(test_db)
 
 
 @pytest.fixture
-def sample_repository(test_db: Session):
+def sample_repository(test_db: AsyncSession):
     """Create a sample repository for testing."""
     repository = Repository(
         name="test-repo",
@@ -31,7 +31,7 @@ def sample_repository(test_db: Session):
 
 
 @pytest.fixture
-def sample_config(test_db: Session):
+def sample_config(test_db: AsyncSession):
     """Create a sample repository check config for testing."""
     config = RepositoryCheckConfig(
         name="test-config",
@@ -56,7 +56,7 @@ class TestRepositoryCheckConfigService:
         result = service.get_all_configs()
         assert result == []
 
-    def test_get_all_configs_with_data(self, service, test_db: Session) -> None:
+    def test_get_all_configs_with_data(self, service, test_db: AsyncSession) -> None:
         """Test getting configs with data."""
         config1 = RepositoryCheckConfig(
             name="config-1", description="First config", check_type="full", enabled=True
@@ -77,7 +77,9 @@ class TestRepositoryCheckConfigService:
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_all_configs_ordered_by_name(self, service, test_db: Session) -> None:
+    def test_get_all_configs_ordered_by_name(
+        self, service, test_db: AsyncSession
+    ) -> None:
         """Test configs are returned ordered by name."""
         config_z = RepositoryCheckConfig(name="z-config", check_type="full")
         config_a = RepositoryCheckConfig(name="a-config", check_type="full")
@@ -92,7 +94,7 @@ class TestRepositoryCheckConfigService:
         names = [c.name for c in result]
         assert names == ["a-config", "m-config", "z-config"]
 
-    def test_get_enabled_configs_only(self, service, test_db: Session) -> None:
+    def test_get_enabled_configs_only(self, service, test_db: AsyncSession) -> None:
         """Test getting only enabled configs."""
         enabled_config = RepositoryCheckConfig(
             name="enabled-config", check_type="full", enabled=True
@@ -133,7 +135,7 @@ class TestRepositoryCheckConfigService:
         result = service.get_config_by_name("non-existent")
         assert result is None
 
-    def test_create_config_success(self, service, test_db: Session) -> None:
+    def test_create_config_success(self, service, test_db: AsyncSession) -> None:
         """Test successful config creation."""
         success, config, error = service.create_config(
             name="new-config",
@@ -251,7 +253,7 @@ class TestRepositoryCheckConfigService:
         assert config.name == "test-config"
         assert config.description == "Updated"
 
-    def test_enable_config_success(self, service, test_db: Session) -> None:
+    def test_enable_config_success(self, service, test_db: AsyncSession) -> None:
         """Test successful config enabling."""
         # Create disabled config
         config = RepositoryCheckConfig(
@@ -280,7 +282,7 @@ class TestRepositoryCheckConfigService:
         assert success_msg is None
         assert "not found" in error
 
-    def test_disable_config_success(self, service, test_db: Session) -> None:
+    def test_disable_config_success(self, service, test_db: AsyncSession) -> None:
         """Test successful config disabling."""
         # Create enabled config
         config = RepositoryCheckConfig(
@@ -371,7 +373,7 @@ class TestRepositoryCheckConfigService:
         assert result["repositories"] == []
         assert result["check_configs"] == []
 
-    def test_config_lifecycle(self, service, test_db: Session) -> None:
+    def test_config_lifecycle(self, service, test_db: AsyncSession) -> None:
         """Test complete config lifecycle: create, update, enable/disable, delete."""
         # Create
         success, created_config, error = service.create_config(

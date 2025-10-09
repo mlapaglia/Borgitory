@@ -197,7 +197,7 @@ class RepositoryStatsService:
         try:
             borg_command = create_borg_command(
                 base_command="borg info",
-                repository_path=repository.path,
+                repository_path="",
                 passphrase=repository.get_passphrase(),
                 additional_args=["--json", f"{repository.path}::{archive_name}"],
             )
@@ -233,35 +233,15 @@ class RepositoryStatsService:
         self,
         repository: Repository,
         db: AsyncSession,
-        progress_callback: Optional[Callable[[str, int], None]] = None,
     ) -> RepositoryStats:
         """Gather comprehensive repository statistics"""
         try:
-            if progress_callback:
-                progress_callback("Initializing repository analysis...", 5)
-
-            # Get list of all archives
-            if progress_callback:
-                progress_callback("Scanning repository for archives...", 10)
             archives = await self.execute_borg_list(repository)
             if not archives:
                 raise ValueError("No archives found in repository")
 
-            if progress_callback:
-                progress_callback(
-                    f"Found {len(archives)} archives. Analyzing archive details...", 15
-                )
-
-            # Get detailed info for each archive
             archive_stats = []
             for i, archive in enumerate(archives):
-                if progress_callback:
-                    # Progress from 15% to 60% during archive analysis
-                    archive_progress = 15 + int((i / len(archives)) * 45)
-                    progress_callback(
-                        f"Analyzing archive {i + 1}/{len(archives)}: {archive}",
-                        archive_progress,
-                    )
                 archive_info = await self.execute_borg_info(repository, archive)
                 if archive_info:
                     archive_stats.append(archive_info)
@@ -269,32 +249,15 @@ class RepositoryStatsService:
             if not archive_stats:
                 raise ValueError("Could not retrieve archive information")
 
-            # Sort archives by date
             archive_stats.sort(key=lambda x: str(x.get("start", "")))
 
-            if progress_callback:
-                progress_callback("Building size and compression statistics...", 65)
+            file_type_stats = await self._get_file_type_stats(repository, archives)
 
-            # Get file type statistics
-            if progress_callback:
-                progress_callback("Analyzing file types and extensions...", 70)
-            file_type_stats = await self._get_file_type_stats(
-                repository, archives, progress_callback
-            )
-
-            if progress_callback:
-                progress_callback("Calculating job execution time statistics...", 80)
-
-            # Get execution time statistics
             execution_time_stats = await self._get_execution_time_stats(repository, db)
             execution_time_chart = self._build_execution_time_chart(
                 execution_time_stats
             )
 
-            if progress_callback:
-                progress_callback("Calculating success/failure statistics...", 85)
-
-            # Get success/failure statistics
             success_failure_stats = await self._get_success_failure_stats(
                 repository, db
             )
@@ -305,10 +268,6 @@ class RepositoryStatsService:
                 repository, db
             )
 
-            if progress_callback:
-                progress_callback("Finalizing statistics and building charts...", 90)
-
-            # Build statistics
             stats = RepositoryStats(
                 repository_path=repository.path,
                 total_archives=len(archive_stats),
@@ -325,9 +284,6 @@ class RepositoryStatsService:
                 timeline_success_failure=timeline_success_failure,
                 summary=self._build_summary_stats(archive_stats),
             )
-
-            if progress_callback:
-                progress_callback("Statistics analysis complete!", 100)
 
             return stats
 

@@ -3,8 +3,10 @@ Tests for NotificationConfigService - Business logic tests
 """
 
 import pytest
-from sqlalchemy.orm import Session
+import pytest_asyncio
 from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.notifications.config_service import NotificationConfigService
 from borgitory.services.notifications.service import NotificationService
 from borgitory.models.database import NotificationConfig
@@ -26,18 +28,14 @@ def notification_service() -> NotificationService:
 
 
 @pytest.fixture
-def service(
-    test_db: Session, notification_service: NotificationService
-) -> NotificationConfigService:
+def service(notification_service: NotificationService) -> NotificationConfigService:
     """NotificationConfigService instance with real database session."""
-    return NotificationConfigService(
-        db=test_db, notification_service=notification_service
-    )
+    return NotificationConfigService(notification_service=notification_service)
 
 
-@pytest.fixture
-def sample_config(
-    test_db: Session, notification_service: NotificationService
+@pytest_asyncio.fixture
+async def sample_config(
+    test_db: AsyncSession, notification_service: NotificationService
 ) -> NotificationConfig:
     """Create a sample notification config for testing."""
     config = NotificationConfig()
@@ -50,23 +48,27 @@ def sample_config(
     config.enabled = True
 
     test_db.add(config)
-    test_db.commit()
-    test_db.refresh(config)
+    await test_db.commit()
+    await test_db.refresh(config)
     return config
 
 
 class TestNotificationConfigService:
     """Test class for NotificationConfigService business logic."""
 
-    def test_get_all_configs_empty(self, service: NotificationConfigService) -> None:
+    @pytest.mark.asyncio
+    async def test_get_all_configs_empty(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
         """Test getting configs when none exist."""
-        result = service.get_all_configs()
+        result = await service.get_all_configs(db=test_db)
         assert result == []
 
-    def test_get_all_configs_with_data(
+    @pytest.mark.asyncio
+    async def test_get_all_configs_with_data(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         notification_service: NotificationService,
     ) -> None:
         """Test getting configs with data."""
@@ -88,18 +90,19 @@ class TestNotificationConfigService:
 
         test_db.add(config1)
         test_db.add(config2)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_all_configs()
+        result = await service.get_all_configs(db=test_db)
         assert len(result) == 2
         names = [c.name for c in result]
         assert "config-1" in names
         assert "config-2" in names
 
-    def test_get_all_configs_pagination(
+    @pytest.mark.asyncio
+    async def test_get_all_configs_pagination(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         notification_service: NotificationService,
     ) -> None:
         """Test getting configs with pagination."""
@@ -116,28 +119,36 @@ class TestNotificationConfigService:
             )
             config.enabled = True
             test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
-        result = service.get_all_configs(skip=2, limit=2)
+        result = await service.get_all_configs(db=test_db, skip=2, limit=2)
         assert len(result) == 2
 
-    def test_get_config_by_id_success(
-        self, service: NotificationConfigService, sample_config: NotificationConfig
+    @pytest.mark.asyncio
+    async def test_get_config_by_id_success(
+        self,
+        service: NotificationConfigService,
+        test_db: AsyncSession,
+        sample_config: NotificationConfig,
     ) -> None:
         """Test getting config by ID successfully."""
-        result = service.get_config_by_id(sample_config.id)
+        result = await service.get_config_by_id(db=test_db, config_id=sample_config.id)
         assert result is not None
         assert result.name == "test-config"
         assert result.id == sample_config.id
 
-    def test_get_config_by_id_not_found(
-        self, service: NotificationConfigService
+    @pytest.mark.asyncio
+    async def test_get_config_by_id_not_found(
+        self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
         """Test getting non-existent config by ID."""
-        result = service.get_config_by_id(999)
+        result = await service.get_config_by_id(db=test_db, config_id=999)
         assert result is None
 
-    def test_get_supported_providers(self, service: NotificationConfigService) -> None:
+    @pytest.mark.asyncio
+    async def test_get_supported_providers(
+        self, service: NotificationConfigService
+    ) -> None:
         """Test getting supported providers."""
         providers = service.get_supported_providers()
         assert len(providers) > 0
@@ -153,11 +164,13 @@ class TestNotificationConfigService:
         assert "pushover" in provider_values
         assert "discord" in provider_values
 
-    def test_create_config_success(
-        self, service: NotificationConfigService, test_db: Session
+    @pytest.mark.asyncio
+    async def test_create_config_success(
+        self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
         """Test successful config creation."""
-        config = service.create_config(
+        config = await service.create_config(
+            db=test_db,
             name="new-config",
             provider="pushover",
             provider_config={
@@ -171,20 +184,24 @@ class TestNotificationConfigService:
         assert config.enabled is True
 
         # Verify saved to database
-        saved_config = (
-            test_db.query(NotificationConfig)
-            .filter(NotificationConfig.name == "new-config")
-            .first()
+        result = await test_db.execute(
+            select(NotificationConfig).where(NotificationConfig.name == "new-config")
         )
+        saved_config = result.scalar_one_or_none()
         assert saved_config is not None
         assert saved_config.provider == "pushover"
 
-    def test_create_config_duplicate_name(
-        self, service: NotificationConfigService, sample_config: NotificationConfig
+    @pytest.mark.asyncio
+    async def test_create_config_duplicate_name(
+        self,
+        service: NotificationConfigService,
+        test_db: AsyncSession,
+        sample_config: NotificationConfig,
     ) -> None:
         """Test creating config with duplicate name."""
         with pytest.raises(HTTPException) as exc_info:
-            service.create_config(
+            await service.create_config(
+                db=test_db,
                 name="test-config",  # Same name as sample_config
                 provider="pushover",
                 provider_config={
@@ -196,12 +213,14 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 400
         assert "already exists" in str(exc_info.value.detail)
 
-    def test_create_config_invalid_provider_config(
-        self, service: NotificationConfigService
+    @pytest.mark.asyncio
+    async def test_create_config_invalid_provider_config(
+        self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
         """Test creating config with invalid provider configuration."""
         with pytest.raises(HTTPException) as exc_info:
-            service.create_config(
+            await service.create_config(
+                db=test_db,
                 name="invalid-config",
                 provider="pushover",
                 provider_config={},  # Missing required fields
@@ -210,14 +229,16 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 400
         assert "Invalid configuration" in str(exc_info.value.detail)
 
-    def test_update_config_success(
+    @pytest.mark.asyncio
+    async def test_update_config_success(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_config: NotificationConfig,
     ) -> None:
         """Test successful config update."""
-        updated_config = service.update_config(
+        updated_config = await service.update_config(
+            db=test_db,
             config_id=sample_config.id,
             name="updated-config",
             provider="pushover",
@@ -231,13 +252,17 @@ class TestNotificationConfigService:
         assert updated_config.provider == "pushover"
 
         # Verify in database
-        test_db.refresh(updated_config)
+        await test_db.refresh(updated_config)
         assert updated_config.name == "updated-config"
 
-    def test_update_config_not_found(self, service: NotificationConfigService) -> None:
+    @pytest.mark.asyncio
+    async def test_update_config_not_found(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
         """Test updating non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
-            service.update_config(
+            await service.update_config(
+                db=test_db,
                 config_id=999,
                 name="not-found",
                 provider="pushover",
@@ -250,10 +275,11 @@ class TestNotificationConfigService:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    def test_enable_config_success(
+    @pytest.mark.asyncio
+    async def test_enable_config_success(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         notification_service: NotificationService,
     ) -> None:
         """Test successful config enabling."""
@@ -267,31 +293,35 @@ class TestNotificationConfigService:
         config.enabled = False
 
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
-        success, message = service.enable_config(config.id)
+        success, message = await service.enable_config(db=test_db, config_id=config.id)
 
         assert success is True
         assert "enabled successfully" in message
         assert config.name in message
 
         # Verify in database
-        test_db.refresh(config)
+        await test_db.refresh(config)
         assert config.enabled is True
 
-    def test_enable_config_not_found(self, service: NotificationConfigService) -> None:
+    @pytest.mark.asyncio
+    async def test_enable_config_not_found(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
         """Test enabling non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
-            service.enable_config(999)
+            await service.enable_config(db=test_db, config_id=999)
 
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    def test_disable_config_success(
+    @pytest.mark.asyncio
+    async def test_disable_config_success(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         notification_service: NotificationService,
     ) -> None:
         """Test successful config disabling."""
@@ -305,67 +335,77 @@ class TestNotificationConfigService:
         config.enabled = True
 
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
-        success, message = service.disable_config(config.id)
+        success, message = await service.disable_config(db=test_db, config_id=config.id)
 
         assert success is True
         assert "disabled successfully" in message
         assert config.name in message
 
         # Verify in database
-        test_db.refresh(config)
+        await test_db.refresh(config)
         assert config.enabled is False
 
-    def test_disable_config_not_found(self, service: NotificationConfigService) -> None:
+    @pytest.mark.asyncio
+    async def test_disable_config_not_found(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
         """Test disabling non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
-            service.disable_config(999)
+            await service.disable_config(db=test_db, config_id=999)
 
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    def test_delete_config_success(
+    @pytest.mark.asyncio
+    async def test_delete_config_success(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         sample_config: NotificationConfig,
     ) -> None:
         """Test successful config deletion."""
         config_id = sample_config.id
         config_name = sample_config.name
 
-        success, returned_name = service.delete_config(config_id)
+        success, returned_name = await service.delete_config(
+            db=test_db, config_id=config_id
+        )
 
         assert success is True
         assert returned_name == config_name
 
         # Verify removed from database
-        deleted_config = (
-            test_db.query(NotificationConfig)
-            .filter(NotificationConfig.id == config_id)
-            .first()
+        result = await test_db.execute(
+            select(NotificationConfig).where(NotificationConfig.id == config_id)
         )
+        deleted_config = result.scalar_one_or_none()
         assert deleted_config is None
 
-    def test_delete_config_not_found(self, service: NotificationConfigService) -> None:
+    @pytest.mark.asyncio
+    async def test_delete_config_not_found(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
         """Test deleting non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
-            service.delete_config(999)
+            await service.delete_config(db=test_db, config_id=999)
 
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    def test_get_config_with_decrypted_data_success(
+    @pytest.mark.asyncio
+    async def test_get_config_with_decrypted_data_success(
         self,
         service: NotificationConfigService,
+        test_db: AsyncSession,
         sample_config: NotificationConfig,
         notification_service: NotificationService,
     ) -> None:
         """Test getting config with decrypted data."""
-        config, decrypted_config = service.get_config_with_decrypted_data(
-            sample_config.id
+        config, decrypted_config = await service.get_config_with_decrypted_data(
+            db=test_db, config_id=sample_config.id
         )
 
         assert config.id == sample_config.id
@@ -376,25 +416,31 @@ class TestNotificationConfigService:
         assert decrypted_config["user_key"].startswith("test-user")
         assert decrypted_config["app_token"].startswith("test-token")
 
-    def test_get_config_with_decrypted_data_not_found(
-        self, service: NotificationConfigService
+    @pytest.mark.asyncio
+    async def test_get_config_with_decrypted_data_not_found(
+        self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
         """Test getting decrypted data for non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
-            service.get_config_with_decrypted_data(999)
+            await service.get_config_with_decrypted_data(db=test_db, config_id=999)
 
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
     async def test_test_config_success(
-        self, service: NotificationConfigService, sample_config: NotificationConfig
+        self,
+        service: NotificationConfigService,
+        test_db: AsyncSession,
+        sample_config: NotificationConfig,
     ) -> None:
         """Test successful config testing."""
         # Note: This will likely fail in tests since we don't have real credentials
         # but we can test that the method exists and handles the flow correctly
         try:
-            success, message = await service.test_config(sample_config.id)
+            success, message = await service.test_config(
+                db=test_db, config_id=sample_config.id
+            )
             # Either succeeds or fails, but should return proper types
             assert isinstance(success, bool)
             assert isinstance(message, str)
@@ -404,11 +450,11 @@ class TestNotificationConfigService:
 
     @pytest.mark.asyncio
     async def test_test_config_not_found(
-        self, service: NotificationConfigService
+        self, service: NotificationConfigService, test_db: AsyncSession
     ) -> None:
         """Test testing non-existent config."""
         with pytest.raises(HTTPException) as exc_info:
-            await service.test_config(999)
+            await service.test_config(db=test_db, config_id=999)
 
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
@@ -417,7 +463,7 @@ class TestNotificationConfigService:
     async def test_test_config_disabled(
         self,
         service: NotificationConfigService,
-        test_db: Session,
+        test_db: AsyncSession,
         notification_service: NotificationService,
     ) -> None:
         """Test testing disabled config."""
@@ -431,21 +477,26 @@ class TestNotificationConfigService:
         config.enabled = False
 
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         with pytest.raises(HTTPException) as exc_info:
-            await service.test_config(config.id)
+            await service.test_config(db=test_db, config_id=config.id)
 
         assert exc_info.value.status_code == 400
         assert "disabled" in str(exc_info.value.detail)
 
-    def test_config_lifecycle(
-        self, service: NotificationConfigService, test_db: Session
+    @pytest.mark.asyncio
+    async def test_config_lifecycle(
+        self,
+        service: NotificationConfigService,
+        test_db: AsyncSession,
+        notification_service: NotificationService,
     ) -> None:
         """Test complete config lifecycle: create, update, enable/disable, delete."""
         # Create
-        created_config = service.create_config(
+        created_config = await service.create_config(
+            db=test_db,
             name="lifecycle-test",
             provider="pushover",
             provider_config={
@@ -456,7 +507,8 @@ class TestNotificationConfigService:
         config_id = created_config.id
 
         # Update
-        updated_config = service.update_config(
+        updated_config = await service.update_config(
+            db=test_db,
             config_id=config_id,
             name="updated-lifecycle-test",
             provider="pushover",
@@ -468,28 +520,31 @@ class TestNotificationConfigService:
         assert updated_config.name == "updated-lifecycle-test"
 
         # Disable
-        success, message = service.disable_config(config_id)
+        success, message = await service.disable_config(db=test_db, config_id=config_id)
         assert success is True
 
         # Enable
-        success, message = service.enable_config(config_id)
+        success, message = await service.enable_config(db=test_db, config_id=config_id)
         assert success is True
 
         # Get with decrypted data
-        config, decrypted_config = service.get_config_with_decrypted_data(config_id)
+        config, decrypted_config = await service.get_config_with_decrypted_data(
+            db=test_db, config_id=config_id
+        )
         assert config.name == "updated-lifecycle-test"
         assert decrypted_config["user_key"].startswith("updated-user")
         assert decrypted_config["app_token"].startswith("updated-token")
 
         # Delete
-        success, config_name = service.delete_config(config_id)
+        success, config_name = await service.delete_config(
+            db=test_db, config_id=config_id
+        )
         assert success is True
         assert config_name == "updated-lifecycle-test"
 
         # Verify completely removed
-        deleted_config = (
-            test_db.query(NotificationConfig)
-            .filter(NotificationConfig.id == config_id)
-            .first()
+        result = await test_db.execute(
+            select(NotificationConfig).where(NotificationConfig.id == config_id)
         )
+        deleted_config = result.scalar_one_or_none()
         assert deleted_config is None

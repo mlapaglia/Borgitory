@@ -5,6 +5,7 @@ Tests business logic independent of HTTP concerns.
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from borgitory.models.borg_info import RepositoryInitializationResult
@@ -433,7 +434,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful repository import without keyfile."""
         # Arrange
@@ -480,7 +481,7 @@ class TestRepositoryService:
         mock_borg_service: Mock,
         mock_path_service: Mock,
         mock_file_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful repository import with keyfile upload."""
         # Arrange
@@ -539,7 +540,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful repository import with keyfile content."""
         # Arrange
@@ -584,7 +585,7 @@ class TestRepositoryService:
     async def test_import_repository_name_already_exists(
         self,
         repository_service: RepositoryService,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test import fails when repository name already exists."""
         # Arrange - create existing repository
@@ -617,7 +618,7 @@ class TestRepositoryService:
     async def test_import_repository_path_already_exists(
         self,
         repository_service: RepositoryService,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test import fails when repository path already exists."""
         # Arrange - create existing repository
@@ -653,7 +654,7 @@ class TestRepositoryService:
         repository_service: RepositoryService,
         mock_path_service: Mock,
         mock_file_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test import fails when keyfile save fails."""
         # Arrange
@@ -686,7 +687,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test import fails when repository verification fails."""
         # Arrange
@@ -719,7 +720,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful repository import with cache directory."""
         # Arrange
@@ -758,7 +759,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test import handles exceptions and performs rollback."""
         # Arrange
@@ -794,7 +795,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test import succeeds even when archive listing fails."""
         # Arrange
@@ -834,7 +835,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful archive listing with multiple archives."""
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -915,7 +916,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful archive listing with no archives."""
         from borgitory.models.borg_info import BorgArchiveListResponse
@@ -950,7 +951,7 @@ class TestRepositoryService:
     async def test_list_archives_repository_not_found(
         self,
         repository_service: RepositoryService,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive listing when repository is not found in database."""
         # Act
@@ -969,7 +970,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive listing when borg service raises an exception."""
         # Arrange - create repository in database
@@ -1003,7 +1004,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive size formatting for different sizes."""
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -1074,7 +1075,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive listing with archive that has no size information."""
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -1120,7 +1121,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test that recent archives are limited to 10 and in reverse order."""
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -1168,7 +1169,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive time formatting."""
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -1213,7 +1214,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive with invalid time format falls back to original time."""
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -1565,7 +1566,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful archive contents retrieval."""
         from borgitory.models.repository_dtos import ArchiveContentsRequest
@@ -1660,7 +1661,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful archive contents retrieval for root path."""
         from borgitory.models.repository_dtos import ArchiveContentsRequest
@@ -1723,7 +1724,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful archive contents retrieval for nested path."""
         from borgitory.models.repository_dtos import ArchiveContentsRequest
@@ -1777,7 +1778,7 @@ class TestRepositoryService:
     async def test_get_archive_contents_repository_not_found(
         self,
         repository_service: RepositoryService,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive contents when repository is not found."""
         from borgitory.models.repository_dtos import ArchiveContentsRequest
@@ -1805,7 +1806,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive contents when borg service raises an exception."""
         from borgitory.models.repository_dtos import ArchiveContentsRequest
@@ -1855,7 +1856,7 @@ class TestRepositoryService:
         self,
         repository_service: RepositoryService,
         mock_borg_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test archive contents when archive is empty."""
         from borgitory.models.repository_dtos import ArchiveContentsRequest
