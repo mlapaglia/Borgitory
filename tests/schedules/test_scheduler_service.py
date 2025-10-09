@@ -1,6 +1,6 @@
 import uuid
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.scheduling.scheduler_service import SchedulerService
@@ -225,7 +225,6 @@ class TestSchedulerService:
 
     async def test_reload_schedules_success(self) -> None:
         """Test successfully reloading schedules from database"""
-        mock_db = Mock()
         mock_schedule1 = Mock()
         mock_schedule1.id = 123
         mock_schedule1.name = "Schedule 1"
@@ -236,20 +235,26 @@ class TestSchedulerService:
         mock_schedule2.name = "Schedule 2"
         mock_schedule2.cron_expression = "0 4 * * *"
 
-        mock_db.query.return_value.filter.return_value.all.return_value = [
-            mock_schedule1,
-            mock_schedule2,
-        ]
+        # Mock SQLAlchemy 2.0 query pattern
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [mock_schedule1, mock_schedule2]
+        mock_result = Mock()
+        mock_result.scalars.return_value = mock_scalars
+
+        mock_db = Mock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db.__aexit__ = AsyncMock(return_value=None)
 
         with (
             patch(
-                "borgitory.services.scheduling.scheduler_service.get_db_session"
-            ) as mock_get_db,
+                "borgitory.models.database.async_session_maker"
+            ) as mock_session_maker,
             patch.object(
                 self.scheduler_service, "_add_schedule_internal", new_callable=AsyncMock
             ) as mock_add,
         ):
-            mock_get_db.return_value.__enter__.return_value = mock_db
+            mock_session_maker.return_value = mock_db
 
             await self.scheduler_service._reload_schedules()
 
@@ -266,20 +271,23 @@ class TestSchedulerService:
         mock_job = Mock()
         mock_job.next_run_time = next_run_time
 
-        mock_db = Mock()
         mock_schedule = Mock()
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_schedule
-        )
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_schedule
+
+        mock_db = Mock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db.__aexit__ = AsyncMock(return_value=None)
 
         with (
             patch.object(self.scheduler_service.scheduler, "get_job") as mock_get_job,
             patch(
-                "borgitory.services.scheduling.scheduler_service.get_db_session"
-            ) as mock_get_db,
+                "borgitory.models.database.async_session_maker"
+            ) as mock_session_maker,
         ):
             mock_get_job.return_value = mock_job
-            mock_get_db.return_value.__enter__.return_value = mock_db
+            mock_session_maker.return_value = mock_db
 
             await self.scheduler_service._update_next_run_time(schedule_id, job_id)
 

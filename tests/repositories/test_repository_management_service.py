@@ -5,7 +5,7 @@ Tests the new repository management features following the established codebase 
 
 import pytest
 import json
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from typing import Any
 
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -229,20 +229,16 @@ class TestRepositoryManagementBusinessLogic:
 
         with (
             patch(
-                "borgitory.services.repositories.repository_service.secure_borg_command"
-            ) as mock_secure_cmd,
+                "borgitory.services.repositories.repository_service.create_borg_command"
+            ) as mock_create_cmd,
             patch("asyncio.create_subprocess_exec", return_value=mock_process),
             patch("asyncio.wait_for", return_value=(b"archive1\narchive2\n", b"")),
         ):
-            # Mock the secure_borg_command context manager
-            mock_context = AsyncMock()
-            mock_context.__aenter__.return_value = (
-                ["borg", "config", "--list", "/test/repo/path"],
-                {"BORG_PASSPHRASE": "test_passphrase"},
-                None,
-            )
-            mock_context.__aexit__.return_value = None
-            mock_secure_cmd.return_value = mock_context
+            # Mock create_borg_command to return a BorgCommandResult object
+            mock_borg_cmd = MagicMock()
+            mock_borg_cmd.command = ["borg", "config", "--list", "/test/repo/path"]
+            mock_borg_cmd.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+            mock_create_cmd.return_value = mock_borg_cmd
 
             result = await repository_service.check_repository_lock_status(
                 mock_repository
@@ -254,12 +250,12 @@ class TestRepositoryManagementBusinessLogic:
             assert result["message"] == "Repository is accessible"
             assert "error" not in result
 
-            # Verify secure_borg_command was called correctly
-            mock_secure_cmd.assert_called_once_with(
+            # Verify create_borg_command was called correctly
+            mock_create_cmd.assert_called_once_with(
                 base_command="borg config",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
-                keyfile_content=mock_repository.get_keyfile_content(),
+                keyfile_path=mock_repository.get_keyfile_path(),
                 additional_args=["--list"],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
@@ -343,22 +339,18 @@ class TestRepositoryManagementBusinessLogic:
 
         with (
             patch(
-                "borgitory.services.repositories.repository_service.secure_borg_command"
-            ) as mock_secure_cmd,
+                "borgitory.services.repositories.repository_service.create_borg_command"
+            ) as mock_create_cmd,
             patch("asyncio.create_subprocess_exec", return_value=mock_process),
             patch(
                 "asyncio.wait_for", return_value=(b"Lock broken successfully\n", b"")
             ),
         ):
-            # Mock the secure_borg_command context manager
-            mock_context = AsyncMock()
-            mock_context.__aenter__.return_value = (
-                ["borg", "break-lock", "/test/repo/path"],
-                {"BORG_PASSPHRASE": "test_passphrase"},
-                None,
-            )
-            mock_context.__aexit__.return_value = None
-            mock_secure_cmd.return_value = mock_context
+            # Mock create_borg_command to return a BorgCommandResult object
+            mock_borg_cmd = MagicMock()
+            mock_borg_cmd.command = ["borg", "break-lock", "/test/repo/path"]
+            mock_borg_cmd.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+            mock_create_cmd.return_value = mock_borg_cmd
 
             result = await repository_service.break_repository_lock(mock_repository)
 
@@ -367,12 +359,12 @@ class TestRepositoryManagementBusinessLogic:
             assert "successfully" in result["message"].lower()
             assert "error" not in result
 
-            # Verify secure_borg_command was called correctly
-            mock_secure_cmd.assert_called_once_with(
+            # Verify create_borg_command was called correctly
+            mock_create_cmd.assert_called_once_with(
                 base_command="borg break-lock",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
-                keyfile_content=mock_repository.get_keyfile_content(),
+                keyfile_path=mock_repository.get_keyfile_path(),
                 additional_args=[],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )

@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -254,15 +255,14 @@ class TestJobManager:
         assert job.id == job_id
         assert job.status == JobStatusEnum.RUNNING
 
-    def test_repository_integration(
+    async def test_repository_integration(
         self, sample_repository: Repository, test_db: AsyncSession
     ) -> None:
         """Test repository database integration"""
-        repo = (
-            test_db.query(Repository)
-            .filter(Repository.id == sample_repository.id)
-            .first()
+        result = await test_db.execute(
+            select(Repository).where(Repository.id == sample_repository.id)
         )
+        repo = result.scalar_one_or_none()
 
         assert repo is not None
         assert repo.id == sample_repository.id

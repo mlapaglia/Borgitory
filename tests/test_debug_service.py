@@ -382,7 +382,7 @@ class TestDebugService:
         self, debug_service: DebugService, mock_db_session: MagicMock
     ) -> None:
         """Test database info exception handling"""
-        mock_db_session.query.side_effect = Exception("Database error")
+        mock_db_session.execute = AsyncMock(side_effect=Exception("Database error"))
 
         result = await debug_service._get_database_info(mock_db_session)
 

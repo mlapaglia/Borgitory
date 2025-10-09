@@ -4,7 +4,7 @@ Test suite for streaming fixes and UUID system improvements
 
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, AsyncMock
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
@@ -148,36 +148,21 @@ class TestJobStreamingFixes:
         job_id = uuid.uuid4()
         task_order = 0
 
-        # Job not in manager, should try database
+        # Job not in manager, should return error (streaming only works from memory)
         mock_job_manager.jobs = {}
 
-        # Mock database session and task - patch the import inside the function
-        with patch("borgitory.models.database.SessionLocal") as mock_session_local:
-            mock_session = Mock()
-            mock_session_local.return_value = mock_session
+        events = []
+        async for event in job_stream_service._task_output_event_generator(
+            job_id, task_order
+        ):
+            events.append(event)
+            if len(events) >= 1:  # Get error event
+                break
 
-            mock_job = Mock()
-            mock_job.id = job_id
-            mock_task = Mock()
-            mock_task.task_name = "backup"
-            mock_task.status = JobStatusEnum.COMPLETED
-            mock_task.output = "Backup completed successfully\nFiles processed: 100"
-
-            # Set up the query chain properly
-            mock_session.query().filter().first.side_effect = [mock_job, mock_task]
-
-            events = []
-            async for event in job_stream_service._task_output_event_generator(
-                job_id, task_order
-            ):
-                events.append(event)
-                if len(events) >= 2:  # Limit to prevent infinite loop
-                    break
-
-            # Should have output events
-            assert len(events) >= 1
-            # The content may vary depending on implementation, just check we got some events
-            assert all(isinstance(event, str) for event in events)
+        # Should have output events indicating error
+        assert len(events) >= 1
+        assert isinstance(events[0], str)
+        assert "error" in events[0].lower()
 
 
 class TestJobRenderServiceUUIDIntegration:

@@ -5,7 +5,7 @@ Tests the frontend behavior and template rendering for package selection.
 
 import pytest
 from typing import Any, Dict
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, ANY
 from fastapi.testclient import TestClient
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -172,9 +172,9 @@ class TestPackageSelectionEndpoints:
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
-            # Should have called install_packages with the correct packages
+            # Should have called install_packages with db session and packages
             mock_package_service.install_packages.assert_called_once_with(
-                ["curl", "jq", "sqlite3"]
+                ANY, ["curl", "jq", "sqlite3"]
             )
 
             # Should render success template
@@ -695,7 +695,7 @@ class TestInstalledPackagesEndpoint:
         mock_package_service.list_installed_packages = AsyncMock(
             return_value=mock_packages
         )
-        mock_package_service.get_user_installed_packages = Mock(
+        mock_package_service.get_user_installed_packages = AsyncMock(
             return_value=[mock_user_package]
         )
 
@@ -758,7 +758,9 @@ class TestInstalledPackagesEndpoint:
 
             # Should have called the service methods
             mock_package_service.list_installed_packages.assert_called_once()
-            mock_package_service.get_user_installed_packages.assert_called_once()
+            mock_package_service.get_user_installed_packages.assert_called_once_with(
+                ANY
+            )
 
             # Should render installed list template
             content = response.text
@@ -879,8 +881,10 @@ class TestPackageRemovalEndpoint:
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
-            # Should have called remove_packages with correct packages
-            mock_package_service.remove_packages.assert_called_once_with(["curl", "jq"])
+            # Should have called remove_packages with db session and packages
+            mock_package_service.remove_packages.assert_called_once_with(
+                ANY, ["curl", "jq"]
+            )
 
             # Should render success template
             content = response.text

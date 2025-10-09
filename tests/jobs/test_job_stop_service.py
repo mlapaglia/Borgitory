@@ -4,7 +4,7 @@ Tests business logic directly without mocking
 """
 
 import uuid
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.services.jobs.job_service import JobService
@@ -246,9 +246,6 @@ class TestJobStopService:
             "error_code": "STOP_FAILED",
         }
 
-        # Mock database to raise exception
-        mock_db = Mock(spec=AsyncSession)
-        mock_db.query.side_effect = Exception("Database connection error")
         job_service = JobService(self.mock_job_manager)
 
         # Act

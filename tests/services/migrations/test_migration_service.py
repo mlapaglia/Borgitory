@@ -22,12 +22,12 @@ from borgitory.protocols.system_protocol import (
 class MockSystemOperations(SystemOperationsProtocol):
     """Mock implementation of system operations for testing."""
 
-    def __init__(self):
-        self.makedirs_calls = []
+    def __init__(self) -> None:
+        self.makedirs_calls: list[tuple[str, bool]] = []
         self.path_exists_return = True
         self.data_dir = "/test/data/dir"
-        self.resources_package = None
-        self.resources_path = None
+        self.resources_package: Optional[str] = None
+        self.resources_path: Optional[str] = None
         self.path_is_file_return = True
 
     def makedirs(self, path: str, exist_ok: bool = True) -> None:
@@ -45,12 +45,12 @@ class MockSystemOperations(SystemOperationsProtocol):
         return Mock()
 
     def resources_files(self, package: str) -> Any:
-        self.resources_package = package
+        self.resources_package = package  # type: ignore[assignment]
         return Mock()
 
     def path_truediv(self, base_path: Any, sub_path: str) -> Any:
         mock_path = Mock()
-        self.resources_path = mock_path
+        self.resources_path = mock_path  # type: ignore[assignment]
         return mock_path
 
     def path_str(self, path: Any) -> str:
@@ -63,7 +63,7 @@ class MockSystemOperations(SystemOperationsProtocol):
 class MockDatabaseOperations(DatabaseOperationsProtocol):
     """Mock implementation of database operations for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.current_revision = "abc123def456"
         self.should_raise = False
 
@@ -76,8 +76,8 @@ class MockDatabaseOperations(DatabaseOperationsProtocol):
 class MockMigrationOperations(MigrationOperationsProtocol):
     """Mock implementation of migration operations for testing."""
 
-    def __init__(self):
-        self.run_calls = []
+    def __init__(self) -> None:
+        self.run_calls: list[str] = []
         self.should_succeed = True
 
     def run_alembic_upgrade(self, config_path: str) -> bool:
@@ -88,18 +88,18 @@ class MockMigrationOperations(MigrationOperationsProtocol):
 class TestMigrationService:
     """Test cases for MigrationService."""
 
-    def test_get_current_revision_success(self) -> None:
+    async def test_get_current_revision_success(self) -> None:
         """Test successful retrieval of current revision."""
         system_ops = MockSystemOperations()
         database_ops = MockDatabaseOperations()
         migration_ops = MockMigrationOperations()
 
         service = MigrationService(system_ops, database_ops, migration_ops)
-        result = service.get_current_revision()
+        result = await service.get_current_revision()
 
         assert result == "abc123def456"
 
-    def test_get_current_revision_none(self) -> None:
+    async def test_get_current_revision_none(self) -> None:
         """Test when no current revision exists."""
         system_ops = MockSystemOperations()
         database_ops = MockDatabaseOperations()
@@ -107,11 +107,11 @@ class TestMigrationService:
         migration_ops = MockMigrationOperations()
 
         service = MigrationService(system_ops, database_ops, migration_ops)
-        result = service.get_current_revision()
+        result = await service.get_current_revision()
 
         assert result is None
 
-    def test_get_current_revision_error(self) -> None:
+    async def test_get_current_revision_error(self) -> None:
         """Test when database operation raises error."""
         system_ops = MockSystemOperations()
         database_ops = MockDatabaseOperations()
@@ -119,7 +119,7 @@ class TestMigrationService:
         migration_ops = MockMigrationOperations()
 
         service = MigrationService(system_ops, database_ops, migration_ops)
-        result = service.get_current_revision()
+        result = await service.get_current_revision()
 
         assert result is None
 
@@ -184,7 +184,7 @@ class TestMigrationService:
         def failing_resources_files(package: str) -> Any:
             raise ImportError("Resources not available")
 
-        system_ops.resources_files = failing_resources_files
+        system_ops.resources_files = failing_resources_files  # type: ignore[assignment]
         database_ops = MockDatabaseOperations()
         migration_ops = MockMigrationOperations()
 
@@ -201,7 +201,7 @@ class TestMigrationService:
         def failing_makedirs(path: str, exist_ok: bool = True) -> None:
             raise OSError("Permission denied")
 
-        system_ops.makedirs = failing_makedirs
+        system_ops.makedirs = failing_makedirs  # type: ignore[assignment]
         database_ops = MockDatabaseOperations()
         migration_ops = MockMigrationOperations()
 

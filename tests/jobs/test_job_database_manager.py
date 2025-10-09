@@ -102,26 +102,25 @@ class TestJobDatabaseManager:
         """Test successful job status update"""
         job_id = uuid.uuid4()
 
-        with patch("borgitory.models.database.Job"):
-            mock_job_instance = Mock()
-            mock_job_instance.id = job_id
-            mock_job_instance.status = JobStatusEnum.RUNNING
-            mock_job_instance.cloud_sync_config_id = None
+        mock_job_instance = Mock()
+        mock_job_instance.id = job_id
+        mock_job_instance.status = JobStatusEnum.RUNNING
+        mock_job_instance.cloud_sync_config_id = None
 
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.update_job_status(
-                job_id=job_id,
-                status=JobStatusEnum.COMPLETED,
-                finished_at=now_utc(),
-                output="Job completed successfully",
-            )
+        result = await job_database_manager.update_job_status(
+            job_id=job_id,
+            status=JobStatusEnum.COMPLETED,
+            finished_at=now_utc(),
+            output="Job completed successfully",
+        )
 
-            assert result is True
-            assert mock_job_instance.status == JobStatusEnum.COMPLETED
-            mock_async_session.commit.assert_called_once()
+        assert result is True
+        assert mock_job_instance.status == JobStatusEnum.COMPLETED
+        mock_async_session.commit.assert_called_once()
 
     async def test_get_job_by_uuid_happy_path(
         self,
@@ -131,30 +130,29 @@ class TestJobDatabaseManager:
         """Test successful job retrieval by UUID"""
         job_id = uuid.uuid4()
 
-        with patch("borgitory.models.database.Job"):
-            mock_job_instance = Mock()
-            mock_job_instance.id = job_id
-            mock_job_instance.repository_id = 1
-            mock_job_instance.type = "backup"
-            mock_job_instance.status = JobStatusEnum.COMPLETED
-            mock_job_instance.started_at = now_utc()
-            mock_job_instance.finished_at = now_utc()
-            mock_job_instance.log_output = "Job output"
-            mock_job_instance.error = None
-            mock_job_instance.cloud_sync_config_id = 123
+        mock_job_instance = Mock()
+        mock_job_instance.id = job_id
+        mock_job_instance.repository_id = 1
+        mock_job_instance.type = "backup"
+        mock_job_instance.status = JobStatusEnum.COMPLETED
+        mock_job_instance.started_at = now_utc()
+        mock_job_instance.finished_at = now_utc()
+        mock_job_instance.log_output = "Job output"
+        mock_job_instance.error = None
+        mock_job_instance.cloud_sync_config_id = 123
 
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.get_job_by_uuid(job_id)
+        result = await job_database_manager.get_job_by_uuid(job_id)
 
-            assert result is not None
-            assert result["id"] == job_id
-            assert result["repository_id"] == 1
-            assert result["type"] == "backup"
-            assert result["status"] == JobStatusEnum.COMPLETED
-            assert result["output"] == "Job output"
+        assert result is not None
+        assert result["id"] == job_id
+        assert result["repository_id"] == 1
+        assert result["type"] == "backup"
+        assert result["status"] == JobStatusEnum.COMPLETED
+        assert result["output"] == "Job output"
 
     async def test_get_jobs_by_repository_happy_path(
         self,
@@ -164,37 +162,36 @@ class TestJobDatabaseManager:
         """Test successful job retrieval by repository"""
         repository_id = 1
 
-        with patch("borgitory.models.database.Job"):
-            mock_job1 = Mock()
-            mock_job1.id = uuid.uuid4()
-            mock_job1.type = "backup"
-            mock_job1.status = JobStatusEnum.COMPLETED
-            mock_job1.started_at = now_utc()
-            mock_job1.finished_at = now_utc()
-            mock_job1.error = None
+        mock_job1 = Mock()
+        mock_job1.id = uuid.uuid4()
+        mock_job1.type = "backup"
+        mock_job1.status = JobStatusEnum.COMPLETED
+        mock_job1.started_at = now_utc()
+        mock_job1.finished_at = now_utc()
+        mock_job1.error = None
 
-            mock_job2 = Mock()
-            mock_job2.id = uuid.uuid4()
-            mock_job2.type = "prune"
-            mock_job2.status = JobStatusEnum.RUNNING
-            mock_job2.started_at = now_utc()
-            mock_job2.finished_at = None
-            mock_job2.error = None
+        mock_job2 = Mock()
+        mock_job2.id = uuid.uuid4()
+        mock_job2.type = "prune"
+        mock_job2.status = JobStatusEnum.RUNNING
+        mock_job2.started_at = now_utc()
+        mock_job2.finished_at = None
+        mock_job2.error = None
 
-            mock_scalars = Mock()
-            mock_scalars.all = Mock(return_value=[mock_job1, mock_job2])
+        mock_scalars = Mock()
+        mock_scalars.all = Mock(return_value=[mock_job1, mock_job2])
 
-            mock_result = Mock()
-            mock_result.scalars = Mock(return_value=mock_scalars)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalars = Mock(return_value=mock_scalars)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.get_jobs_by_repository(
-                repository_id, limit=10
-            )
+        result = await job_database_manager.get_jobs_by_repository(
+            repository_id, limit=10
+        )
 
-            assert len(result) == 2
-            assert result[0]["id"] == mock_job1.id
-            assert result[1]["id"] == mock_job2.id
+        assert len(result) == 2
+        assert result[0]["id"] == mock_job1.id
+        assert result[1]["id"] == mock_job2.id
 
     async def test_save_job_tasks_happy_path(
         self,
@@ -226,25 +223,21 @@ class TestJobDatabaseManager:
 
         tasks = [mock_task1, mock_task2]
 
-        with (
-            patch("borgitory.models.database.Job"),
-            patch("borgitory.models.database.JobTask"),
-        ):
-            mock_job_instance = Mock()
-            mock_job_instance.id = job_id
+        mock_job_instance = Mock()
+        mock_job_instance.id = job_id
 
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.save_job_tasks(
-                job_id, cast(list[BorgJobTask], tasks)
-            )
+        result = await job_database_manager.save_job_tasks(
+            job_id, cast(list[BorgJobTask], tasks)
+        )
 
-            assert result is True
-            assert mock_job_instance.total_tasks == 2
-            assert mock_job_instance.completed_tasks == 1
-            mock_async_session.commit.assert_called_once()
+        assert result is True
+        assert mock_job_instance.total_tasks == 2
+        assert mock_job_instance.completed_tasks == 1
+        mock_async_session.commit.assert_called_once()
 
     async def test_get_job_statistics_happy_path(
         self,
@@ -252,44 +245,45 @@ class TestJobDatabaseManager:
         mock_async_session: AsyncMock,
     ) -> None:
         """Test job statistics retrieval"""
-        with patch("borgitory.models.database.Job"):
-            mock_status_result = Mock()
-            mock_status_result.all = Mock(
-                return_value=[
-                    (JobStatusEnum.COMPLETED, 10),
-                    (JobStatusEnum.RUNNING, 2),
-                ]
-            )
+        mock_status_result = Mock()
+        mock_status_result.all = Mock(
+            return_value=[
+                (JobStatusEnum.COMPLETED, 10),
+                (JobStatusEnum.RUNNING, 2),
+            ]
+        )
 
-            mock_type_result = Mock()
-            mock_type_result.all = Mock(
-                return_value=[
-                    ("backup", 8),
-                    ("prune", 4),
-                ]
-            )
+        mock_type_result = Mock()
+        mock_type_result.all = Mock(
+            return_value=[
+                ("backup", 8),
+                ("prune", 4),
+            ]
+        )
 
-            mock_recent_result = Mock()
-            mock_recent_result.scalar = Mock(return_value=5)
+        mock_recent_result = Mock()
+        mock_recent_result.scalar = Mock(return_value=5)
 
-            mock_total_result = Mock()
-            mock_total_result.scalar = Mock(return_value=12)
+        mock_total_result = Mock()
+        mock_total_result.scalar = Mock(return_value=12)
 
-            mock_async_session.execute.side_effect = [
+        mock_async_session.execute = AsyncMock(
+            side_effect=[
                 mock_status_result,
                 mock_type_result,
                 mock_recent_result,
                 mock_total_result,
             ]
+        )
 
-            result = await job_database_manager.get_job_statistics()
+        result = await job_database_manager.get_job_statistics()
 
-            assert result["total_jobs"] == 12
-            assert result["recent_jobs_24h"] == 5
-            by_status = cast(dict[Any, Any], result.get("by_status", {}))
-            by_type = cast(dict[Any, Any], result.get("by_type", {}))
-            assert JobStatusEnum.COMPLETED in by_status
-            assert "backup" in by_type
+        assert result["total_jobs"] == 12
+        assert result["recent_jobs_24h"] == 5
+        by_status = cast(dict[Any, Any], result.get("by_status", {}))
+        by_type = cast(dict[Any, Any], result.get("by_type", {}))
+        assert JobStatusEnum.COMPLETED in by_status
+        assert "backup" in by_type
 
     async def test_get_repository_data_happy_path(
         self,
@@ -299,25 +293,24 @@ class TestJobDatabaseManager:
         """Test repository data retrieval"""
         repository_id = 1
 
-        with patch("borgitory.models.database.Repository"):
-            mock_repo = Mock()
-            mock_repo.id = repository_id
-            mock_repo.name = "test-repo"
-            mock_repo.path = "/path/to/repo"
-            mock_repo.cache_dir = "/cache"
-            mock_repo.get_passphrase = Mock(return_value="secret")
-            mock_repo.get_keyfile_content = Mock(return_value=None)
+        mock_repo = Mock()
+        mock_repo.id = repository_id
+        mock_repo.name = "test-repo"
+        mock_repo.path = "/path/to/repo"
+        mock_repo.cache_dir = "/cache"
+        mock_repo.get_passphrase = Mock(return_value="secret")
+        mock_repo.get_keyfile_content = Mock(return_value=None)
 
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=mock_repo)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=mock_repo)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.get_repository_data(repository_id)
+        result = await job_database_manager.get_repository_data(repository_id)
 
-            assert result is not None
-            assert result["id"] == repository_id
-            assert result["name"] == "test-repo"
-            assert result["path"] == "/path/to/repo"
+        assert result is not None
+        assert result["id"] == repository_id
+        assert result["name"] == "test-repo"
+        assert result["path"] == "/path/to/repo"
 
     async def test_error_handling_create_job(
         self,
@@ -327,17 +320,16 @@ class TestJobDatabaseManager:
         """Test error handling in job creation"""
         mock_async_session.add.side_effect = Exception("Database error")
 
-        with patch("borgitory.models.database.Job"):
-            sample_data = DatabaseJobData(
-                id=uuid.uuid4(),
-                repository_id=1,
-                job_type=JobTypeEnum.BACKUP,
-                status=JobStatusEnum.RUNNING,
-                started_at=now_utc(),
-            )
+        sample_data = DatabaseJobData(
+            id=uuid.uuid4(),
+            repository_id=1,
+            job_type=JobTypeEnum.BACKUP,
+            status=JobStatusEnum.RUNNING,
+            started_at=now_utc(),
+        )
 
-            result = await job_database_manager.create_database_job(sample_data)
-            assert result is None
+        result = await job_database_manager.create_database_job(sample_data)
+        assert result is None
 
     async def test_error_handling_update_job_status(
         self,
@@ -347,16 +339,15 @@ class TestJobDatabaseManager:
         """Test error handling in job status update"""
         mock_async_session.commit.side_effect = Exception("Database error")
 
-        with patch("borgitory.models.database.Job"):
-            mock_job_instance = Mock()
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
-            mock_async_session.execute.return_value = mock_result
+        mock_job_instance = Mock()
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.update_job_status(
-                job_id=uuid.uuid4(), status=JobStatusEnum.COMPLETED
-            )
-            assert result is False
+        result = await job_database_manager.update_job_status(
+            job_id=uuid.uuid4(), status=JobStatusEnum.COMPLETED
+        )
+        assert result is False
 
     async def test_get_job_statistics_error_handling(
         self,
@@ -376,21 +367,20 @@ class TestJobDatabaseManager:
         mock_async_session: AsyncMock,
     ) -> None:
         """Test scenarios where job is not found"""
-        with patch("borgitory.models.database.Job"):
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=None)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=None)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.update_job_status(
-                job_id=uuid.uuid4(), status=JobStatusEnum.COMPLETED
-            )
-            assert result is False
+        result = await job_database_manager.update_job_status(
+            job_id=uuid.uuid4(), status=JobStatusEnum.COMPLETED
+        )
+        assert result is False
 
-            result_job = await job_database_manager.get_job_by_uuid(uuid.uuid4())
-            assert result_job is None
+        result_job = await job_database_manager.get_job_by_uuid(uuid.uuid4())
+        assert result_job is None
 
-            result = await job_database_manager.save_job_tasks(uuid.uuid4(), [])
-            assert result is False
+        result = await job_database_manager.save_job_tasks(uuid.uuid4(), [])
+        assert result is False
 
     async def test_get_repository_data_not_found(
         self,
@@ -398,14 +388,13 @@ class TestJobDatabaseManager:
         mock_async_session: AsyncMock,
     ) -> None:
         """Test repository data retrieval when repository not found"""
-        with patch("borgitory.models.database.Repository"):
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=None)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=None)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.get_repository_data(999)
+        result = await job_database_manager.get_repository_data(999)
 
-            assert result is None
+        assert result is None
 
     async def test_save_job_tasks_with_dict_output_lines(
         self,
@@ -428,20 +417,16 @@ class TestJobDatabaseManager:
         mock_task.error = None
         mock_task.return_code = 0
 
-        with (
-            patch("borgitory.models.database.Job"),
-            patch("borgitory.models.database.JobTask"),
-        ):
-            mock_job_instance = Mock()
-            mock_job_instance.id = job_id
+        mock_job_instance = Mock()
+        mock_job_instance.id = job_id
 
-            mock_result = Mock()
-            mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
-            mock_async_session.execute.return_value = mock_result
+        mock_result = Mock()
+        mock_result.scalar_one_or_none = Mock(return_value=mock_job_instance)
+        mock_async_session.execute = AsyncMock(return_value=mock_result)
 
-            result = await job_database_manager.save_job_tasks(
-                job_id, cast(list[BorgJobTask], [mock_task])
-            )
+        result = await job_database_manager.save_job_tasks(
+            job_id, cast(list[BorgJobTask], [mock_task])
+        )
 
-            assert result is True
-            mock_async_session.commit.assert_called_once()
+        assert result is True
+        mock_async_session.commit.assert_called_once()
