@@ -23,6 +23,7 @@ from borgitory.models.enums import EncryptionType
 from borgitory.protocols.path_protocols import PlatformServiceProtocol
 from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
 from borgitory.services.cloud_providers.registry import get_metadata
+from borgitory.services.path.platform_service import PlatformService
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -146,8 +147,6 @@ def get_platform_service() -> PlatformServiceProtocol:
     Returns:
         PlatformServiceProtocol: Platform service instance
     """
-    from borgitory.services.path.platform_service import PlatformService
-
     return PlatformService()
 
 
@@ -394,19 +393,36 @@ def get_notification_config_service(
     return NotificationConfigService(notification_service=notification_service)
 
 
+def get_file_service(
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    platform_service: "PlatformServiceProtocol" = Depends(get_platform_service),
+) -> "FileServiceProtocol":
+    """
+    Provide a FileService instance for file operations.
+
+    Returns:
+        FileServiceProtocol: File service implementation
+    """
+    from borgitory.services.files.file_service_factory import create_file_service
+
+    return create_file_service(command_executor, platform_service)
+
+
 def get_rclone_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> RcloneService:
     """
     Provide a RcloneService instance with proper FastAPI dependency injection.
 
     Args:
         command_executor: Injected CommandExecutorProtocol instance
+        file_service: Injected FileServiceProtocol instance
 
     Returns:
         RcloneService: New RcloneService instance for each request
     """
-    return RcloneService(command_executor=command_executor)
+    return RcloneService(command_executor=command_executor, file_service=file_service)
 
 
 def get_repository_stats_service(
@@ -734,8 +750,9 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     queue_manager = get_job_queue_manager()
     database_manager = get_job_database_manager()
     event_broadcaster = get_job_event_broadcaster_dep()
-    rclone_service = get_rclone_service(command_executor)
-    notification_service = get_notification_service_singleton()  # Use singleton version
+    file_service = get_file_service(command_executor, get_platform_service())
+    rclone_service = get_rclone_service(command_executor, file_service)
+    notification_service = get_notification_service_singleton()
     encryption_service = get_encryption_service()
     storage_factory = get_storage_factory(rclone_service)
     registry_factory = get_registry_factory()
@@ -1124,21 +1141,6 @@ def get_archive_service(
         ArchiveServiceProtocol: Archive service implementation
     """
     return archive_manager
-
-
-def get_file_service(
-    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
-    platform_service: PlatformServiceProtocol = Depends(get_platform_service),
-) -> "FileServiceProtocol":
-    """
-    Provide a FileService instance for file operations.
-
-    Returns:
-        FileServiceProtocol: File service implementation
-    """
-    from borgitory.services.files.file_service_factory import create_file_service
-
-    return create_file_service(command_executor, platform_service)
 
 
 def get_borg_service(

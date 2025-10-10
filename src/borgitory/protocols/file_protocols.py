@@ -2,12 +2,19 @@
 Protocol interfaces for file operations.
 """
 
-from typing import Protocol, IO
+from typing import Protocol, IO, AsyncContextManager, Optional
 from abc import abstractmethod
 
 
 class FileServiceProtocol(Protocol):
     """Protocol for file operations."""
+
+    @abstractmethod
+    def create_temp_file(
+        self, suffix: str, content: Optional[bytes] = None
+    ) -> AsyncContextManager[str]:
+        """Create a temporary file with the given suffix. Returns an async context manager that yields the file path and cleans up on exit."""
+        ...
 
     @abstractmethod
     async def write_file(self, file_path: str, content: bytes) -> None:

@@ -9,13 +9,8 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 )
 from borgitory.services.jobs.job_models import (
     JobManagerConfig,
-    JobManagerDependencies,
 )
-from borgitory.services.jobs.job_manager_factory import (
-    JobManagerFactory,
-    get_default_job_manager_dependencies,
-    get_test_job_manager_dependencies,
-)
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 
 
 class TestJobManagerFactory:
@@ -88,16 +83,6 @@ class TestJobManagerFactory:
         assert deps.async_session_maker is mock_db_session
         assert deps.rclone_service is mock_rclone
 
-    def test_create_minimal(self) -> None:
-        """Test creating minimal dependencies"""
-        deps = JobManagerFactory.create_minimal()
-
-        assert deps is not None
-        assert deps.queue_manager is not None
-        assert deps.output_manager is not None
-        # Should have reduced limits
-        assert deps.queue_manager.max_concurrent_backups == 1
-
     def test_dependencies_initialization(self) -> None:
         """Test JobManagerDependencies initialization"""
 
@@ -111,35 +96,3 @@ class TestJobManagerFactory:
         deps_custom.async_session_maker = custom_factory
 
         assert deps_custom.async_session_maker is custom_factory
-
-
-class TestJobManagerFactoryFunctions:
-    """Test module-level factory functions"""
-
-    def test_get_default_job_manager_dependencies(self) -> None:
-        """Test getting default dependencies"""
-        deps = get_default_job_manager_dependencies()
-
-        assert isinstance(deps, JobManagerDependencies)
-        assert deps.job_executor is not None
-        assert deps.output_manager is not None
-        assert deps.queue_manager is not None
-
-    def test_get_test_job_manager_dependencies(self) -> None:
-        """Test getting test dependencies"""
-        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
-        mock_subprocess = AsyncMock()
-        mock_db_session = Mock()
-        mock_rclone = Mock()
-
-        deps = get_test_job_manager_dependencies(
-            mock_event_broadcaster=mock_event_broadcaster,
-            mock_subprocess=mock_subprocess,
-            mock_async_session_maker=mock_db_session,
-            mock_rclone_service=mock_rclone,
-        )
-
-        assert deps.event_broadcaster is mock_event_broadcaster
-        assert deps.subprocess_executor is mock_subprocess
-        assert deps.async_session_maker is mock_db_session
-        assert deps.rclone_service is mock_rclone

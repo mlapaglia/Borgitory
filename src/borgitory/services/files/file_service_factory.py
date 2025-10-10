@@ -37,7 +37,7 @@ def wsl_available() -> bool:
 
 def create_file_service(
     command_executor: "CommandExecutorProtocol",
-    platform_service: PlatformServiceProtocol,
+    platform_service: "PlatformServiceProtocol",
 ) -> FileServiceProtocol:
     """
     Create a file service for the current environment.

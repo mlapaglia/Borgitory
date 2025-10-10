@@ -33,8 +33,8 @@ from borgitory.api import (
 from borgitory.dependencies import (
     get_db,
     get_recovery_service,
-    get_scheduler_service_singleton,
     get_package_restoration_service_for_startup,
+    get_scheduler_service_singleton,
 )
 
 logging.basicConfig(

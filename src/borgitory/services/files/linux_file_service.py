@@ -4,8 +4,11 @@ Linux file service for native Linux file operations.
 
 import logging
 import os
-from typing import IO
+from typing import IO, AsyncIterator
+from contextlib import asynccontextmanager
 from borgitory.protocols.file_protocols import FileServiceProtocol
+import tempfile
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +16,27 @@ logger = logging.getLogger(__name__)
 class LinuxFileService(FileServiceProtocol):
     """Linux file service that uses native OS file operations."""
 
+    @asynccontextmanager
+    async def create_temp_file(
+        self, suffix: str, content: Optional[bytes] = None
+    ) -> AsyncIterator[str]:
+        """Create a temporary file with the given suffix. Returns a context manager that yields the file path."""
+        temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        logger.info(f"Created temp file at {temp_path}")
+
+        if content:
+            await self.write_file(temp_path, content)
+
+        try:
+            yield temp_path
+        finally:
+            await self.remove_file(temp_path)
+
     async def write_file(self, file_path: str, content: bytes) -> None:
         """Write content to a file at the given path."""
-        # Ensure parent directory exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         with open(file_path, "wb") as f:

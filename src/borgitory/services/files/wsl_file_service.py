@@ -4,7 +4,9 @@ WSL-aware file service for cross-platform file operations.
 
 import logging
 import io
-from typing import IO
+from typing import IO, AsyncIterator, Optional
+from contextlib import asynccontextmanager
+
 from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
@@ -16,6 +18,30 @@ class WSLFileService(FileServiceProtocol):
 
     def __init__(self, command_executor: CommandExecutorProtocol):
         self.command_executor = command_executor
+
+    @asynccontextmanager
+    async def create_temp_file(
+        self, suffix: str, content: Optional[bytes] = None
+    ) -> AsyncIterator[str]:
+        """Create a temporary file with the given suffix. Returns a context manager that yields the file path."""
+        result = await self.command_executor.execute_command(
+            command=["mktemp", f"--suffix={suffix}"],
+            timeout=10.0,
+        )
+
+        temp_path = result.stdout.strip()
+        logger.info(f"Created temp file at {temp_path} via WSL")
+
+        if not result.success:
+            raise Exception(f"Failed to create temp file: {result.stderr}")
+
+        if content:
+            await self.write_file(temp_path, content)
+
+        try:
+            yield temp_path
+        finally:
+            await self.remove_file(temp_path)
 
     async def write_file(self, file_path: str, content: bytes) -> None:
         """Write content to a file at the given path using WSL."""

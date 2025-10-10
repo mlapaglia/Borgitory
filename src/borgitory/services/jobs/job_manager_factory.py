@@ -76,6 +76,7 @@ class JobManagerFactory:
             # Import the required services
             from borgitory.dependencies import (
                 get_rclone_service,
+                get_file_service,
                 get_encryption_service,
                 get_storage_factory,
                 get_registry_factory,
@@ -87,6 +88,9 @@ class JobManagerFactory:
                 HttpClient,
             )
 
+            file_service = get_file_service(command_executor, platform_service)
+            rclone_service = get_rclone_service(command_executor, file_service)
+
             custom_dependencies = JobManagerDependencies(
                 event_broadcaster=event_broadcaster,
                 job_executor=job_executor,
@@ -94,10 +98,10 @@ class JobManagerFactory:
                 queue_manager=queue_manager,
                 database_manager=database_manager,
                 async_session_maker=async_session_maker,
-                rclone_service=get_rclone_service(),
+                rclone_service=rclone_service,
                 http_client_factory=lambda: HttpClient(),  # type: ignore
                 encryption_service=get_encryption_service(),
-                storage_factory=get_storage_factory(get_rclone_service()),
+                storage_factory=get_storage_factory(rclone_service),
                 provider_registry=get_provider_registry(
                     registry_factory=get_registry_factory()
                 ),
@@ -146,6 +150,7 @@ class JobManagerFactory:
             get_registry_factory,
             get_provider_registry,
             get_hook_execution_service,
+            get_file_service,
         )
 
         # Create complete dependencies with all cloud sync and notification services
@@ -183,6 +188,9 @@ class JobManagerFactory:
             HttpClient,
         )
 
+        file_service = get_file_service(command_executor, platform_service)
+        rclone_service = get_rclone_service(command_executor, file_service)
+
         complete_deps = JobManagerDependencies(
             event_broadcaster=get_job_event_broadcaster(),
             job_executor=job_executor,
@@ -190,10 +198,10 @@ class JobManagerFactory:
             queue_manager=queue_manager,
             database_manager=database_manager,
             async_session_maker=async_session_maker,
-            rclone_service=get_rclone_service(),
+            rclone_service=rclone_service,
             http_client_factory=lambda: HttpClient(),  # type: ignore
             encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(get_rclone_service()),
+            storage_factory=get_storage_factory(rclone_service),
             provider_registry=get_provider_registry(
                 registry_factory=get_registry_factory()
             ),
@@ -254,19 +262,6 @@ class JobManagerFactory:
         )
 
         return cls.create_dependencies(config=config, custom_dependencies=test_deps)
-
-    @classmethod
-    def create_minimal(cls) -> JobManagerDependencies:
-        """Create minimal dependencies (useful for testing or simple use cases)"""
-
-        config = JobManagerConfig(
-            max_concurrent_backups=1,
-            max_concurrent_operations=2,
-            max_output_lines_per_job=100,
-            sse_max_queue_size=10,
-        )
-
-        return cls.create_complete_dependencies(config=config)
 
 
 def get_default_job_manager_dependencies() -> JobManagerDependencies:

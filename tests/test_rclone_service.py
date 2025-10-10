@@ -5,6 +5,7 @@ Tests for RcloneService - Behavioral tests focused on service functionality
 import pytest
 from unittest.mock import Mock, AsyncMock
 from typing import Dict, Any, cast
+from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.services.rclone_service import RcloneService, CloudProviderConfig
 from borgitory.protocols.command_executor_protocol import (
     CommandExecutorProtocol,
@@ -23,9 +24,34 @@ def mock_command_executor() -> Mock:
 
 
 @pytest.fixture
-def rclone_service(mock_command_executor: Mock) -> RcloneService:
+def mock_file_service() -> Mock:
+    """Create mock file service."""
+    from contextlib import asynccontextmanager
+    from typing import Optional, AsyncIterator
+
+    mock = Mock(spec=FileServiceProtocol)
+
+    # Mock create_temp_file to return an async context manager
+    @asynccontextmanager
+    async def mock_create_temp_file(
+        suffix: str, content: Optional[bytes] = None
+    ) -> AsyncIterator[str]:
+        """Mock async context manager for temp file creation."""
+        temp_path = f"/tmp/mock_temp_file{suffix}"
+        yield temp_path
+
+    mock.create_temp_file = mock_create_temp_file
+    return mock
+
+
+@pytest.fixture
+def rclone_service(
+    mock_command_executor: Mock, mock_file_service: Mock
+) -> RcloneService:
     """Create RcloneService with mock command executor."""
-    return RcloneService(command_executor=mock_command_executor)
+    return RcloneService(
+        command_executor=mock_command_executor, file_service=mock_file_service
+    )
 
 
 @pytest.fixture
@@ -39,9 +65,13 @@ def mock_repository() -> Mock:
 class TestRcloneServiceBasics:
     """Test basic RcloneService functionality."""
 
-    def test_initialization(self, mock_command_executor: Mock) -> None:
+    def test_initialization(
+        self, mock_command_executor: Mock, mock_file_service: Mock
+    ) -> None:
         """Test RcloneService initializes correctly with command executor."""
-        service = RcloneService(command_executor=mock_command_executor)
+        service = RcloneService(
+            command_executor=mock_command_executor, file_service=mock_file_service
+        )
         assert service.command_executor is mock_command_executor
 
     def test_build_s3_flags(self, rclone_service: RcloneService) -> None:
@@ -66,45 +96,46 @@ class TestRcloneServiceBasics:
         assert "--s3-storage-class" in flags
         assert "GLACIER" in flags
 
-    def test_build_sftp_flags_with_password(
+    async def test_build_sftp_flags_with_password(
         self, rclone_service: RcloneService
     ) -> None:
         """Test SFTP flags are built correctly with password."""
-        flags = rclone_service._build_sftp_flags(
+        async with rclone_service._build_sftp_flags(
             host="sftp.example.com", username="testuser", port=2222, password="testpass"
-        )
+        ) as flags:
+            assert "--sftp-host" in flags
+            assert "sftp.example.com" in flags
+            assert "--sftp-user" in flags
+            assert "testuser" in flags
+            assert "--sftp-port" in flags
+            assert "2222" in flags
+            assert "--sftp-pass" in flags
 
-        assert "--sftp-host" in flags
-        assert "sftp.example.com" in flags
-        assert "--sftp-user" in flags
-        assert "testuser" in flags
-        assert "--sftp-port" in flags
-        assert "2222" in flags
-        assert "--sftp-pass" in flags
-
-    def test_build_sftp_flags_with_private_key(
+    async def test_build_sftp_flags_with_private_key(
         self, rclone_service: RcloneService
     ) -> None:
         """Test SFTP flags are built correctly with private key."""
-        flags = rclone_service._build_sftp_flags(
+        async with rclone_service._build_sftp_flags(
             host="sftp.example.com",
             username="testuser",
             private_key="-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
-        )
-
-        assert "--sftp-host" in flags
-        assert "--sftp-user" in flags
-        assert "--sftp-key-file" in flags
+        ) as flags:
+            assert "--sftp-host" in flags
+            assert "--sftp-user" in flags
+            assert "--sftp-key-file" in flags
 
 
 class TestRcloneServiceS3Operations:
     """Test S3-related operations."""
 
     async def test_test_s3_connection_success(
-        self, rclone_service: RcloneService, mock_command_executor: Mock
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_file_service: Mock,
     ) -> None:
         """Test successful S3 connection test."""
-        # Mock successful command execution
+        # Mock successful command execution for both read and write tests
         mock_command_executor.execute_command.return_value = CommandResult(
             command=["rclone", "lsd", ":s3:test-bucket"],
             return_code=0,
@@ -122,8 +153,8 @@ class TestRcloneServiceS3Operations:
 
         assert result.get("status") == "success"
         assert "connection successful" in result.get("message", "").lower()
-        # The method calls execute_command multiple times (read test + write test)
-        assert mock_command_executor.execute_command.call_count >= 1
+        # The method calls execute_command multiple times (read test + write test + cleanup)
+        assert mock_command_executor.execute_command.call_count >= 2
 
     async def test_test_s3_connection_bucket_not_found(
         self, rclone_service: RcloneService, mock_command_executor: Mock
@@ -198,10 +229,13 @@ class TestRcloneServiceSFTPOperations:
     """Test SFTP-related operations."""
 
     async def test_test_sftp_connection_success(
-        self, rclone_service: RcloneService, mock_command_executor: Mock
+        self,
+        rclone_service: RcloneService,
+        mock_command_executor: Mock,
+        mock_file_service: Mock,
     ) -> None:
         """Test successful SFTP connection test."""
-        # Mock successful command execution
+        # Mock successful command execution for both read and write tests
         mock_command_executor.execute_command.return_value = CommandResult(
             command=["rclone", "lsd", ":sftp:/remote/path"],
             return_code=0,
@@ -220,6 +254,8 @@ class TestRcloneServiceSFTPOperations:
 
         assert result.get("status") == "success"
         assert "connection successful" in result.get("message", "").lower()
+        # The method calls execute_command multiple times (read test + write test + cleanup)
+        assert mock_command_executor.execute_command.call_count >= 2
 
     async def test_test_sftp_connection_auth_failed(
         self, rclone_service: RcloneService, mock_command_executor: Mock
