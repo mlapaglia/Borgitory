@@ -184,10 +184,10 @@ async def list_directories_autocomplete(
 
 @router.get("/import-form", response_class=HTMLResponse)
 async def get_import_form(
-    request: Request, templates: TemplatesDep, borg_service: BorgServiceDep
+    request: Request, templates: TemplatesDep, path_service: PathServiceDep
 ) -> _TemplateResponse:
     """Get the import repository form"""
-    default_directories = await borg_service.get_default_directories()
+    default_directories = await path_service.get_default_directories()
     return templates.TemplateResponse(
         request,
         "partials/repositories/import/form_import.html",
@@ -225,10 +225,10 @@ async def get_create_encryption_fields(
 
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(
-    request: Request, templates: TemplatesDep, borg_service: BorgServiceDep
+    request: Request, templates: TemplatesDep, path_service: PathServiceDep
 ) -> _TemplateResponse:
     """Get the create repository form"""
-    default_directories = await borg_service.get_default_directories()
+    default_directories = await path_service.get_default_directories()
     return templates.TemplateResponse(
         request,
         "partials/repositories/create/form_create.html",
@@ -241,7 +241,7 @@ async def get_edit_form(
     repo_id: int,
     request: Request,
     templates: TemplatesDep,
-    borg_service: BorgServiceDep,
+    path_service: PathServiceDep,
     db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Get the edit repository form"""
@@ -250,7 +250,7 @@ async def get_edit_form(
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    default_directories = await borg_service.get_default_directories()
+    default_directories = await path_service.get_default_directories()
     return templates.TemplateResponse(
         request,
         "partials/repositories/create/form_create.html",

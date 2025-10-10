@@ -7,14 +7,10 @@ APP_DIR = Path(__file__).parent  # This is the app/ directory
 
 def get_data_dir() -> str:
     """Get the data directory using synchronous path configuration."""
-    # Import here to avoid circular imports
-    from borgitory.services.path.path_configuration_service import (
-        PathConfigurationService,
-    )
+    from borgitory.services.path.platform_service import PlatformService
 
     try:
-        # Use path configuration service directly for sync access
-        config = PathConfigurationService()
+        config = PlatformService()
         return config.get_base_data_dir()
     except Exception:
         # Ultimate fallback

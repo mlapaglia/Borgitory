@@ -20,9 +20,9 @@ from borgitory.factories.service_factory import CloudProviderServiceFactory
 from borgitory.models.database import async_session_maker
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
 from borgitory.models.enums import EncryptionType
+from borgitory.protocols.path_protocols import PlatformServiceProtocol
 from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
 from borgitory.services.cloud_providers.registry import get_metadata
-from borgitory.services.path.path_configuration_service import PathConfigurationService
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -139,6 +139,18 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
+def get_platform_service() -> PlatformServiceProtocol:
+    """
+    Provide PlatformService for platform detection.
+
+    Returns:
+        PlatformServiceProtocol: Platform service instance
+    """
+    from borgitory.services.path.platform_service import PlatformService
+
+    return PlatformService()
+
+
 def get_wsl_command_executor() -> "WSLCommandExecutor":
     """
     Provide a WSLCommandExecutor instance with proper FastAPI dependency injection.
@@ -155,6 +167,7 @@ def get_wsl_command_executor() -> "WSLCommandExecutor":
 
 def get_command_executor(
     wsl_executor: "WSLCommandExecutor" = Depends(get_wsl_command_executor),
+    platform_service: PlatformServiceProtocol = Depends(get_platform_service),
 ) -> "CommandExecutorProtocol":
     """
     Provide a command executor for cross-platform command execution.
@@ -173,7 +186,7 @@ def get_command_executor(
         create_command_executor_with_injection,
     )
 
-    return create_command_executor_with_injection(wsl_executor)
+    return create_command_executor_with_injection(wsl_executor, platform_service)
 
 
 def get_subprocess_executor() -> Callable[
@@ -423,15 +436,6 @@ def get_file_system() -> "FileSystemInterface":
     return OsFileSystem()
 
 
-def get_path_configuration_service() -> "PathConfigurationService":
-    """Get path configuration service."""
-    from borgitory.services.path.path_configuration_service import (
-        PathConfigurationService,
-    )
-
-    return PathConfigurationService()
-
-
 def get_path_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> "PathServiceInterface":
@@ -444,16 +448,9 @@ def get_path_service(
     Returns:
         PathServiceInterface: Unified path service implementation
     """
-    import logging
     from borgitory.services.path.path_service import PathService
 
-    logger = logging.getLogger(__name__)
-    config = get_path_configuration_service()
-
-    logger.debug(
-        f"Creating unified path service for {config.get_platform_name()} with {type(command_executor).__name__}"
-    )
-    return PathService(config, command_executor)
+    return PathService(command_executor)
 
 
 def get_hook_execution_service() -> HookExecutionService:
@@ -464,7 +461,8 @@ def get_hook_execution_service() -> HookExecutionService:
     """
     command_runner_config = get_command_runner_config()
     wsl_executor = get_wsl_command_executor()
-    command_executor = get_command_executor(wsl_executor)
+    platform_service = get_platform_service()
+    command_executor = get_command_executor(wsl_executor, platform_service)
     command_runner = get_simple_command_runner(command_runner_config, command_executor)
     return HookExecutionService(command_runner=command_runner)
 
@@ -729,7 +727,8 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     env_config = get_job_manager_env_config()
     config = get_job_manager_config(env_config)
     wsl_executor = get_wsl_command_executor()
-    command_executor = get_command_executor(wsl_executor)
+    platform_service = get_platform_service()
+    command_executor = get_command_executor(wsl_executor, platform_service)
     job_executor = get_job_executor(command_executor)
     output_manager = get_job_output_manager()
     queue_manager = get_job_queue_manager()
@@ -1060,6 +1059,7 @@ HookExecutionServiceDep = Annotated[
 ]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 PathServiceDep = Annotated["PathServiceInterface", Depends(get_path_service)]
+PlatformServiceDep = Annotated[PlatformServiceProtocol, Depends(get_platform_service)]
 
 
 @lru_cache()
@@ -1080,7 +1080,8 @@ def get_archive_manager_singleton() -> ArchiveManagerProtocol:
     """
     # Resolve dependencies directly (not via FastAPI DI)
     wsl_executor = get_wsl_command_executor()
-    command_executor = get_command_executor(wsl_executor)
+    platform_service = get_platform_service()
+    command_executor = get_command_executor(wsl_executor, platform_service)
     job_executor = get_job_executor(command_executor)
 
     return ArchiveManager(
@@ -1280,8 +1281,9 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
         create_command_executor,
     )
 
+    platform_service = get_platform_service()
     config = CommandRunnerConfig()
-    executor = create_command_executor()
+    executor = create_command_executor(platform_service=platform_service)
     command_runner = SimpleCommandRunner(config=config, executor=executor)
     package_manager = PackageManagerService(command_runner=command_runner)
     return PackageRestorationService(package_manager=package_manager)

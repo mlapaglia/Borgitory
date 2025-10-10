@@ -8,7 +8,57 @@ filesystem operations for different environments (native, WSL, container).
 from abc import ABC, abstractmethod
 from typing import List
 
+from borgitory.models.borg_info import BorgDefaultDirectories
 from borgitory.utils.secure_path import DirectoryInfo
+
+
+class PlatformServiceProtocol(ABC):
+    """
+    Protocol for platform detection and identification.
+
+    This service provides methods to identify the current platform
+    and execution environment (Windows, Linux, Docker, etc.).
+    """
+
+    @abstractmethod
+    def get_platform_name(self) -> str:
+        """
+        Get the platform name for logging and debugging.
+
+        Returns:
+            Platform name: 'windows', 'linux', 'docker', 'darwin'
+        """
+        pass
+
+    @abstractmethod
+    def is_docker(self) -> bool:
+        """
+        Check if running inside a Docker container.
+
+        Returns:
+            True if running in a Docker container
+        """
+        pass
+
+    @abstractmethod
+    def is_windows(self) -> bool:
+        """
+        Check if running on Windows.
+
+        Returns:
+            True if running on Windows
+        """
+        pass
+
+    @abstractmethod
+    def is_linux(self) -> bool:
+        """
+        Check if running on Linux.
+
+        Returns:
+            True if running on Linux
+        """
+        pass
 
 
 class PathServiceInterface(ABC):
@@ -18,31 +68,6 @@ class PathServiceInterface(ABC):
     This service abstracts filesystem operations to support different
     execution environments (native Unix, WSL on Windows, containers).
     """
-
-    @abstractmethod
-    async def get_data_dir(self) -> str:
-        """Get the application data directory path."""
-        pass
-
-    @abstractmethod
-    async def get_temp_dir(self) -> str:
-        """Get the temporary directory path."""
-        pass
-
-    @abstractmethod
-    async def get_cache_dir(self) -> str:
-        """Get the cache directory path."""
-        pass
-
-    @abstractmethod
-    async def get_keyfiles_dir(self) -> str:
-        """Get the keyfiles directory path."""
-        pass
-
-    @abstractmethod
-    async def get_mount_base_dir(self) -> str:
-        """Get the base directory for archive mounts."""
-        pass
 
     @abstractmethod
     def secure_join(self, base_path: str, *path_parts: str) -> str:
@@ -56,24 +81,6 @@ class PathServiceInterface(ABC):
         Returns:
             The securely joined path
         """
-        pass
-
-    @abstractmethod
-    async def ensure_directory(self, path: str) -> None:
-        """
-        Ensure a directory exists, creating it if necessary.
-
-        Args:
-            path: The directory path to ensure exists
-
-        Raises:
-            OSError: If directory cannot be created
-        """
-        pass
-
-    @abstractmethod
-    def get_platform_name(self) -> str:
-        """Get the platform name (native, wsl, container)."""
         pass
 
     @abstractmethod
@@ -118,41 +125,7 @@ class PathServiceInterface(ABC):
         """
         pass
 
-
-class PathConfigurationInterface(ABC):
-    """
-    Interface for path configuration management.
-
-    This service manages the configuration of base directories
-    and path resolution strategies.
-    """
-
     @abstractmethod
-    def get_base_data_dir(self) -> str:
-        """Get the base data directory from configuration."""
-        pass
-
-    @abstractmethod
-    def get_base_temp_dir(self) -> str:
-        """Get the base temp directory from configuration."""
-        pass
-
-    @abstractmethod
-    def get_base_cache_dir(self) -> str:
-        """Get the base cache directory from configuration."""
-        pass
-
-    @abstractmethod
-    def is_docker(self) -> bool:
-        """Check if running in a idocker environment."""
-        pass
-
-    @abstractmethod
-    def get_platform_name(self) -> str:
-        """Get the platform name (windows, unix, container)."""
-        pass
-
-    @abstractmethod
-    def is_windows(self) -> bool:
-        """Check if running on Windows platform."""
+    async def get_default_directories(self) -> BorgDefaultDirectories:
+        """Get the default directories for the current environment."""
         pass

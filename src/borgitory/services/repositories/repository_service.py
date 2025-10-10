@@ -36,7 +36,6 @@ from borgitory.utils.datetime_utils import (
     parse_datetime_string,
 )
 from borgitory.utils.secure_path import (
-    create_secure_filename,
     get_directory_listing,
     secure_exists,
     secure_isdir,
@@ -625,27 +624,6 @@ class RepositoryService:
             return "A repository already exists at this location."
         else:
             return f"Failed to initialize repository: {borg_error}"
-
-    async def _save_keyfile(
-        self, repository_name: str, keyfile: KeyfileProtocol
-    ) -> KeyfileSaveResult:
-        """Save uploaded keyfile securely."""
-        keyfiles_dir = await self.path_service.get_keyfiles_dir()
-        await self.path_service.ensure_directory(keyfiles_dir)
-
-        safe_filename = create_secure_filename(
-            repository_name, keyfile.filename or "keyfile", add_uuid=True
-        )
-        keyfile_path = self.path_service.secure_join(keyfiles_dir, safe_filename)
-
-        content = await keyfile.read()
-        await self.file_service.write_file(keyfile_path, content)
-
-        logger.info(
-            f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
-        )
-
-        return {"success": True, "path": keyfile_path}
 
     async def check_repository_lock_status(
         self, repository: Repository

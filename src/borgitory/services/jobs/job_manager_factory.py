@@ -17,6 +17,7 @@ from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_queue_manager_protocol import JobQueueManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
+from borgitory.services.path.platform_service import PlatformService
 from borgitory.services.rclone_service import RcloneService
 
 
@@ -53,7 +54,8 @@ class JobManagerFactory:
                 keepalive_timeout=config.sse_keepalive_timeout,
             )
 
-            command_executor = create_command_executor()
+            platform_service = PlatformService()
+            command_executor = create_command_executor(platform_service)
             job_executor = JobExecutor(command_executor)
 
             output_manager = JobOutputManager(
@@ -159,7 +161,8 @@ class JobManagerFactory:
         from borgitory.services.jobs.job_queue_manager import JobQueueManager
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        command_executor = create_command_executor()
+        platform_service = PlatformService()
+        command_executor = create_command_executor(platform_service)
         job_executor = JobExecutor(command_executor)
 
         output_manager = JobOutputManager(

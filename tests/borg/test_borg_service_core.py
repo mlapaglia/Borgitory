@@ -9,6 +9,7 @@ from unittest.mock import Mock, AsyncMock
 
 from borgitory.services.borg_service import BorgService
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.models.database import Repository
 from borgitory.models.borg_info import BorgDefaultDirectories
 
@@ -47,22 +48,13 @@ def mock_archive_service() -> Mock:
 
 
 @pytest.fixture
-def mock_path_service() -> Mock:
-    """Create mock path service."""
+def mock_path_service(mock_command_executor: Mock) -> "PathServiceInterface":
+    """Create path service with mock command executor."""
+    from borgitory.services.path.path_service import PathService
 
-    def secure_join_impl(base: str, *parts: str) -> str:
-        """Mock implementation of secure_join that mimics path joining."""
-        if not parts:
-            return base
-        # Join all parts together with /
-        result = base
-        for part in parts:
-            result = f"{result}/{part}"
-        return result
-
-    mock = Mock()
-    mock.secure_join = Mock(side_effect=secure_join_impl)
-    return mock
+    # Return a real PathService instance with the mock command executor
+    # This way async methods like get_default_directories will work properly
+    return PathService(command_executor=mock_command_executor)
 
 
 @pytest.fixture
@@ -207,7 +199,7 @@ class TestBorgDefaultDirectories:
 
     @pytest.mark.asyncio
     async def test_default_directories_with_no_env_vars(
-        self, borg_service: BorgService, mock_command_executor: Mock
+        self, mock_path_service: PathServiceInterface, mock_command_executor: Mock
     ) -> None:
         """Test default directory resolution with no environment variables set."""
 
@@ -228,7 +220,7 @@ class TestBorgDefaultDirectories:
             return result
 
         mock_command_executor.execute_command = AsyncMock(side_effect=mock_execute)
-        result = await borg_service.get_default_directories()
+        result = await mock_path_service.get_default_directories()
 
         assert isinstance(result, BorgDefaultDirectories)
         assert result.base_dir == "/home/testuser"
@@ -240,7 +232,7 @@ class TestBorgDefaultDirectories:
 
     @pytest.mark.asyncio
     async def test_default_directories_with_borg_base_dir(
-        self, borg_service: BorgService, mock_command_executor: Mock
+        self, mock_path_service: PathServiceInterface, mock_command_executor: Mock
     ) -> None:
         """Test directory resolution when BORG_BASE_DIR is explicitly set."""
 
@@ -260,7 +252,7 @@ class TestBorgDefaultDirectories:
             return result
 
         mock_command_executor.execute_command = AsyncMock(side_effect=mock_execute)
-        result = await borg_service.get_default_directories()
+        result = await mock_path_service.get_default_directories()
 
         assert result.base_dir == "/custom/borg/base"
         assert result.cache_dir == "/custom/borg/base/.cache/borg"
@@ -270,7 +262,7 @@ class TestBorgDefaultDirectories:
 
     @pytest.mark.asyncio
     async def test_default_directories_with_xdg_vars(
-        self, borg_service: BorgService, mock_command_executor: Mock
+        self, mock_path_service: PathServiceInterface, mock_command_executor: Mock
     ) -> None:
         """Test XDG variables take precedence when BORG_BASE_DIR is not set."""
 
@@ -294,7 +286,7 @@ class TestBorgDefaultDirectories:
             return result
 
         mock_command_executor.execute_command = AsyncMock(side_effect=mock_execute)
-        result = await borg_service.get_default_directories()
+        result = await mock_path_service.get_default_directories()
 
         assert result.base_dir == "/home/testuser"
         assert result.cache_dir == "/custom/cache/borg"
@@ -304,7 +296,7 @@ class TestBorgDefaultDirectories:
 
     @pytest.mark.asyncio
     async def test_default_directories_borg_base_overrides_xdg(
-        self, borg_service: BorgService, mock_command_executor: Mock
+        self, mock_path_service: PathServiceInterface, mock_command_executor: Mock
     ) -> None:
         """Test BORG_BASE_DIR overrides XDG variables when explicitly set."""
 
@@ -328,15 +320,15 @@ class TestBorgDefaultDirectories:
             return result
 
         mock_command_executor.execute_command = AsyncMock(side_effect=mock_execute)
-        result = await borg_service.get_default_directories()
+        result = await mock_path_service.get_default_directories()
 
         assert result.base_dir == "/custom/borg/base"
         assert result.cache_dir == "/custom/borg/base/.cache/borg"
         assert result.config_dir == "/custom/borg/base/.config/borg"
 
     def test_has_get_default_directories_method(
-        self, borg_service: BorgService
+        self, mock_path_service: PathServiceInterface
     ) -> None:
-        """Test that BorgService has get_default_directories method."""
-        assert hasattr(borg_service, "get_default_directories")
-        assert callable(getattr(borg_service, "get_default_directories"))
+        """Test that PathService has get_default_directories method."""
+        assert hasattr(mock_path_service, "get_default_directories")
+        assert callable(getattr(mock_path_service, "get_default_directories"))

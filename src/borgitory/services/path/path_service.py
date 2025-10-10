@@ -9,9 +9,9 @@ import logging
 import posixpath
 from typing import List, Tuple
 
+from borgitory.models.borg_info import BorgDefaultDirectories
 from borgitory.protocols.path_protocols import (
     PathServiceInterface,
-    PathConfigurationInterface,
 )
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.command_protocols import CommandResult
@@ -31,72 +31,9 @@ class PathService(PathServiceInterface):
 
     def __init__(
         self,
-        config: PathConfigurationInterface,
         command_executor: CommandExecutorProtocol,
     ):
-        self.config = config
         self.command_executor = command_executor
-        logger.debug(
-            f"Initialized path service for {config.get_platform_name()} with {type(command_executor).__name__}"
-        )
-
-    async def get_data_dir(self) -> str:
-        """Get the application data directory."""
-        if self.config.is_windows():
-            # Use WSL-style paths for Windows
-            data_dir = (
-                "/mnt/c/Users/" + self._get_current_user() + "/.local/share/borgitory"
-            )
-        else:
-            # Use native paths for Unix systems
-            data_dir = self.config.get_base_data_dir()
-
-        await self.ensure_directory(data_dir)
-        return data_dir
-
-    async def get_temp_dir(self) -> str:
-        """Get the temporary directory."""
-        if self.config.is_windows():
-            # Use WSL temp directory for Windows
-            temp_dir = "/tmp/borgitory"
-        else:
-            # Use configured temp directory for Unix systems
-            temp_dir = self.config.get_base_temp_dir()
-
-        await self.ensure_directory(temp_dir)
-        return temp_dir
-
-    async def get_cache_dir(self) -> str:
-        """Get the cache directory."""
-        if self.config.is_windows():
-            # Use WSL-style paths for Windows
-            cache_dir = "/mnt/c/Users/" + self._get_current_user() + "/.cache/borgitory"
-        else:
-            # Use configured cache directory for Unix systems
-            cache_dir = self.config.get_base_cache_dir()
-
-        await self.ensure_directory(cache_dir)
-        return cache_dir
-
-    async def get_keyfiles_dir(self) -> str:
-        """Get the keyfiles directory."""
-        data_dir = await self.get_data_dir()
-        keyfiles_dir = self.secure_join(data_dir, "keyfiles")
-        await self.ensure_directory(keyfiles_dir)
-        return keyfiles_dir
-
-    async def get_mount_base_dir(self) -> str:
-        """Get the base directory for archive mounts."""
-        temp_dir = await self.get_temp_dir()
-        mount_dir = self.secure_join(temp_dir, "borgitory-mounts")
-        await self.ensure_directory(mount_dir)
-        return mount_dir
-
-    def _get_current_user(self) -> str:
-        """Get the current Windows username for WSL paths."""
-        import os
-
-        return os.getenv("USERNAME", "user")
 
     def secure_join(self, base_path: str, *path_parts: str) -> str:
         """
@@ -146,10 +83,6 @@ class PathService(PathServiceInterface):
             )
 
         return final_path
-
-    def get_platform_name(self) -> str:
-        """Get the platform name from configuration."""
-        return self.config.get_platform_name()
 
     async def path_exists(self, path: str) -> bool:
         """
@@ -226,37 +159,6 @@ class PathService(PathServiceInterface):
         except Exception as e:
             logger.error(f"Error listing directory {path}: {e}")
             return []
-
-    async def ensure_directory(self, path: str) -> None:
-        """
-        Ensure a directory exists using the command executor, creating it if necessary.
-
-        Args:
-            path: Path to ensure exists
-
-        Raises:
-            OSError: If directory cannot be created
-        """
-        if not path:
-            return
-
-        try:
-            result = await self.command_executor.execute_command(
-                ["mkdir", "-p", path], timeout=10.0
-            )
-
-            if result.success:
-                logger.debug(f"Ensured directory exists: {path}")
-            else:
-                error_msg = f"Failed to create directory {path}: {result.error}"
-                logger.error(error_msg)
-                raise OSError(error_msg)
-
-        except Exception as e:
-            if isinstance(e, OSError):
-                raise
-            logger.error(f"Error ensuring directory {path}: {e}")
-            raise OSError(f"Failed to ensure directory {path}: {str(e)}")
 
     async def _parse_ls_output(
         self, ls_output: str, base_path: str, include_files: bool
@@ -460,3 +362,71 @@ class PathService(PathServiceInterface):
             if dir_path == target_path:
                 dir_info.is_borg_cache = True
                 break
+
+    async def get_default_directories(self) -> BorgDefaultDirectories:
+        """
+        Determine Borg's default directories based on environment variable resolution.
+
+        Uses command executor to query environment variables from the actual execution
+        environment (e.g., WSL when running on Windows but executing in Linux).
+
+        Follows Borg's environment variable precedence rules:
+        - BORG_BASE_DIR defaults to $HOME or ~$USER or ~
+        - BORG_CACHE_DIR defaults to $BORG_BASE_DIR/.cache/borg (or $XDG_CACHE_HOME/borg if XDG is set)
+        - BORG_CONFIG_DIR defaults to $BORG_BASE_DIR/.config/borg (or $XDG_CONFIG_HOME/borg if XDG is set)
+        - BORG_SECURITY_DIR defaults to $BORG_CONFIG_DIR/security
+        - BORG_KEYS_DIR defaults to $BORG_CONFIG_DIR/keys
+        """
+
+        async def get_env_var(var_name: str) -> str:
+            """Get environment variable from execution environment."""
+            result = await self.command_executor.execute_command(
+                ["echo", f"${var_name}"]
+            )
+
+            return result.stdout.strip() if result.success and result.stdout else ""
+
+        borg_base_dir_explicit = await get_env_var("BORG_BASE_DIR")
+
+        if borg_base_dir_explicit:
+            base_dir = borg_base_dir_explicit
+        else:
+            home = await get_env_var("HOME")
+            if not home:
+                user = await get_env_var("USER")
+                if user:
+                    result = await self.command_executor.execute_command(
+                        ["cd", "~", "&&", "pwd"]
+                    )
+                    home = result.stdout.strip() if result.success else ""
+            base_dir = home
+
+        xdg_cache_home = await get_env_var("XDG_CACHE_HOME")
+        xdg_config_home = await get_env_var("XDG_CONFIG_HOME")
+
+        if not borg_base_dir_explicit and xdg_cache_home:
+            cache_dir = self.secure_join(xdg_cache_home, "borg")
+        else:
+            cache_dir = self.secure_join(base_dir, ".cache", "borg")
+
+        if not borg_base_dir_explicit and xdg_config_home:
+            config_dir = self.secure_join(xdg_config_home, "borg")
+        else:
+            config_dir = self.secure_join(base_dir, ".config", "borg")
+
+        security_dir = self.secure_join(config_dir, "security")
+        keys_dir = self.secure_join(config_dir, "keys")
+
+        temp_result = await self.command_executor.execute_command(
+            ["echo", "${TMPDIR:-/tmp}"]
+        )
+        temp_dir = temp_result.stdout.strip() if temp_result.success else "/tmp"
+
+        return BorgDefaultDirectories(
+            base_dir=base_dir,
+            cache_dir=cache_dir,
+            config_dir=config_dir,
+            security_dir=security_dir,
+            keys_dir=keys_dir,
+            temp_dir=temp_dir,
+        )
