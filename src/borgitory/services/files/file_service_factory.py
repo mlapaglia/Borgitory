@@ -11,7 +11,7 @@ import subprocess
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.file_protocols import FileServiceProtocol
-from borgitory.services.path.path_configuration_service import PathConfigurationService
+from borgitory.protocols.path_protocols import PlatformServiceProtocol
 from .linux_file_service import LinuxFileService
 from .wsl_file_service import WSLFileService
 
@@ -37,6 +37,7 @@ def wsl_available() -> bool:
 
 def create_file_service(
     command_executor: "CommandExecutorProtocol",
+    platform_service: PlatformServiceProtocol,
 ) -> FileServiceProtocol:
     """
     Create a file service for the current environment.
@@ -48,20 +49,21 @@ def create_file_service(
     Returns:
         FileServiceProtocol: A file service implementation
     """
-    config = PathConfigurationService()
 
-    if config.is_windows():
+    if platform_service.is_windows():
         if wsl_available():
             logger.debug("Creating WSL file service for Windows environment")
             return WSLFileService(command_executor)
         else:
             logger.error("WSL is not available on Windows environment")
             raise RuntimeError("WSL is not available on Windows environment")
-    elif config.is_linux() or config.is_docker():
+    elif platform_service.is_linux() or platform_service.is_docker():
         logger.debug("Creating Linux file service")
         return LinuxFileService()
     else:
         logger.error(
-            f"Unknown environment {config.get_platform_name()}, using native file service"
+            f"Unknown environment {platform_service.get_platform_name()}, using native file service"
         )
-        raise RuntimeError(f"Unknown environment {config.get_platform_name()}")
+        raise RuntimeError(
+            f"Unknown environment {platform_service.get_platform_name()}"
+        )
