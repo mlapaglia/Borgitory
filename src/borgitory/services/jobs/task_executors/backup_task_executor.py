@@ -10,10 +10,11 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 )
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
+from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import secure_borg_command, cleanup_temp_keyfile
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +27,12 @@ class BackupTaskExecutor:
         job_executor: ProcessExecutorProtocol,
         output_manager: JobOutputManagerProtocol,
         event_broadcaster: JobEventBroadcasterProtocol,
+        database_manager: JobDatabaseManagerProtocol,
     ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
+        self.database_manager = database_manager
 
     async def execute_backup_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -42,7 +45,9 @@ class BackupTaskExecutor:
                 task.status = TaskStatusEnum.FAILED
                 task.error = "Repository ID is missing"
                 return False
-            repo_data = await self._get_repository_data(job.repository_id)
+            repo_data = await self.database_manager.get_repository_data(
+                job.repository_id
+            )
             if not repo_data:
                 task.status = TaskStatusEnum.FAILED
                 task.return_code = 1
@@ -54,9 +59,7 @@ class BackupTaskExecutor:
             passphrase = str(
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
-            keyfile_content = repo_data.get("keyfile_content")
-            if keyfile_content is not None and not isinstance(keyfile_content, str):
-                keyfile_content = None  # Ensure it's str or None
+
             cache_dir = repo_data.get("cache_dir")
 
             def task_output_callback(line: str) -> None:
@@ -121,7 +124,6 @@ class BackupTaskExecutor:
                         str(repository_path),
                         passphrase,
                         task_output_callback,
-                        keyfile_content,
                     )
                 except Exception as e:
                     logger.warning(f"Break-lock failed, continuing with backup: {e}")
@@ -132,19 +134,16 @@ class BackupTaskExecutor:
             if cache_dir and isinstance(cache_dir, str):
                 env_overrides["BORG_CACHE_DIR"] = cache_dir
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg create",
                 repository_path="",
                 passphrase=passphrase,
-                keyfile_content=keyfile_content,
                 additional_args=additional_args,
                 environment_overrides=env_overrides,
-                cleanup_keyfile=False,
-            ) as (command, env, temp_keyfile_path):
-                process = await self.job_executor.start_process(command, env)
-
-                if temp_keyfile_path:
-                    setattr(task, "_temp_keyfile_path", temp_keyfile_path)
+            )
+            process = await self.job_executor.start_process(
+                borg_command.command, borg_command.environment
+            )
 
             # Monitor the process (outside context manager since it's long-running)
             result = await self.job_executor.monitor_process_output(
@@ -168,10 +167,6 @@ class BackupTaskExecutor:
                 else TaskStatusEnum.FAILED
             )
             task.completed_at = now_utc()
-
-            if hasattr(task, "_temp_keyfile_path"):
-                cleanup_temp_keyfile(getattr(task, "_temp_keyfile_path"))
-                delattr(task, "_temp_keyfile_path")
 
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
@@ -210,10 +205,6 @@ class BackupTaskExecutor:
             task.error = f"Backup task failed: {str(e)}"
             task.completed_at = now_utc()
 
-            if hasattr(task, "_temp_keyfile_path"):
-                cleanup_temp_keyfile(getattr(task, "_temp_keyfile_path"))
-                delattr(task, "_temp_keyfile_path")
-
             return False
 
     async def _execute_break_lock(
@@ -221,7 +212,7 @@ class BackupTaskExecutor:
         repository_path: str,
         passphrase: str,
         output_callback: Optional[Callable[[str], None]] = None,
-        keyfile_content: Optional[str] = None,
+        keyfile_path: Optional[str] = None,
     ) -> None:
         """Execute borg break-lock command to release stale repository locks"""
         try:
@@ -230,49 +221,49 @@ class BackupTaskExecutor:
                     "Running 'borg break-lock' to remove stale repository locks..."
                 )
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg break-lock",
                 repository_path=repository_path,
                 passphrase=passphrase,
-                keyfile_content=keyfile_content,
+                keyfile_path=keyfile_path,
                 additional_args=[],
-            ) as (command, env, _):
-                process = await self.job_executor.start_process(command, env)
+            )
+            process = await self.job_executor.start_process(
+                borg_command.command, borg_command.environment
+            )
 
-                try:
-                    result = await asyncio.wait_for(
-                        self.job_executor.monitor_process_output(
-                            process, output_callback=output_callback
-                        ),
-                        timeout=30,
-                    )
-                except asyncio.TimeoutError:
-                    if output_callback:
-                        output_callback("Break-lock timed out, terminating process")
-                    process.kill()
-                    await process.wait()
-                    raise Exception("Break-lock operation timed out")
+            try:
+                result = await asyncio.wait_for(
+                    self.job_executor.monitor_process_output(
+                        process, output_callback=output_callback
+                    ),
+                    timeout=30,
+                )
+            except asyncio.TimeoutError:
+                if output_callback:
+                    output_callback("Break-lock timed out, terminating process")
+                process.kill()
+                await process.wait()
+                raise Exception("Break-lock operation timed out")
 
-                if result.return_code == 0:
-                    if output_callback:
-                        output_callback("Successfully released repository lock")
-                    logger.info(
-                        f"Successfully released lock on repository: {repository_path}"
-                    )
-                else:
-                    error_msg = f"Break-lock returned {result.return_code}"
-                    if result.stdout:
-                        stdout_text = result.stdout.decode(
-                            "utf-8", errors="replace"
-                        ).strip()
-                        if stdout_text:
-                            error_msg += f": {stdout_text}"
+            if result.return_code == 0:
+                if output_callback:
+                    output_callback("Successfully released repository lock")
+                logger.info(
+                    f"Successfully released lock on repository: {repository_path}"
+                )
+            else:
+                error_msg = f"Break-lock returned {result.return_code}"
+                if result.stdout:
+                    stdout_text = result.stdout.decode(
+                        "utf-8", errors="replace"
+                    ).strip()
+                    if stdout_text:
+                        error_msg += f": {stdout_text}"
 
-                    if output_callback:
-                        output_callback(f"Warning: {error_msg}")
-                    logger.warning(
-                        f"Break-lock warning for {repository_path}: {error_msg}"
-                    )
+                if output_callback:
+                    output_callback(f"Warning: {error_msg}")
+                logger.warning(f"Break-lock warning for {repository_path}: {error_msg}")
 
         except Exception as e:
             error_msg = f"Error executing break-lock: {str(e)}"
@@ -280,10 +271,3 @@ class BackupTaskExecutor:
                 output_callback(f"Warning: {error_msg}")
             logger.error(f"Break-lock error for repository {repository_path}: {e}")
             raise
-
-    async def _get_repository_data(
-        self, repository_id: int
-    ) -> Optional[Dict[str, object]]:
-        """Get repository data by ID - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None

@@ -4,10 +4,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi import Request
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from borgitory.models.database import get_db
-from borgitory.dependencies import DebugServiceDep, get_templates
+from borgitory.dependencies import DebugServiceDep, get_db, get_templates
 
 router = APIRouter(prefix="/api/debug", tags=["debug"])
 templates = get_templates()
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/info", response_model=None)
 async def get_debug_info(
-    debug_svc: DebugServiceDep, db: Session = Depends(get_db)
+    debug_svc: DebugServiceDep, db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Get comprehensive debug information"""
     try:
@@ -28,7 +27,7 @@ async def get_debug_info(
 
 @router.get("/html", response_class=HTMLResponse)
 async def get_debug_html(
-    request: Request, debug_svc: DebugServiceDep, db: Session = Depends(get_db)
+    request: Request, debug_svc: DebugServiceDep, db: AsyncSession = Depends(get_db)
 ) -> HTMLResponse:
     """Get debug information as HTML"""
     try:

@@ -5,7 +5,7 @@ Tests that the endpoint calls the service correctly and returns HTML
 
 import uuid
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from unittest.mock import Mock, AsyncMock
 
 from borgitory.main import app
@@ -17,18 +17,13 @@ class TestJobStopAPISimple:
     """Simplified test job stop API endpoints"""
 
     @pytest.fixture
-    def client(self) -> TestClient:
-        """Create FastAPI test client"""
-        return TestClient(app)
-
-    @pytest.fixture
     def mock_job_service(self) -> Mock:
         """Create mock job service for API testing"""
         mock_service = Mock()
         return mock_service
 
-    def test_stop_job_success_calls_service(
-        self, client: TestClient, mock_job_service: Mock
+    async def test_stop_job_success_calls_service(
+        self, async_client: AsyncClient, mock_job_service: Mock
     ) -> None:
         """Test that successful job stop calls the service correctly"""
         # Arrange
@@ -48,7 +43,7 @@ class TestJobStopAPISimple:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 200
@@ -63,8 +58,8 @@ class TestJobStopAPISimple:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_error_calls_service(
-        self, client: TestClient, mock_job_service: Mock
+    async def test_stop_job_error_calls_service(
+        self, async_client: AsyncClient, mock_job_service: Mock
     ) -> None:
         """Test that job stop error calls the service correctly"""
         # Arrange
@@ -80,7 +75,7 @@ class TestJobStopAPISimple:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 400
@@ -95,8 +90,8 @@ class TestJobStopAPISimple:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_invalid_status_error(
-        self, client: TestClient, mock_job_service: Mock
+    async def test_stop_job_invalid_status_error(
+        self, async_client: AsyncClient, mock_job_service: Mock
     ) -> None:
         """Test stopping job in invalid status returns proper error"""
         # Arrange
@@ -114,7 +109,7 @@ class TestJobStopAPISimple:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 400
@@ -124,8 +119,8 @@ class TestJobStopAPISimple:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_endpoint_path_validation(
-        self, client: TestClient, mock_job_service: Mock
+    async def test_stop_job_endpoint_path_validation(
+        self, async_client: AsyncClient, mock_job_service: Mock
     ) -> None:
         """Test that the stop job endpoint is correctly routed"""
         # Arrange
@@ -145,7 +140,7 @@ class TestJobStopAPISimple:
 
         try:
             # Act - Test the exact endpoint path
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 200
@@ -154,23 +149,23 @@ class TestJobStopAPISimple:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_method_not_allowed(self, client: TestClient) -> None:
+    async def test_stop_job_method_not_allowed(self, async_client: AsyncClient) -> None:
         """Test that only POST method is allowed for stop endpoint"""
         job_id = uuid.uuid4()
         # Act & Assert - GET should not be allowed
-        response = client.get(f"/api/jobs/{job_id}/stop")
+        response = await async_client.get(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
         # Act & Assert - PUT should not be allowed
-        response = client.put(f"/api/jobs/{job_id}/stop")
+        response = await async_client.put(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
         # Act & Assert - DELETE should not be allowed
-        response = client.delete(f"/api/jobs/{job_id}/stop")
+        response = await async_client.delete(f"/api/jobs/{job_id}/stop")
         assert response.status_code == 405  # Method Not Allowed
 
-    def test_stop_job_success_with_task_details(
-        self, client: TestClient, mock_job_service: Mock
+    async def test_stop_job_success_with_task_details(
+        self, async_client: AsyncClient, mock_job_service: Mock
     ) -> None:
         """Test successful job stop with task details in response"""
         # Arrange
@@ -190,7 +185,7 @@ class TestJobStopAPISimple:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 200
@@ -201,8 +196,8 @@ class TestJobStopAPISimple:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_no_tasks_skipped(
-        self, client: TestClient, mock_job_service: Mock
+    async def test_stop_job_no_tasks_skipped(
+        self, async_client: AsyncClient, mock_job_service: Mock
     ) -> None:
         """Test stopping job with no remaining tasks"""
         # Arrange
@@ -222,7 +217,7 @@ class TestJobStopAPISimple:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 200

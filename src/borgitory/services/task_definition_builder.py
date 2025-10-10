@@ -7,7 +7,8 @@ by providing a consistent interface for building all task types.
 
 import logging
 from typing import List, Optional, cast
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from borgitory.models.database import (
     PruneConfig,
     RepositoryCheckConfig,
@@ -29,14 +30,10 @@ class TaskDefinitionBuilder:
     Eliminates duplication between manual and scheduled job creation.
     """
 
-    def __init__(self, db_session: Session) -> None:
+    def __init__(self) -> None:
         """
-        Initialize the builder with a database session for configuration lookups.
-
-        Args:
-            db_session: SQLAlchemy session for accessing configurations
+        Initialize the builder.
         """
-        self.db_session = db_session
 
     def build_backup_task(
         self,
@@ -77,8 +74,8 @@ class TaskDefinitionBuilder:
             parameters=parameters,
         )
 
-    def build_prune_task_from_config(
-        self, prune_config_id: int, repository_name: str
+    async def build_prune_task_from_config(
+        self, db: AsyncSession, prune_config_id: int, repository_name: str
     ) -> Optional[TaskDefinition]:
         """
         Build a prune task definition from a stored prune configuration.
@@ -90,11 +87,10 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary or None if config not found
         """
-        prune_config = (
-            self.db_session.query(PruneConfig)
-            .filter(PruneConfig.id == prune_config_id)
-            .first()
+        result = await db.execute(
+            select(PruneConfig).where(PruneConfig.id == prune_config_id)
         )
+        prune_config = result.scalar_one_or_none()
 
         if not prune_config:
             return None
@@ -154,8 +150,8 @@ class TaskDefinitionBuilder:
             parameters=parameters,
         )
 
-    def build_check_task_from_config(
-        self, check_config_id: int, repository_name: str
+    async def build_check_task_from_config(
+        self, db: AsyncSession, check_config_id: int, repository_name: str
     ) -> Optional[TaskDefinition]:
         """
         Build a check task definition from a stored check configuration.
@@ -167,11 +163,12 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary or None if config not found
         """
-        check_config = (
-            self.db_session.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.id == check_config_id)
-            .first()
+        result = await db.execute(
+            select(RepositoryCheckConfig).where(
+                RepositoryCheckConfig.id == check_config_id
+            )
         )
+        check_config = result.scalar_one_or_none()
 
         if not check_config:
             return None
@@ -248,8 +245,8 @@ class TaskDefinitionBuilder:
             },
         )
 
-    def build_notification_task(
-        self, notification_config_id: int, repository_name: str
+    async def build_notification_task(
+        self, db: AsyncSession, notification_config_id: int, repository_name: str
     ) -> Optional[TaskDefinition]:
         """
         Build a notification task definition from a stored notification configuration.
@@ -261,11 +258,12 @@ class TaskDefinitionBuilder:
         Returns:
             Task definition dictionary or None if config not found
         """
-        notification_config = (
-            self.db_session.query(NotificationConfig)
-            .filter(NotificationConfig.id == notification_config_id)
-            .first()
+        result = await db.execute(
+            select(NotificationConfig).where(
+                NotificationConfig.id == notification_config_id
+            )
         )
+        notification_config = result.scalar_one_or_none()
 
         if not notification_config:
             return None
@@ -356,8 +354,9 @@ class TaskDefinitionBuilder:
             logger.error(f"Failed to parse {hook_type}-job hooks: {e}")
             return []
 
-    def build_task_list(
+    async def build_task_list(
         self,
+        db: AsyncSession,
         repository_name: str,
         include_backup: bool = True,
         backup_params: Optional[ConfigDict] = None,
@@ -437,8 +436,8 @@ class TaskDefinitionBuilder:
                 self.build_prune_task_from_request(prune_request, repository_name)
             )
         elif prune_config_id:
-            prune_task = self.build_prune_task_from_config(
-                prune_config_id, repository_name
+            prune_task = await self.build_prune_task_from_config(
+                db, prune_config_id, repository_name
             )
             if prune_task:
                 tasks.append(prune_task)
@@ -448,8 +447,8 @@ class TaskDefinitionBuilder:
                 self.build_check_task_from_request(check_request, repository_name)
             )
         elif check_config_id:
-            check_task = self.build_check_task_from_config(
-                check_config_id, repository_name
+            check_task = await self.build_check_task_from_config(
+                db, check_config_id, repository_name
             )
             if check_task:
                 tasks.append(check_task)
@@ -460,8 +459,8 @@ class TaskDefinitionBuilder:
             )
 
         if notification_config_id:
-            notification_task = self.build_notification_task(
-                notification_config_id, repository_name
+            notification_task = await self.build_notification_task(
+                db, notification_config_id, repository_name
             )
             if notification_task:
                 tasks.append(notification_task)

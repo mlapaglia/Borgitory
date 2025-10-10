@@ -3,7 +3,6 @@ Tests for JobManager hook task execution with critical failures.
 """
 
 import uuid
-import pytest
 from typing import Dict, List, Optional
 from unittest.mock import AsyncMock, Mock
 
@@ -103,7 +102,6 @@ class TestJobManagerHookExecution:
             parameters={"hook_type": hook_type, "hooks": hooks_json},
         )
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_success(self) -> None:
         """Test successful hook task execution."""
         # Setup successful hook execution
@@ -149,7 +147,6 @@ class TestJobManagerHookExecution:
         else:
             assert "test hook" in str(output_line)
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_critical_failure(self) -> None:
         """Test hook task execution with critical failure."""
         # Setup critical hook failure
@@ -190,7 +187,6 @@ class TestJobManagerHookExecution:
         assert hook_task.parameters["critical_failure"] is True
         assert hook_task.parameters["failed_critical_hook_name"] == "critical hook"
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_non_critical_failure(self) -> None:
         """Test hook task execution with non-critical failure."""
         # Setup non-critical hook failure
@@ -232,7 +228,6 @@ class TestJobManagerHookExecution:
         assert hook_task.parameters.get("critical_failure") is None
         assert hook_task.parameters.get("failed_critical_hook_name") is None
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_post_hook_with_job_failure(self) -> None:
         """Test post-hook execution with job failure status."""
         # Setup successful post-hook execution
@@ -271,7 +266,6 @@ class TestJobManagerHookExecution:
         call_args = self.mock_hook_service.execute_hooks_mock.call_args
         assert call_args.kwargs["job_failed"] is True
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_no_hooks_json(self) -> None:
         """Test hook task execution with empty hooks JSON."""
         # Create test job and task with empty hooks
@@ -291,7 +285,6 @@ class TestJobManagerHookExecution:
         # Verify hook service was not called
         self.mock_hook_service.execute_hooks_mock.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_invalid_json(self) -> None:
         """Test hook task execution with invalid JSON."""
         # Create test job and task with invalid JSON
@@ -313,7 +306,6 @@ class TestJobManagerHookExecution:
         # Verify hook service was not called
         self.mock_hook_service.execute_hooks_mock.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_execute_hook_task_context_parameters(self) -> None:
         """Test hook task execution passes correct context parameters."""
         # Setup successful hook execution

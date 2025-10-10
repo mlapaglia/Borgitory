@@ -3,7 +3,9 @@ from dataclasses import dataclass
 import uuid
 from borgitory.custom_types import ConfigDict
 from typing import Dict, List, Optional
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import Repository, Job
 from borgitory.models.schemas import BackupRequest, PruneRequest, CheckRequest
@@ -53,28 +55,25 @@ class JobService:
 
     def __init__(
         self,
-        db: Session,
         job_manager: JobManagerProtocol,
     ) -> None:
-        self.db = db
         self.job_manager = job_manager
 
     async def create_backup_job(
-        self, backup_request: BackupRequest, job_type: JobType
+        self, db: AsyncSession, backup_request: BackupRequest, job_type: JobType
     ) -> JobCreationResponse:
         """Create a backup job with optional cleanup and check tasks"""
-        repository = (
-            self.db.query(Repository)
-            .filter(Repository.id == backup_request.repository_id)
-            .first()
+        result = await db.execute(
+            select(Repository).where(Repository.id == backup_request.repository_id)
         )
+        repository = result.scalar_one_or_none()
 
         if repository is None:
             return JobCreationError(
                 error="Repository not found", error_code="REPOSITORY_NOT_FOUND"
             )
 
-        builder = TaskDefinitionBuilder(self.db)
+        builder = TaskDefinitionBuilder()
 
         # Convert patterns JSON to Borg command format
         patterns = []
@@ -132,7 +131,8 @@ class JobService:
             "patterns": patterns,
         }
 
-        task_definitions = builder.build_task_list(
+        task_definitions = await builder.build_task_list(
+            db=db,
             repository_name=repository.name,
             include_backup=True,
             backup_params=backup_params,
@@ -157,20 +157,19 @@ class JobService:
         return JobCreationResult(job_id=job_id, status="started")
 
     async def create_prune_job(
-        self, prune_request: PruneRequest
+        self, db: AsyncSession, prune_request: PruneRequest
     ) -> JobCreationResponse:
         """Create a standalone prune job"""
-        repository = (
-            self.db.query(Repository)
-            .filter(Repository.id == prune_request.repository_id)
-            .first()
+        result = await db.execute(
+            select(Repository).where(Repository.id == prune_request.repository_id)
         )
+        repository = result.scalar_one_or_none()
 
         if repository is None:
             raise ValueError("Repository not found")
 
         # Use TaskDefinitionBuilder to create prune task
-        builder = TaskDefinitionBuilder(self.db)
+        builder = TaskDefinitionBuilder()
         task_def = builder.build_prune_task_from_request(prune_request, repository.name)
         task_definitions = [task_def]
 
@@ -185,14 +184,13 @@ class JobService:
         return JobCreationResult(job_id=job_id, status="started")
 
     async def create_check_job(
-        self, check_request: CheckRequest
+        self, db: AsyncSession, check_request: CheckRequest
     ) -> JobCreationResponse:
         """Create a repository check job"""
-        repository = (
-            self.db.query(Repository)
-            .filter(Repository.id == check_request.repository_id)
-            .first()
+        result = await db.execute(
+            select(Repository).where(Repository.id == check_request.repository_id)
         )
+        repository = result.scalar_one_or_none()
 
         if repository is None:
             return JobCreationError(
@@ -200,12 +198,12 @@ class JobService:
             )
 
         # Use TaskDefinitionBuilder to create check task
-        builder = TaskDefinitionBuilder(self.db)
+        builder = TaskDefinitionBuilder()
 
         # Determine check parameters - either from borgitory.config or request
         if check_request.check_config_id:
-            task_def = builder.build_check_task_from_config(
-                check_request.check_config_id, repository.name
+            task_def = await builder.build_check_task_from_config(
+                db, check_request.check_config_id, repository.name
             )
             if task_def is None:
                 raise ValueError("Check configuration not found or disabled")
@@ -227,18 +225,24 @@ class JobService:
 
         return JobCreationResult(job_id=job_id, status="started")
 
-    def list_jobs(
-        self, skip: int = 0, limit: int = 100, job_type: Optional[str] = None
+    async def list_jobs(
+        self,
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100,
+        job_type: Optional[str] = None,
     ) -> List[Dict[str, object]]:
         """List database job records and active JobManager jobs"""
         # Get database jobs (legacy) with repository relationship loaded
-        query = self.db.query(Job).options(joinedload(Job.repository))
+        query = select(Job).options(joinedload(Job.repository))
 
         # Filter by type if provided
         if job_type:
-            query = query.filter(Job.type == job_type)
+            query = query.where(Job.type == job_type)
 
-        db_jobs = query.order_by(Job.id.desc()).offset(skip).limit(limit).all()
+        query = query.order_by(Job.id.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        db_jobs = list(result.scalars().all())
 
         # Convert to dict format and add JobManager jobs
         jobs_list = []
@@ -302,7 +306,9 @@ class JobService:
 
         return jobs_list
 
-    def get_job(self, job_id: uuid.UUID) -> Optional[Dict[str, object]]:
+    async def get_job(
+        self, db: AsyncSession, job_id: uuid.UUID
+    ) -> Optional[Dict[str, object]]:
         """Get job details - supports both database IDs and JobManager IDs"""
         # Try to get from JobManager first (if it's a UUID format)
         status = self.job_manager.get_job_status(job_id)
@@ -321,12 +327,10 @@ class JobService:
 
         # Try database lookup
         try:
-            job = (
-                self.db.query(Job)
-                .options(joinedload(Job.repository))
-                .filter(Job.id == job_id)
-                .first()
+            result = await db.execute(
+                select(Job).options(joinedload(Job.repository)).where(Job.id == job_id)
             )
+            job = result.scalar_one_or_none()
             if job:
                 repository_name = "Unknown"
                 if job.repository_id and job.repository:

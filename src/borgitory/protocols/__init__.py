@@ -42,6 +42,11 @@ from .cloud_protocols import (
     StorageFactoryProtocol,
 )
 
+# Path service protocols
+from .path_protocols import (
+    PlatformServiceProtocol,
+)
+
 __all__ = [
     # Command protocols
     "CommandResult",
@@ -65,4 +70,6 @@ __all__ = [
     "CloudSyncConfigServiceProtocol",
     "EncryptionServiceProtocol",
     "StorageFactoryProtocol",
+    # Path protocols
+    "PlatformServiceProtocol",
 ]

@@ -2,12 +2,12 @@
 Tests for JobService business logic - Database operations and service methods
 """
 
-import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.utils.datetime_utils import now_utc
 
-from sqlalchemy.orm import Session
 
 from borgitory.services.jobs.job_service import JobService
 from borgitory.models.job_results import (
@@ -44,12 +44,9 @@ class TestJobService:
         self.mock_job_manager = Mock()
         self.mock_job_manager.create_composite_job = AsyncMock()
         self.mock_db = Mock()
-        self.job_service = JobService(
-            db=self.mock_db, job_manager=self.mock_job_manager
-        )
+        self.job_service = JobService(job_manager=self.mock_job_manager)
 
-    @pytest.mark.asyncio
-    async def test_create_backup_job_simple(self, test_db: Session) -> None:
+    async def test_create_backup_job_simple(self, test_db: AsyncSession) -> None:
         """Test creating a simple backup job without additional tasks."""
         # Create test repository
         repository = Repository()
@@ -57,7 +54,7 @@ class TestJobService:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock return value
         self.mock_job_manager.create_composite_job.return_value = "job-123"
@@ -74,9 +71,8 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
         result = await self.job_service.create_backup_job(
-            backup_request, JobType.MANUAL_BACKUP
+            db=test_db, backup_request=backup_request, job_type=JobType.MANUAL_BACKUP
         )
 
         assert isinstance(result, JobCreationResult)
@@ -90,8 +86,7 @@ class TestJobService:
         assert len(call_args.kwargs["task_definitions"]) == 1
         assert call_args.kwargs["task_definitions"][0].type == "backup"
 
-    @pytest.mark.asyncio
-    async def test_create_backup_job_with_prune(self, test_db: Session) -> None:
+    async def test_create_backup_job_with_prune(self, test_db: AsyncSession) -> None:
         """Test creating a backup job with prune task."""
         # Create test data
         repository = Repository()
@@ -107,7 +102,7 @@ class TestJobService:
         prune_config.show_stats = True
         prune_config.save_space = False
         test_db.add_all([repository, prune_config])
-        test_db.commit()
+        await test_db.commit()
 
         self.mock_job_manager.create_composite_job = AsyncMock(return_value="job-123")
 
@@ -123,9 +118,8 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
         result = await self.job_service.create_backup_job(
-            backup_request, JobType.MANUAL_BACKUP
+            db=test_db, backup_request=backup_request, job_type=JobType.MANUAL_BACKUP
         )
 
         assert isinstance(result, JobCreationResult)
@@ -139,9 +133,8 @@ class TestJobService:
         assert task_definitions[1].type == "prune"
         assert task_definitions[1].parameters["keep_within"] == "30d"
 
-    @pytest.mark.asyncio
     async def test_create_backup_job_repository_not_found(
-        self, test_db: Session
+        self, test_db: AsyncSession
     ) -> None:
         """Test backup job creation with non-existent repository."""
         backup_request = BackupRequest(
@@ -156,23 +149,23 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
         result = await self.job_service.create_backup_job(
-            backup_request, JobType.MANUAL_BACKUP
+            db=test_db, backup_request=backup_request, job_type=JobType.MANUAL_BACKUP
         )
 
         assert isinstance(result, JobCreationError)
         assert "Repository not found" in result.error
 
-    @pytest.mark.asyncio
-    async def test_create_prune_job_simple_strategy(self, test_db: Session) -> None:
+    async def test_create_prune_job_simple_strategy(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test creating a prune job with simple retention strategy."""
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock return value
         self.mock_job_manager.create_composite_job.return_value = "prune-job-123"
@@ -196,8 +189,9 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        result = await self.job_service.create_prune_job(prune_request)
+        result = await self.job_service.create_prune_job(
+            db=test_db, prune_request=prune_request
+        )
 
         assert isinstance(result, JobCreationResult)
         assert result.job_id == "prune-job-123"
@@ -209,15 +203,16 @@ class TestJobService:
         assert task_def.type == "prune"
         assert task_def.parameters["keep_within"] == "7d"
 
-    @pytest.mark.asyncio
-    async def test_create_prune_job_advanced_strategy(self, test_db: Session) -> None:
+    async def test_create_prune_job_advanced_strategy(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test creating a prune job with advanced retention strategy."""
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock return value
         self.mock_job_manager.create_composite_job.return_value = "prune-job-123"
@@ -241,8 +236,9 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        result = await self.job_service.create_prune_job(prune_request)
+        result = await self.job_service.create_prune_job(
+            db=test_db, prune_request=prune_request
+        )
 
         assert isinstance(result, JobCreationResult)
         assert result.job_id == "prune-job-123"
@@ -255,8 +251,7 @@ class TestJobService:
         assert task_def.parameters["keep_monthly"] == 6
         assert task_def.parameters["keep_yearly"] == 1
 
-    @pytest.mark.asyncio
-    async def test_create_check_job_with_config(self, test_db: Session) -> None:
+    async def test_create_check_job_with_config(self, test_db: AsyncSession) -> None:
         """Test creating a check job with existing check policy."""
         repository = Repository()
         repository.name = "test-repo"
@@ -271,7 +266,7 @@ class TestJobService:
         check_config.max_duration = 3600
         check_config.enabled = True
         test_db.add_all([repository, check_config])
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock return value
         self.mock_job_manager.create_composite_job.return_value = "check-job-123"
@@ -287,8 +282,9 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        result = await self.job_service.create_check_job(check_request)
+        result = await self.job_service.create_check_job(
+            db=test_db, check_request=check_request
+        )
 
         assert isinstance(result, JobCreationResult)
         assert result.job_id == "check-job-123"
@@ -302,15 +298,16 @@ class TestJobService:
         assert task_def.parameters["verify_data"] is True
         assert task_def.parameters["save_space"] is True
 
-    @pytest.mark.asyncio
-    async def test_create_check_job_custom_parameters(self, test_db: Session) -> None:
+    async def test_create_check_job_custom_parameters(
+        self, test_db: AsyncSession
+    ) -> None:
         """Test creating a check job with custom parameters."""
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock return value
         self.mock_job_manager.create_composite_job.return_value = "check-job-123"
@@ -330,8 +327,9 @@ class TestJobService:
         )
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        result = await self.job_service.create_check_job(check_request)
+        result = await self.job_service.create_check_job(
+            db=test_db, check_request=check_request
+        )
 
         assert isinstance(result, JobCreationResult)
         assert result.job_id == "check-job-123"
@@ -344,7 +342,7 @@ class TestJobService:
         assert task_def.parameters["repair_mode"] is False
         assert task_def.parameters["first_n_archives"] == 10
 
-    def test_list_jobs_database_only(self, test_db: Session) -> None:
+    async def test_list_jobs_database_only(self, test_db: AsyncSession) -> None:
         """Test listing jobs from database only."""
         # Create test jobs
         repository = Repository()
@@ -352,7 +350,7 @@ class TestJobService:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()  # Commit repository first to get ID
+        await test_db.commit()  # Commit repository first to get ID
 
         job1 = Job()
         job1.repository_id = repository.id
@@ -363,14 +361,13 @@ class TestJobService:
         job2.type = "prune"
         job2.status = "failed"
         test_db.add_all([job1, job2])
-        test_db.commit()
+        await test_db.commit()
 
         # Mock empty job manager
         self.mock_job_manager.jobs = {}
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        jobs = self.job_service.list_jobs(skip=0, limit=100)
+        jobs = await self.job_service.list_jobs(db=test_db, skip=0, limit=100)
 
         assert len(jobs) == 2
         # Jobs should be ordered by ID desc, but let's check what we actually get
@@ -379,7 +376,7 @@ class TestJobService:
         assert "prune" in job_types
         assert all(job["source"] == "database" for job in jobs)
 
-    def test_list_jobs_with_jobmanager(self, test_db: Session) -> None:
+    async def test_list_jobs_with_jobmanager(self, test_db: AsyncSession) -> None:
         """Test listing jobs including JobManager jobs."""
         # Create mock JobManager job
         mock_borg_job = Mock()
@@ -392,8 +389,7 @@ class TestJobService:
         self.mock_job_manager.jobs = {"job-uuid": mock_borg_job}
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        jobs = self.job_service.list_jobs(skip=0, limit=100)
+        jobs = await self.job_service.list_jobs(db=test_db, skip=0, limit=100)
 
         # Should include the JobManager job
         jm_job = next((j for j in jobs if j["source"] == "jobmanager"), None)
@@ -401,34 +397,33 @@ class TestJobService:
         assert jm_job["type"] == JobType.BACKUP  # Inferred from "create" command
         assert jm_job["status"] == "running"
 
-    def test_get_job_from_database(self, test_db: Session) -> None:
+    async def test_get_job_from_database(self, test_db: AsyncSession) -> None:
         """Test getting a job from database by ID."""
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()  # Commit repository first to get ID
+        await test_db.commit()  # Commit repository first to get ID
 
         job = Job()
         job.repository_id = repository.id
         job.type = "backup"
         job.status = JobStatusEnum.COMPLETED
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         self.mock_job_manager.get_job_status.return_value = None
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-        result = self.job_service.get_job(job.id)
+        result = await self.job_service.get_job(db=test_db, job_id=job.id)
 
         assert result is not None
         assert result["type"] == "backup"
         assert result["source"] == "database"
         assert result["repository_name"] == "test-repo"
 
-    def test_get_job_from_jobmanager(self, test_db: Session) -> None:
+    async def test_get_job_from_jobmanager(self, test_db: AsyncSession) -> None:
         """Test getting a job from JobManager by UUID."""
         from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
         from datetime import datetime
@@ -443,23 +438,20 @@ class TestJobService:
             error=None,
         )
 
-        result = self.job_service.get_job(job_id)
+        result = await self.job_service.get_job(db=test_db, job_id=job_id)
 
         assert result is not None
         assert result["status"] == JobStatusEnum.RUNNING
         assert result["source"] == "jobmanager"
 
-    def test_get_job_not_found(self, test_db: Session) -> None:
+    async def test_get_job_not_found(self, test_db: AsyncSession) -> None:
         """Test getting a non-existent job."""
         self.mock_job_manager.get_job_status.return_value = None
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
-
-        result = self.job_service.get_job(uuid.uuid4())
+        result = await self.job_service.get_job(db=test_db, job_id=uuid.uuid4())
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_job_status(self) -> None:
         """Test getting job status."""
         from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
@@ -486,8 +478,7 @@ class TestJobService:
         assert result.status == JobStatusEnum.RUNNING
         self.mock_job_manager.get_job_status.assert_called_once_with(job_id)
 
-    @pytest.mark.asyncio
-    async def test_cancel_job_jobmanager(self, test_db: Session) -> None:
+    async def test_cancel_job_jobmanager(self, test_db: AsyncSession) -> None:
         """Test cancelling a JobManager job."""
         self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
 
@@ -497,27 +488,25 @@ class TestJobService:
         assert result is True
         self.mock_job_manager.cancel_job.assert_called_once_with(job_id)
 
-    @pytest.mark.asyncio
-    async def test_cancel_job_database(self, test_db: Session) -> None:
+    async def test_cancel_job_database(self, test_db: AsyncSession) -> None:
         """Test cancelling a database job."""
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()  # Commit repository first to get ID
+        await test_db.commit()  # Commit repository first to get ID
 
         job = Job()
         job.repository_id = repository.id
         job.type = "backup"
         job.status = JobStatusEnum.RUNNING
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         self.mock_job_manager.cancel_job = AsyncMock(return_value=True)
 
         # Override mock db with real test_db for this test
-        self.job_service.db = test_db
         result = await self.job_service.cancel_job(job.id)
 
         assert result is True

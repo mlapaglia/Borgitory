@@ -38,33 +38,6 @@ class TestSimpleCommandRunnerProtocol:
 
         use_command_runner(mock_runner)
 
-    def test_fastapi_dependency_override_with_protocol(self) -> None:
-        """Test that FastAPI dependency overrides work with protocol mocks."""
-        from tests.utils.di_testing import override_dependency
-
-        # Create protocol mock
-        mock_runner = ProtocolMockFactory.create_command_runner_mock()
-
-        # Override dependency with protocol mock
-        def mock_config() -> CommandRunnerConfig:
-            return CommandRunnerConfig(timeout=999)
-
-        def mock_runner_factory(config: CommandRunnerConfig = mock_config()):
-            return mock_runner
-
-        with (
-            override_dependency(get_command_runner_config, mock_config),
-            override_dependency(
-                get_simple_command_runner, mock_runner_factory
-            ) as client,
-        ):
-            # Test that we can make API calls (the override works for FastAPI)
-            response = client.get("/")  # Basic endpoint test
-            assert response.status_code in [
-                200,
-                404,
-            ]  # Either works or endpoint doesn't exist
-
     def test_protocol_interface_methods(self) -> None:
         """Test that all protocol methods are available and callable."""
         config = get_command_runner_config()
@@ -125,23 +98,30 @@ class TestCommandRunnerProtocolIntegration:
 
     def test_dependency_injection_with_same_config(self) -> None:
         """Test that same configuration produces equivalent runners."""
+        from borgitory.services.simple_command_runner import SimpleCommandRunner
+
         config = CommandRunnerConfig(timeout=300)
         runner1 = get_simple_command_runner(config)
         runner2 = get_simple_command_runner(config)
 
-        # Same configuration, equivalent behavior (but different instances)
+        assert isinstance(runner1, SimpleCommandRunner)
+        assert isinstance(runner2, SimpleCommandRunner)
         assert isinstance(runner1, type(runner2))
         assert runner1.timeout == runner2.timeout
         assert runner1.max_retries == runner2.max_retries
 
     def test_dependency_injection_with_different_configs(self) -> None:
         """Test that different configurations produce different behaviors."""
+        from borgitory.services.simple_command_runner import SimpleCommandRunner
+
         config1 = CommandRunnerConfig(timeout=100)
         config2 = CommandRunnerConfig(timeout=200)
 
         runner1 = get_simple_command_runner(config1)
         runner2 = get_simple_command_runner(config2)
 
+        assert isinstance(runner1, SimpleCommandRunner)
+        assert isinstance(runner2, SimpleCommandRunner)
         assert runner1.timeout == 100
         assert runner2.timeout == 200
 

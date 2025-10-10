@@ -4,7 +4,7 @@ import sys
 import os
 import logging
 from typing import Dict, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from importlib.metadata import version, PackageNotFoundError
 
 from borgitory.models.database import Repository, Job
@@ -154,12 +154,12 @@ class DebugService:
         result = await self.command_executor.execute_command(command, timeout=timeout)
         return result.return_code, result.stdout, result.stderr
 
-    async def get_debug_info(self, db: Session) -> DebugInfo:
+    async def get_debug_info(self, db: AsyncSession) -> DebugInfo:
         """Gather comprehensive debug information"""
         debug_info = DebugInfo()
         debug_info.system = await self._get_system_info()
         debug_info.application = await self._get_application_info()
-        debug_info.database = self._get_database_info(db)
+        debug_info.database = await self._get_database_info(db)
         debug_info.tools = await self._get_tool_versions()
         debug_info.environment = self._get_environment_info()
         debug_info.job_manager = self._get_job_manager_info()
@@ -201,18 +201,27 @@ class DebugService:
             app_info.error = str(e)
             return app_info
 
-    def _get_database_info(self, db: Session) -> DatabaseInfo:
+    async def _get_database_info(self, db: AsyncSession) -> DatabaseInfo:
         """Get database information"""
         try:
+            from sqlalchemy import select, func
+
             database_url = self.environment.get_database_url()
 
-            repository_count = db.query(Repository).count()
-            total_jobs = db.query(Job).count()
+            result = await db.execute(select(func.count(Repository.id)))
+            repository_count = result.scalar() or 0
+
+            result = await db.execute(select(func.count(Job.id)))
+            total_jobs = result.scalar() or 0
+
             # Use started_at instead of created_at for Job model
             today_start = self.environment.now_utc().replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
-            recent_jobs = db.query(Job).filter(Job.started_at >= today_start).count()
+            result = await db.execute(
+                select(func.count(Job.id)).where(Job.started_at >= today_start)
+            )
+            recent_jobs = result.scalar() or 0
 
             # Get database file size (for SQLite)
             database_size = "Unknown"

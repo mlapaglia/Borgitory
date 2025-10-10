@@ -1,24 +1,26 @@
 import inspect
 import json
 import logging
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
 from borgitory.utils.datetime_utils import now_utc
 from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from borgitory.services.cloud_providers.registry import ProviderMetadata
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
 
 from borgitory.models.database import CloudSyncConfig
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
 )
-from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import (
     get_storage_class,
 )
-from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 from borgitory.services.encryption_service import EncryptionService
 from borgitory.custom_types import ConfigDict
 
@@ -67,33 +69,29 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
         return []
 
 
-class CloudSyncConfigService:
+class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
     """Service class for cloud sync configuration management (CRUD operations)."""
 
     def __init__(
         self,
-        db: Session,
-        rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
         get_metadata_func: Callable[[str], Optional["ProviderMetadata"]],
     ):
-        self.db = db
-        self._rclone_service = rclone_service
         self._storage_factory = storage_factory
         self._encryption_service = encryption_service
         self._get_metadata = get_metadata_func
 
-    def create_cloud_sync_config(
-        self, config: CloudSyncConfigCreate
+    async def create_cloud_sync_config(
+        self, config: CloudSyncConfigCreate, db: AsyncSession
     ) -> CloudSyncConfig:
         """Create a new cloud sync configuration using the new provider pattern."""
+        from sqlalchemy import select
 
-        existing = (
-            self.db.query(CloudSyncConfig)
-            .filter(CloudSyncConfig.name == config.name)
-            .first()
+        result = await db.execute(
+            select(CloudSyncConfig).where(CloudSyncConfig.name == config.name)
         )
+        existing = result.scalar_one_or_none()
         if existing:
             raise HTTPException(
                 status_code=400,
@@ -128,45 +126,48 @@ class CloudSyncConfigService:
         db_config.provider_config = json.dumps(encrypted_config)
         db_config.path_prefix = config.path_prefix or ""
 
-        self.db.add(db_config)
-        self.db.commit()
-        self.db.refresh(db_config)
+        db.add(db_config)
+        await db.commit()
+        await db.refresh(db_config)
 
         return db_config
 
-    def get_cloud_sync_configs(self) -> List[CloudSyncConfig]:
+    async def get_cloud_sync_configs(self, db: AsyncSession) -> List[CloudSyncConfig]:
         """Get all cloud sync configurations."""
-        return self.db.query(CloudSyncConfig).all()
 
-    def get_cloud_sync_config_by_id(self, config_id: int) -> CloudSyncConfig:
+        result = await db.execute(select(CloudSyncConfig))
+        return list(result.scalars().all())
+
+    async def get_cloud_sync_config_by_id(
+        self, config_id: int, db: AsyncSession
+    ) -> CloudSyncConfig:
         """Get cloud sync configuration by ID."""
-        config = (
-            self.db.query(CloudSyncConfig)
-            .filter(CloudSyncConfig.id == config_id)
-            .first()
+
+        result = await db.execute(
+            select(CloudSyncConfig).where(CloudSyncConfig.id == config_id)
         )
+        config = result.scalar_one_or_none()
         if not config:
             raise HTTPException(
                 status_code=404, detail="Cloud sync configuration not found"
             )
         return config
 
-    def update_cloud_sync_config(
-        self, config_id: int, config_update: CloudSyncConfigUpdate
+    async def update_cloud_sync_config(
+        self, config_id: int, config_update: CloudSyncConfigUpdate, db: AsyncSession
     ) -> CloudSyncConfig:
         """Update a cloud sync configuration."""
 
-        config = self.get_cloud_sync_config_by_id(config_id)
+        config = await self.get_cloud_sync_config_by_id(config_id, db)
 
         if config_update.name and config_update.name != config.name:
-            existing = (
-                self.db.query(CloudSyncConfig)
-                .filter(
+            result = await db.execute(
+                select(CloudSyncConfig).where(
                     CloudSyncConfig.name == config_update.name,
                     CloudSyncConfig.id != config_id,
                 )
-                .first()
             )
+            existing = result.scalar_one_or_none()
 
             if existing:
                 raise HTTPException(
@@ -206,44 +207,48 @@ class CloudSyncConfigService:
             config.provider_config = json.dumps(encrypted_config)
 
         config.updated_at = now_utc()
-        self.db.commit()
-        self.db.refresh(config)
+        await db.commit()
+        await db.refresh(config)
 
         return config
 
-    def delete_cloud_sync_config(self, config_id: int) -> None:
+    async def delete_cloud_sync_config(self, config_id: int, db: AsyncSession) -> None:
         """Delete a cloud sync configuration."""
-        config = self.get_cloud_sync_config_by_id(config_id)
-        self.db.delete(config)
-        self.db.commit()
+        config = await self.get_cloud_sync_config_by_id(config_id, db)
+        await db.delete(config)
+        await db.commit()
 
-    def enable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
+    async def enable_cloud_sync_config(
+        self, config_id: int, db: AsyncSession
+    ) -> CloudSyncConfig:
         """Enable a cloud sync configuration."""
-        config = self.get_cloud_sync_config_by_id(config_id)
+        config = await self.get_cloud_sync_config_by_id(config_id, db)
         config.enabled = True
         config.updated_at = now_utc()
-        self.db.commit()
+        await db.commit()
         return config
 
-    def disable_cloud_sync_config(self, config_id: int) -> CloudSyncConfig:
+    async def disable_cloud_sync_config(
+        self, config_id: int, db: AsyncSession
+    ) -> CloudSyncConfig:
         """Disable a cloud sync configuration."""
-        config = self.get_cloud_sync_config_by_id(config_id)
+        config = await self.get_cloud_sync_config_by_id(config_id, db)
         config.enabled = False
         config.updated_at = now_utc()
-        self.db.commit()
+        await db.commit()
         return config
 
     async def test_cloud_sync_config(
         self,
         config_id: int,
-        rclone: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """Test a cloud sync configuration using dynamic provider registry."""
         logger.info(f"Starting test for cloud sync config {config_id}")
 
-        config = self.get_cloud_sync_config_by_id(config_id)
+        config = await self.get_cloud_sync_config_by_id(config_id, db)
         logger.info(
             f"Config {config_id}: provider={config.provider}, name={config.name}"
         )
@@ -256,7 +261,9 @@ class CloudSyncConfigService:
             provider_config, sensitive_fields
         )
 
-        storage_factory.create_storage(str(config.provider), decrypted_config)
+        storage_provider = storage_factory.create_storage(
+            str(config.provider), decrypted_config
+        )
 
         # Get provider metadata and rclone mapping using injected dependency
         metadata = self._get_metadata(str(config.provider))
@@ -274,7 +281,7 @@ class CloudSyncConfigService:
         logger.info(f"Using test method: {test_method_name}")
 
         # Check if rclone service has the test method
-        if not hasattr(rclone, test_method_name):
+        if not hasattr(storage_provider, test_method_name):
             logger.error(f"Rclone service missing test method: {test_method_name}")
             raise HTTPException(
                 status_code=500,
@@ -312,7 +319,7 @@ class CloudSyncConfigService:
         )  # Don't log values for security
 
         # Get the test method and filter parameters to match method signature
-        test_method = getattr(rclone, test_method_name)
+        test_method = getattr(storage_provider, test_method_name)
 
         # Filter parameters to only include those supported by the test method
         method_signature = inspect.signature(test_method)
@@ -334,14 +341,15 @@ class CloudSyncConfigService:
             logger.error(f"Error calling {test_method_name}: {e}", exc_info=True)
             raise
 
-    def get_decrypted_config_for_editing(
+    async def get_decrypted_config_for_editing(
         self,
         config_id: int,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """Get decrypted configuration for editing in forms."""
-        config = self.get_cloud_sync_config_by_id(config_id)
+        config = await self.get_cloud_sync_config_by_id(config_id, db)
 
         provider_config = json.loads(str(config.provider_config))
 

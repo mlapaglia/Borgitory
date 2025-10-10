@@ -11,7 +11,6 @@ import os
 import subprocess
 
 from borgitory.protocols.path_protocols import PathServiceInterface
-from borgitory.services.path.path_configuration_service import PathConfigurationService
 from borgitory.services.path.path_service import PathService
 from borgitory.services.command_execution.linux_command_executor import (
     LinuxCommandExecutor,
@@ -47,15 +46,12 @@ def create_path_service() -> PathServiceInterface:
     Returns:
         PathServiceInterface: A path service implementation
     """
-    config = PathConfigurationService()
 
     # For factory usage, default to Linux command executor
     # In production, the proper executor is injected via DI
     command_executor = LinuxCommandExecutor()
 
-    platform = config.get_platform_name()
-    logger.info(f"Creating path service for {platform} environment (factory mode)")
-    return PathService(config, command_executor)
+    return PathService(command_executor)
 
 
 def get_path_service() -> PathServiceInterface:

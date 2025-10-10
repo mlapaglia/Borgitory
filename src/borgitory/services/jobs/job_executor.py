@@ -8,20 +8,24 @@ import logging
 import re
 import inspect
 from typing import Dict, List, Optional, Callable, TYPE_CHECKING, cast
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from borgitory.constants.retention import RetentionFieldHandler
-from borgitory.utils.security import secure_borg_command
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import (
+    CloudSyncService,
+    StorageFactory,
+)
 from borgitory.services.encryption_service import EncryptionService
 from borgitory.custom_types import ConfigDict
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -272,25 +276,24 @@ class JobExecutor:
                 f"Starting borg prune - Repository: {repository_path}, Dry run: {dry_run}"
             )
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg prune",
                 repository_path="",  # Path is in additional_args
                 passphrase=passphrase,
-                keyfile_content=keyfile_content,
                 additional_args=additional_args,
-            ) as (command, env, _):
-                process = await self.start_process(command, env)
+            )
+            process = await self.start_process(
+                borg_command.command, borg_command.environment
+            )
 
-                result = await self.monitor_process_output(process, output_callback)
+            result = await self.monitor_process_output(process, output_callback)
 
-                if result.return_code == 0:
-                    logger.info("Prune task completed successfully")
-                else:
-                    logger.error(
-                        f"Prune task failed with return code {result.return_code}"
-                    )
+            if result.return_code == 0:
+                logger.info("Prune task completed successfully")
+            else:
+                logger.error(f"Prune task failed with return code {result.return_code}")
 
-                return result
+            return result
 
         except Exception as e:
             logger.error(f"Exception in prune task: {str(e)}")
@@ -302,7 +305,8 @@ class JobExecutor:
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable[[], "Session"],
+        session_maker: "async_sessionmaker[AsyncSession]",
+        cloud_sync_service: CloudSyncService,
         rclone_service: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
@@ -315,7 +319,7 @@ class JobExecutor:
         Args:
             repository_path: Path to the borg repository
             cloud_sync_config_id: ID of the cloud sync configuration
-            db_session_factory: Factory for database sessions (required)
+            session_maker: Async session maker for database sessions (required)
             rclone_service: Rclone service instance for cloud operations (required)
             encryption_service: Service for encrypting/decrypting sensitive fields (required)
             storage_factory: Factory for creating cloud storage instances (required)
@@ -327,20 +331,20 @@ class JobExecutor:
         """
         try:
             from borgitory.models.database import CloudSyncConfig
-
-            session_factory = db_session_factory
+            from sqlalchemy import select
 
             logger.info(f"Starting cloud sync for repository {repository_path}")
 
             if output_callback:
                 output_callback("Starting cloud sync...")
 
-            with session_factory() as db:
-                config = (
-                    db.query(CloudSyncConfig)
-                    .filter(CloudSyncConfig.id == cloud_sync_config_id)
-                    .first()
+            async with session_maker() as db:
+                result = await db.execute(
+                    select(CloudSyncConfig).where(
+                        CloudSyncConfig.id == cloud_sync_config_id
+                    )
                 )
+                config = result.scalar_one_or_none()
 
                 if not config or not config.enabled:
                     logger.info(
@@ -438,6 +442,7 @@ class JobExecutor:
                         )
 
                     # Use the generic rclone dispatcher
+                    await cloud_sync_service.execute_sync(config, repository_path)
                     progress_generator = rclone_service.sync_repository_to_provider(
                         provider=config.provider,
                         repository=repo_obj,

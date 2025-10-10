@@ -5,9 +5,11 @@ Handles all repository-related business operations independent of HTTP concerns.
 
 import logging
 from typing import Dict, List, Protocol, TypedDict, Union, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import Repository, Job, Schedule
+from borgitory.models.enums import EncryptionType
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
     ImportRepositoryRequest,
@@ -23,6 +25,7 @@ from borgitory.models.repository_dtos import (
     DeleteRepositoryRequest,
     DeleteRepositoryResult,
 )
+from borgitory.models.schemas import RepositoryUpdate
 from borgitory.services.borg_service import BorgService
 from borgitory.services.scheduling.scheduler_service import SchedulerService
 from borgitory.protocols.path_protocols import PathServiceInterface
@@ -33,13 +36,12 @@ from borgitory.utils.datetime_utils import (
     parse_datetime_string,
 )
 from borgitory.utils.secure_path import (
-    create_secure_filename,
     get_directory_listing,
     secure_exists,
     secure_isdir,
     DirectoryInfo,
 )
-from borgitory.utils.security import secure_borg_command
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +99,7 @@ class RepositoryService:
         self.file_service = file_service
 
     async def create_repository(
-        self, request: CreateRepositoryRequest, db: Session
+        self, request: CreateRepositoryRequest, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Create a new Borg repository."""
         try:
@@ -112,9 +114,9 @@ class RepositoryService:
             db_repo.name = request.name
             db_repo.path = request.path
             db_repo.set_passphrase(request.passphrase)
+            db_repo.encryption_type = request.encryption_type
             db_repo.cache_dir = request.cache_dir
 
-            # Initialize repository with Borg
             init_result = await self.borg_service.initialize_repository(db_repo)
             if not init_result.success:
                 borg_error = init_result.message
@@ -129,10 +131,26 @@ class RepositoryService:
                     borg_error=borg_error,
                 )
 
-            # Save to database
+            if db_repo.encryption_type in [
+                EncryptionType.KEYFILE,
+                EncryptionType.KEYFILE_BLAKE2,
+            ]:
+                keyfile_result = await self.export_repository_key(db_repo)
+                keyfile_contents = keyfile_result.get("key_data")
+                if keyfile_contents:
+                    db_repo.set_keyfile_content(keyfile_contents)
+                    await db.commit()
+                    logger.info(
+                        f"Saved keyfile contents for repository '{request.name}'"
+                    )
+                else:
+                    logger.warning(
+                        f"Could not retrieve keyfile contents for repository '{request.name}'"
+                    )
+
             db.add(db_repo)
-            db.commit()
-            db.refresh(db_repo)
+            await db.commit()
+            await db.refresh(db_repo)
 
             logger.info(
                 f"Successfully created and initialized repository '{request.name}'"
@@ -146,53 +164,20 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             error_message = f"Failed to create repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
 
     async def import_repository(
-        self, request: ImportRepositoryRequest, db: Session
+        self, request: ImportRepositoryRequest, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Import an existing Borg repository."""
-        keyfile_path: str | None = None
         try:
-            # Validate repository doesn't already exist
             validation_errors = await self._validate_repository_import(request, db)
             if validation_errors:
                 return RepositoryOperationResult(
                     success=False, validation_errors=validation_errors
-                )
-
-            # Handle keyfile if provided
-            if request.keyfile and request.keyfile.filename:
-                keyfile_result = await self._save_keyfile(request.name, request.keyfile)
-                if not keyfile_result["success"]:
-                    error_msg = keyfile_result.get("error")
-                    return RepositoryOperationResult(
-                        success=False,
-                        error_message=str(error_msg)
-                        if error_msg
-                        else "Unknown keyfile error",
-                    )
-
-                path_value = keyfile_result.get("path")
-                keyfile_path = str(path_value) if path_value else None
-
-            verification_successful = await self.borg_service.verify_repository_access(
-                repo_path=request.path,
-                passphrase=request.passphrase,
-                keyfile_path=str(keyfile_path) if keyfile_path else "",
-                keyfile_content=request.keyfile_content or "",
-            )
-
-            if not verification_successful:
-                if keyfile_path:
-                    await self.file_service.remove_file(keyfile_path)
-
-                return RepositoryOperationResult(
-                    success=False,
-                    error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
                 )
 
             db_repo = Repository()
@@ -207,9 +192,15 @@ class RepositoryService:
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)
 
-            db.add(db_repo)
-            db.commit()
-            db.refresh(db_repo)
+            verification_successful = await self.borg_service.verify_repository_access(
+                db_repo
+            )
+
+            if not verification_successful:
+                return RepositoryOperationResult(
+                    success=False,
+                    error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
+                )
 
             try:
                 archives_response = await self.borg_service.list_archives(db_repo)
@@ -217,9 +208,17 @@ class RepositoryService:
                     f"Successfully imported repository '{request.name}' with {len(archives_response.archives)} archives"
                 )
             except Exception:
-                logger.info(
-                    f"Successfully imported repository '{request.name}' (could not count archives)"
+                logger.warning(
+                    f"Imported repository could not list archives '{request.name}'"
                 )
+                return RepositoryOperationResult(
+                    success=False,
+                    error_message="Failed to list archives. Please check the path, passphrase, and keyfile (if required).",
+                )
+
+            db.add(db_repo)
+            await db.commit()
+            await db.refresh(db_repo)
 
             return RepositoryOperationResult(
                 success=True,
@@ -229,24 +228,68 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
-            if keyfile_path is not None:
-                try:
-                    await self.file_service.remove_file(keyfile_path)
-                except Exception:
-                    pass
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
 
+    async def update_repository(
+        self, repository_id: int, update_data: RepositoryUpdate, db: AsyncSession
+    ) -> RepositoryOperationResult:
+        """Update an existing repository."""
+        try:
+            result = await db.execute(
+                select(Repository).where(Repository.id == repository_id)
+            )
+            repository = result.scalar_one_or_none()
+            if not repository:
+                return RepositoryOperationResult(
+                    success=False, error_message="Repository not found"
+                )
+
+            # Validate update data
+            validation_errors = await self._validate_repository_update(
+                repository, update_data, db
+            )
+            if validation_errors:
+                return RepositoryOperationResult(
+                    success=False, validation_errors=validation_errors
+                )
+
+            # Update fields
+            update_dict = update_data.model_dump(exclude_unset=True)
+
+            if "name" in update_dict:
+                repository.name = update_dict["name"]
+
+            if "cache_dir" in update_dict:
+                repository.cache_dir = update_dict["cache_dir"]
+
+            if "passphrase" in update_dict and update_dict["passphrase"]:
+                repository.set_passphrase(update_dict["passphrase"])
+
+            await db.commit()
+            await db.refresh(repository)
+
+            logger.info(f"Repository '{repository.name}' updated successfully")
+            return RepositoryOperationResult(
+                success=True, repository_name=repository.name
+            )
+
+        except Exception as e:
+            await db.rollback()
+            error_message = f"Failed to update repository: {str(e)}"
+            logger.error(error_message)
+            return RepositoryOperationResult(success=False, error_message=error_message)
+
     async def list_archives(
-        self, repository_id: int, db: Session
+        self, repository_id: int, db: AsyncSession
     ) -> ArchiveListingResult:
         """List archives in a repository."""
         try:
-            repository = (
-                db.query(Repository).filter(Repository.id == repository_id).first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return ArchiveListingResult(
                     success=False,
@@ -329,7 +372,7 @@ class RepositoryService:
                     success=True, path=request.path, directories=[]
                 )
 
-            directory_data = get_directory_listing(
+            directory_data = await get_directory_listing(
                 request.path, self.file_service, include_files=request.include_files
             )
 
@@ -353,15 +396,14 @@ class RepositoryService:
             )
 
     async def get_archive_contents(
-        self, request: ArchiveContentsRequest, db: Session
+        self, request: ArchiveContentsRequest, db: AsyncSession
     ) -> ArchiveContentsResult:
         """Get contents of an archive at specified path."""
         try:
-            repository = (
-                db.query(Repository)
-                .filter(Repository.id == request.repository_id)
-                .first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == request.repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return ArchiveContentsResult(
                     success=False,
@@ -414,15 +456,14 @@ class RepositoryService:
             )
 
     async def delete_repository(
-        self, request: DeleteRepositoryRequest, db: Session
+        self, request: DeleteRepositoryRequest, db: AsyncSession
     ) -> DeleteRepositoryResult:
         """Delete a repository and its associated data."""
         try:
-            repository = (
-                db.query(Repository)
-                .filter(Repository.id == request.repository_id)
-                .first()
+            result = await db.execute(
+                select(Repository).where(Repository.id == request.repository_id)
             )
+            repository = result.scalar_one_or_none()
             if not repository:
                 return DeleteRepositoryResult(
                     success=False,
@@ -432,14 +473,13 @@ class RepositoryService:
 
             repo_name = repository.name
 
-            active_jobs = (
-                db.query(Job)
-                .filter(
+            job_result = await db.execute(
+                select(Job).where(
                     Job.repository_id == request.repository_id,
                     Job.status.in_(["running", "pending", "queued"]),
                 )
-                .all()
             )
+            active_jobs = job_result.scalars().all()
 
             if active_jobs:
                 active_job_types = [job.type for job in active_jobs]
@@ -450,11 +490,10 @@ class RepositoryService:
                     error_message=f"Cannot delete repository '{repo_name}' - {len(active_jobs)} active job(s) running: {', '.join(active_job_types)}. Please wait for jobs to complete or cancel them first.",
                 )
 
-            schedules_to_delete = (
-                db.query(Schedule)
-                .filter(Schedule.repository_id == request.repository_id)
-                .all()
+            schedule_result = await db.execute(
+                select(Schedule).where(Schedule.repository_id == request.repository_id)
             )
+            schedules_to_delete = schedule_result.scalars().all()
 
             deleted_schedules = 0
             for schedule in schedules_to_delete:
@@ -467,8 +506,8 @@ class RepositoryService:
                         f"Could not remove scheduled job for schedule ID {schedule.id}: {e}"
                     )
 
-            db.delete(repository)
-            db.commit()
+            await db.delete(repository)
+            await db.commit()
 
             logger.info(f"Successfully deleted repository '{repo_name}'")
 
@@ -480,7 +519,7 @@ class RepositoryService:
             )
 
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             error_message = f"Failed to delete repository: {str(e)}"
             logger.error(error_message)
             return DeleteRepositoryResult(
@@ -490,14 +529,15 @@ class RepositoryService:
             )
 
     async def _validate_repository_creation(
-        self, request: CreateRepositoryRequest, db: Session
+        self, request: CreateRepositoryRequest, db: AsyncSession
     ) -> List[RepositoryValidationError]:
         """Validate repository creation request."""
         errors = []
 
-        existing_name = (
-            db.query(Repository).filter(Repository.name == request.name).first()
+        result = await db.execute(
+            select(Repository).where(Repository.name == request.name)
         )
+        existing_name = result.scalar_one_or_none()
         if existing_name:
             errors.append(
                 RepositoryValidationError(
@@ -505,9 +545,10 @@ class RepositoryService:
                 )
             )
 
-        existing_path = (
-            db.query(Repository).filter(Repository.path == request.path).first()
+        result = await db.execute(
+            select(Repository).where(Repository.path == request.path)
         )
+        existing_path = result.scalar_one_or_none()
         if existing_path:
             errors.append(
                 RepositoryValidationError(
@@ -519,14 +560,15 @@ class RepositoryService:
         return errors
 
     async def _validate_repository_import(
-        self, request: ImportRepositoryRequest, db: Session
+        self, request: ImportRepositoryRequest, db: AsyncSession
     ) -> List[RepositoryValidationError]:
         """Validate repository import request."""
         errors = []
 
-        existing_name = (
-            db.query(Repository).filter(Repository.name == request.name).first()
+        result = await db.execute(
+            select(Repository).where(Repository.name == request.name)
         )
+        existing_name = result.scalar_one_or_none()
         if existing_name:
             errors.append(
                 RepositoryValidationError(
@@ -534,9 +576,10 @@ class RepositoryService:
                 )
             )
 
-        existing_path = (
-            db.query(Repository).filter(Repository.path == request.path).first()
+        result = await db.execute(
+            select(Repository).where(Repository.path == request.path)
         )
+        existing_path = result.scalar_one_or_none()
         if existing_path:
             errors.append(
                 RepositoryValidationError(
@@ -544,6 +587,30 @@ class RepositoryService:
                     message=f"Repository with path '{request.path}' already exists with name '{existing_path.name}'",
                 )
             )
+
+        return errors
+
+    async def _validate_repository_update(
+        self, repository: Repository, update_data: RepositoryUpdate, db: AsyncSession
+    ) -> List[RepositoryValidationError]:
+        """Validate repository update request."""
+        errors = []
+        update_dict = update_data.model_dump(exclude_unset=True)
+
+        # Check if name is being changed and if it conflicts
+        if "name" in update_dict and update_dict["name"] != repository.name:
+            result = await db.execute(
+                select(Repository)
+                .where(Repository.name == update_dict["name"])
+                .where(Repository.id != repository.id)
+            )
+            existing_name = result.scalar_one_or_none()
+            if existing_name:
+                errors.append(
+                    RepositoryValidationError(
+                        field="name", message="Repository with this name already exists"
+                    )
+                )
 
         return errors
 
@@ -558,77 +625,56 @@ class RepositoryService:
         else:
             return f"Failed to initialize repository: {borg_error}"
 
-    async def _save_keyfile(
-        self, repository_name: str, keyfile: KeyfileProtocol
-    ) -> KeyfileSaveResult:
-        """Save uploaded keyfile securely."""
-        keyfiles_dir = await self.path_service.get_keyfiles_dir()
-        await self.path_service.ensure_directory(keyfiles_dir)
-
-        safe_filename = create_secure_filename(
-            repository_name, keyfile.filename or "keyfile", add_uuid=True
-        )
-        keyfile_path = self.path_service.secure_join(keyfiles_dir, safe_filename)
-
-        content = await keyfile.read()
-        await self.file_service.write_file(keyfile_path, content)
-
-        logger.info(
-            f"Saved keyfile for repository '{repository_name}' at {keyfile_path}"
-        )
-
-        return {"success": True, "path": keyfile_path}
-
     async def check_repository_lock_status(
         self, repository: Repository
     ) -> Dict[str, Any]:
         """Check if a repository is currently locked by attempting a quick borg list operation."""
         try:
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg config",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=10.0,
-                )
+            )
 
-                if result.success:
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=10.0,
+            )
+
+            if result.success:
+                return {
+                    "locked": False,
+                    "accessible": True,
+                    "message": "Repository is accessible",
+                }
+            else:
+                stderr_text = result.stderr
+                if (
+                    "Failed to create/acquire the lock" in stderr_text
+                    or "LockTimeout" in stderr_text
+                ):
                     return {
-                        "locked": False,
-                        "accessible": True,
-                        "message": "Repository is accessible",
+                        "locked": True,
+                        "accessible": False,
+                        "message": "Repository is locked by another process",
+                        "error": stderr_text,
+                    }
+                elif "Command timed out" in stderr_text:
+                    return {
+                        "locked": True,
+                        "accessible": False,
+                        "message": "Repository check timed out (possibly locked)",
                     }
                 else:
-                    stderr_text = result.stderr
-                    if (
-                        "Failed to create/acquire the lock" in stderr_text
-                        or "LockTimeout" in stderr_text
-                    ):
-                        return {
-                            "locked": True,
-                            "accessible": False,
-                            "message": "Repository is locked by another process",
-                            "error": stderr_text,
-                        }
-                    elif "Command timed out" in stderr_text:
-                        return {
-                            "locked": True,
-                            "accessible": False,
-                            "message": "Repository check timed out (possibly locked)",
-                        }
-                    else:
-                        return {
-                            "locked": False,
-                            "accessible": False,
-                            "message": f"Repository access failed: {stderr_text}",
-                            "error": stderr_text,
-                        }
+                    return {
+                        "locked": False,
+                        "accessible": False,
+                        "message": f"Repository access failed: {stderr_text}",
+                        "error": stderr_text,
+                    }
 
         except Exception as e:
             logger.error(f"Error checking repository lock status: {e}")
@@ -644,47 +690,44 @@ class RepositoryService:
         try:
             logger.info(f"Attempting to break lock on repository: {repository.name}")
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg break-lock",
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=[],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
 
-                if result.success:
-                    logger.info(
-                        f"Successfully broke lock on repository: {repository.name}"
+            if result.success:
+                logger.info(f"Successfully broke lock on repository: {repository.name}")
+                return {
+                    "success": True,
+                    "message": "Repository lock successfully removed",
+                }
+            else:
+                stderr_text = result.stderr or "No error details"
+                if "Command timed out" in stderr_text:
+                    logger.warning(
+                        f"Break-lock timed out for repository: {repository.name}"
                     )
                     return {
-                        "success": True,
-                        "message": "Repository lock successfully removed",
+                        "success": False,
+                        "message": "Break-lock operation timed out",
                     }
                 else:
-                    stderr_text = result.stderr or "No error details"
-                    if "Command timed out" in stderr_text:
-                        logger.warning(
-                            f"Break-lock timed out for repository: {repository.name}"
-                        )
-                        return {
-                            "success": False,
-                            "message": "Break-lock operation timed out",
-                        }
-                    else:
-                        logger.warning(
-                            f"Break-lock returned {result.return_code} for {repository.name}: {stderr_text}"
-                        )
-                        return {
-                            "success": False,
-                            "message": f"Failed to break lock: {stderr_text}",
-                            "error": stderr_text,
-                        }
+                    logger.warning(
+                        f"Break-lock returned {result.return_code} for {repository.name}: {stderr_text}"
+                    )
+                    return {
+                        "success": False,
+                        "message": f"Failed to break lock: {stderr_text}",
+                        "error": stderr_text,
+                    }
 
         except Exception as e:
             logger.error(f"Error breaking lock for repository {repository.name}: {e}")
@@ -727,89 +770,85 @@ class RepositoryService:
     async def _get_borg_info(self, repository: Repository) -> Dict[str, Any]:
         """Get repository information using borg info command."""
         try:
-            async with secure_borg_command(
-                base_command="borg info",
+            borg_command = create_borg_command(
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
+                base_command="borg info",
                 additional_args=["--json"],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
 
-                if result.success:
-                    import json
+            if result.success:
+                import json
 
-                    info_data = json.loads(result.stdout)
+                info_data = json.loads(result.stdout)
 
-                    # Extract relevant information
-                    info_result = {
-                        "success": True,
-                        "repository_id": info_data.get("repository", {}).get("id"),
-                        "location": info_data.get("repository", {}).get("location"),
-                        "encryption": info_data.get("encryption"),
-                        "cache": info_data.get("cache"),
-                        "security_dir": info_data.get("security_dir"),
-                    }
+                # Extract relevant information
+                info_result = {
+                    "success": True,
+                    "repository_id": info_data.get("repository", {}).get("id"),
+                    "location": info_data.get("repository", {}).get("location"),
+                    "encryption": info_data.get("encryption"),
+                    "keyfile": info_data.get("key file"),
+                    "cache": info_data.get("cache"),
+                    "security_dir": info_data.get("security_dir"),
+                }
 
-                    # Add archive statistics if available
-                    archives = info_data.get("archives", [])
+                # Add archive statistics if available
+                archives = info_data.get("archives", [])
+                if archives:
+                    info_result["archives_count"] = len(archives)
+
+                    # Calculate totals
+                    total_original = sum(
+                        archive.get("stats", {}).get("original_size", 0)
+                        for archive in archives
+                    )
+                    total_compressed = sum(
+                        archive.get("stats", {}).get("compressed_size", 0)
+                        for archive in archives
+                    )
+                    total_deduplicated = sum(
+                        archive.get("stats", {}).get("deduplicated_size", 0)
+                        for archive in archives
+                    )
+
+                    # Format sizes
+                    info_result["original_size"] = self._format_bytes(total_original)
+                    info_result["compressed_size"] = self._format_bytes(
+                        total_compressed
+                    )
+                    info_result["deduplicated_size"] = self._format_bytes(
+                        total_deduplicated
+                    )
+
+                    # Get last modified from most recent archive
                     if archives:
-                        info_result["archives_count"] = len(archives)
-
-                        # Calculate totals
-                        total_original = sum(
-                            archive.get("stats", {}).get("original_size", 0)
-                            for archive in archives
-                        )
-                        total_compressed = sum(
-                            archive.get("stats", {}).get("compressed_size", 0)
-                            for archive in archives
-                        )
-                        total_deduplicated = sum(
-                            archive.get("stats", {}).get("deduplicated_size", 0)
-                            for archive in archives
+                        latest_archive = max(archives, key=lambda a: a.get("start", ""))
+                        info_result["last_modified"] = latest_archive.get(
+                            "start", "Unknown"
                         )
 
-                        # Format sizes
-                        info_result["original_size"] = self._format_bytes(
-                            total_original
-                        )
-                        info_result["compressed_size"] = self._format_bytes(
-                            total_compressed
-                        )
-                        info_result["deduplicated_size"] = self._format_bytes(
-                            total_deduplicated
-                        )
-
-                        # Get last modified from most recent archive
-                        if archives:
-                            latest_archive = max(
-                                archives, key=lambda a: a.get("start", "")
-                            )
-                            info_result["last_modified"] = latest_archive.get(
-                                "start", "Unknown"
-                            )
-
-                    return info_result
+                return info_result
+            else:
+                stderr_text = result.stderr or "Unknown error"
+                if "Command timed out" in stderr_text:
+                    return {
+                        "success": False,
+                        "error": True,
+                        "error_message": "Repository info command timed out",
+                    }
                 else:
-                    stderr_text = result.stderr or "Unknown error"
-                    if "Command timed out" in stderr_text:
-                        return {
-                            "success": False,
-                            "error": True,
-                            "error_message": "Repository info command timed out",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error": True,
-                            "error_message": f"Failed to get repository info: {stderr_text}",
-                        }
+                    return {
+                        "success": False,
+                        "error": True,
+                        "error_message": f"Failed to get repository info: {stderr_text}",
+                    }
 
         except Exception as e:
             logger.error(f"Error getting borg info for {repository.name}: {e}")
@@ -822,44 +861,44 @@ class RepositoryService:
     async def _get_borg_config(self, repository: Repository) -> Dict[str, Any]:
         """Get repository configuration using borg config --list command."""
         try:
-            async with secure_borg_command(
-                base_command="borg config",
+            borg_command = create_borg_command(
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
+                base_command="borg config",
                 additional_args=["--list"],
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
 
-                if result.success:
-                    config_output = result.stdout.strip()
-                    config_dict = {}
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
 
-                    # Parse the config output (format: key = value)
-                    for line in config_output.split("\n"):
-                        line = line.strip()
-                        if line and "=" in line:
-                            key, value = line.split("=", 1)
-                            config_dict[key.strip()] = value.strip()
+            if result.success:
+                config_output = result.stdout.strip()
+                config_dict = {}
 
-                    return {"success": True, "config": config_dict}
+                # Parse the config output (format: key = value)
+                for line in config_output.split("\n"):
+                    line = line.strip()
+                    if line and "=" in line:
+                        key, value = line.split("=", 1)
+                        config_dict[key.strip()] = value.strip()
+
+                return {"success": True, "config": config_dict}
+            else:
+                stderr_text = result.stderr or "Unknown error"
+                if "Command timed out" in stderr_text:
+                    return {
+                        "success": False,
+                        "error_message": "Repository config command timed out",
+                    }
                 else:
-                    stderr_text = result.stderr or "Unknown error"
-                    if "Command timed out" in stderr_text:
-                        return {
-                            "success": False,
-                            "error_message": "Repository config command timed out",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error_message": f"Failed to get repository config: {stderr_text}",
-                        }
+                    return {
+                        "success": False,
+                        "error_message": f"Failed to get repository config: {stderr_text}",
+                    }
 
         except Exception as e:
             logger.error(f"Error getting borg config for {repository.name}: {e}")
@@ -871,39 +910,38 @@ class RepositoryService:
     async def export_repository_key(self, repository: Repository) -> Dict[str, Any]:
         """Export repository key using borg key export command."""
         try:
-            async with secure_borg_command(
-                base_command="borg key export",
+            borg_command = create_borg_command(
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
-                additional_args=[],
+                base_command="borg key export",
                 environment_overrides=_build_repository_env_overrides(repository),
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                    timeout=30.0,
-                )
+            )
 
-                if result.success:
-                    key_data = result.stdout.strip()
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=30.0,
+            )
+
+            if result.success:
+                key_data = result.stdout.strip()
+                return {
+                    "success": True,
+                    "key_data": key_data,
+                    "filename": f"{repository.name}_key.txt",
+                }
+            else:
+                stderr_text = result.stderr or "Unknown error"
+                if "Command timed out" in stderr_text:
                     return {
-                        "success": True,
-                        "key_data": key_data,
-                        "filename": f"{repository.name}_key.txt",
+                        "success": False,
+                        "error_message": "Key export command timed out",
                     }
                 else:
-                    stderr_text = result.stderr or "Unknown error"
-                    if "Command timed out" in stderr_text:
-                        return {
-                            "success": False,
-                            "error_message": "Key export command timed out",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "error_message": f"Failed to export repository key: {stderr_text}",
-                        }
+                    return {
+                        "success": False,
+                        "error_message": f"Failed to export repository key: {stderr_text}",
+                    }
 
         except Exception as e:
             logger.error(f"Error exporting key for repository {repository.name}: {e}")
@@ -925,6 +963,15 @@ class RepositoryService:
             value /= 1024.0
         return f"{value:.1f} PB"
 
+    async def get_repository_by_id(
+        self, repository_id: int, db: AsyncSession
+    ) -> Repository | None:
+        """Get a repository by its ID from the database."""
+        result = await db.execute(
+            select(Repository).where(Repository.id == repository_id)
+        )
+        return result.scalar_one_or_none()
+
     async def list_directories_for_autocomplete(
         self, path: str, search_term: str = "", include_files: bool = False
     ) -> List[DirectoryInfo]:
@@ -940,30 +987,16 @@ class RepositoryService:
             List of DirectoryInfo objects matching the criteria
         """
         try:
-            directories = []
+            directories: List[DirectoryInfo] = []
 
-            # Use special handling for Windows/WSL environments
-            if self.path_service.get_platform_name() == "windows":
-                # Special handling for root directory - show /mnt directory where Windows drives are mounted
-                if path == "/" or path == "":
-                    # Instead of showing Unix root, show /mnt where Windows drives are mounted
-                    directories = await self.path_service.list_directory(
-                        "/mnt", include_files=include_files
-                    )
-                else:
-                    directories = await self.path_service.list_directory(
-                        path, include_files=include_files
-                    )
+            if not self.path_service.path_exists(path):
+                directories = []
+            elif not self.path_service.is_directory(path):
+                directories = []
             else:
-                # Fallback to legacy functions for non-WSL
-                if not secure_exists(path):
-                    directories = []
-                elif not secure_isdir(path):
-                    directories = []
-                else:
-                    directories = get_directory_listing(
-                        path, self.file_service, include_files=include_files
-                    )
+                directories = await self.path_service.list_directory(
+                    path, include_files=include_files
+                )
 
             # Filter directories based on search term
             if search_term:

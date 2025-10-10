@@ -112,12 +112,9 @@ class TestDependencies:
 
     def test_get_configuration_service(self) -> None:
         """Test ConfigurationService dependency provider."""
-        # Create a mock database session
-        mock_db = Mock()
-        config_service = get_configuration_service(mock_db)
+        config_service = get_configuration_service()
 
         assert isinstance(config_service, ConfigurationService)
-        assert config_service.db is mock_db
 
     def test_get_registry_factory(self) -> None:
         """Test RegistryFactory dependency provider."""

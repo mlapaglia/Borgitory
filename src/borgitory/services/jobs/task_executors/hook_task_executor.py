@@ -23,10 +23,12 @@ class HookTaskExecutor:
         job_executor: ProcessExecutorProtocol,
         output_manager: JobOutputManagerProtocol,
         event_broadcaster: JobEventBroadcasterProtocol,
+        hook_execution_service: Optional[Any] = None,
     ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
+        self.hook_execution_service = hook_execution_service
 
     async def execute_hook_task(
         self,
@@ -153,5 +155,4 @@ class HookTaskExecutor:
 
     async def _get_hook_execution_service(self) -> Optional[Any]:
         """Get hook execution service - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None
+        return self.hook_execution_service

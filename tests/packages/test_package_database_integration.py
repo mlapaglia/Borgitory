@@ -5,7 +5,8 @@ Tests for PackageManagerService database integration and startup restoration
 import pytest
 from typing import Any, Dict, List, Optional, Generator
 from unittest.mock import AsyncMock, Mock
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.services.startup.package_restoration_service import (
@@ -61,20 +62,19 @@ def mock_command_runner() -> MockCommandRunner:
 
 @pytest.fixture
 def package_service_with_db(
-    mock_command_runner: MockCommandRunner, db_session: Session
+    mock_command_runner: MockCommandRunner,
 ) -> PackageManagerService:
     return PackageManagerService(
-        command_runner=mock_command_runner, db_session=db_session
+        command_runner=mock_command_runner,
     )
 
 
-@pytest.mark.asyncio
 class TestPackageManagerDatabaseIntegration:
     async def test_install_package_saves_to_database(
         self,
         package_service_with_db: PackageManagerService,
         mock_command_runner: MockCommandRunner,
-        db_session: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test that installing a package saves it to the database"""
         # Mock successful installation
@@ -110,17 +110,20 @@ class TestPackageManagerDatabaseIntegration:
         ]
 
         # Install package
-        success, message = await package_service_with_db.install_packages(["curl"])
+        success, message = await package_service_with_db.install_packages(
+            session=test_db, packages=["curl"]
+        )
 
         assert success is True
         assert "Successfully installed: curl" in message
 
-        # Check database record was created
-        package_record = (
-            db_session.query(UserInstalledPackage)
-            .filter(UserInstalledPackage.package_name == "curl")
-            .first()
+        # Check database record was created using SQLAlchemy 2.0 syntax
+        result = await test_db.execute(
+            select(UserInstalledPackage).where(
+                UserInstalledPackage.package_name == "curl"
+            )
         )
+        package_record = result.scalar_one_or_none()
 
         assert package_record is not None
         assert package_record.package_name == "curl"
@@ -132,7 +135,7 @@ class TestPackageManagerDatabaseIntegration:
         self,
         package_service_with_db: PackageManagerService,
         mock_command_runner: MockCommandRunner,
-        db_session: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test that removing a package removes it from the database"""
         # First create a package record in database
@@ -141,8 +144,8 @@ class TestPackageManagerDatabaseIntegration:
         package_record.version = "7.81.0-1ubuntu1.15"
         package_record.installed_at = now_utc()
         package_record.install_command = "apt-get install curl"
-        db_session.add(package_record)
-        db_session.commit()
+        test_db.add(package_record)
+        await test_db.commit()
 
         # Mock successful removal
         mock_command_runner._run_command_mock.return_value = CommandResult(
@@ -154,22 +157,25 @@ class TestPackageManagerDatabaseIntegration:
         )
 
         # Remove package
-        success, message = await package_service_with_db.remove_packages(["curl"])
+        success, message = await package_service_with_db.remove_packages(
+            session=test_db, packages=["curl"]
+        )
 
         assert success is True
         assert "Successfully removed: curl" in message
 
-        # Check database record was removed
-        remaining_record = (
-            db_session.query(UserInstalledPackage)
-            .filter(UserInstalledPackage.package_name == "curl")
-            .first()
+        # Check database record was removed using SQLAlchemy 2.0 syntax
+        result = await test_db.execute(
+            select(UserInstalledPackage).where(
+                UserInstalledPackage.package_name == "curl"
+            )
         )
+        remaining_record = result.scalar_one_or_none()
 
         assert remaining_record is None
 
     async def test_get_user_installed_packages(
-        self, package_service_with_db: PackageManagerService, db_session: Session
+        self, package_service_with_db: PackageManagerService, test_db: AsyncSession
     ) -> None:
         """Test getting user-installed packages from database"""
         # Create test package records
@@ -188,11 +194,13 @@ class TestPackageManagerDatabaseIntegration:
         packages = [package1, package2]
 
         for pkg in packages:
-            db_session.add(pkg)
-        db_session.commit()
+            test_db.add(pkg)
+        await test_db.commit()
 
         # Get user packages
-        user_packages = package_service_with_db.get_user_installed_packages()
+        user_packages = await package_service_with_db.get_user_installed_packages(
+            session=test_db
+        )
 
         assert len(user_packages) == 2
         package_names = [pkg.package_name for pkg in user_packages]
@@ -203,7 +211,7 @@ class TestPackageManagerDatabaseIntegration:
         self,
         package_service_with_db: PackageManagerService,
         mock_command_runner: MockCommandRunner,
-        db_session: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test ensure_user_packages_installed when all packages are already installed"""
         # Create package record in database
@@ -212,8 +220,8 @@ class TestPackageManagerDatabaseIntegration:
         package_record.version = "7.81.0-1ubuntu1.15"
         package_record.installed_at = now_utc()
         package_record.install_command = "apt-get install curl"
-        db_session.add(package_record)
-        db_session.commit()
+        test_db.add(package_record)
+        await test_db.commit()
 
         # Mock package info showing it's installed
         mock_command_runner._run_command_mock.side_effect = [
@@ -236,7 +244,9 @@ class TestPackageManagerDatabaseIntegration:
         (
             success,
             message,
-        ) = await package_service_with_db.ensure_user_packages_installed()
+        ) = await package_service_with_db.ensure_user_packages_installed(
+            session=test_db
+        )
 
         assert success is True
         assert "already installed" in message.lower()
@@ -248,7 +258,7 @@ class TestPackageManagerDatabaseIntegration:
         self,
         package_service_with_db: PackageManagerService,
         mock_command_runner: MockCommandRunner,
-        db_session: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test ensure_user_packages_installed when packages need to be reinstalled"""
         # Create package record in database
@@ -257,8 +267,8 @@ class TestPackageManagerDatabaseIntegration:
         package_record.version = "7.81.0-1ubuntu1.15"
         package_record.installed_at = now_utc()
         package_record.install_command = "apt-get install curl"
-        db_session.add(package_record)
-        db_session.commit()
+        test_db.add(package_record)
+        await test_db.commit()
 
         # Mock package info showing it's NOT installed, then successful reinstall
         mock_command_runner._run_command_mock.side_effect = [
@@ -308,7 +318,9 @@ class TestPackageManagerDatabaseIntegration:
         (
             success,
             message,
-        ) = await package_service_with_db.ensure_user_packages_installed()
+        ) = await package_service_with_db.ensure_user_packages_installed(
+            session=test_db
+        )
 
         assert success is True
         assert "Restored 1 packages: curl" in message
@@ -317,20 +329,19 @@ class TestPackageManagerDatabaseIntegration:
         assert mock_command_runner._run_command_mock.call_count == 6
 
 
-@pytest.mark.asyncio
 class TestPackageRestorationService:
-    async def test_restore_user_packages_success(self, in_memory_db: Any) -> None:
+    async def test_restore_user_packages_success(
+        self, in_memory_db: Any, test_db: AsyncSession
+    ) -> None:
         """Test successful package restoration on startup"""
-        db_session = in_memory_db()
-
         # Create package record in database
         package_record = UserInstalledPackage()
         package_record.package_name = "curl"
         package_record.version = "7.81.0-1ubuntu1.15"
         package_record.installed_at = now_utc()
         package_record.install_command = "apt-get install curl"
-        db_session.add(package_record)
-        db_session.commit()
+        test_db.add(package_record)
+        await test_db.commit()
 
         # Create mock package manager
         mock_package_manager = Mock(spec=PackageManagerService)
@@ -344,17 +355,17 @@ class TestPackageRestorationService:
         )
 
         # Test restoration
-        await restoration_service.restore_user_packages()
+        await restoration_service.restore_user_packages(session=test_db)
 
         # Verify the method was called
         mock_package_manager.ensure_user_packages_installed.assert_called_once()
 
-        db_session.close()
+        await test_db.close()
 
-    async def test_restore_user_packages_failure(self, in_memory_db: Any) -> None:
+    async def test_restore_user_packages_failure(
+        self, in_memory_db: Any, test_db: AsyncSession
+    ) -> None:
         """Test package restoration failure handling"""
-        db_session = in_memory_db()
-
         # Create mock package manager that fails
         mock_package_manager = Mock(spec=PackageManagerService)
         mock_package_manager.ensure_user_packages_installed = AsyncMock(
@@ -367,9 +378,9 @@ class TestPackageRestorationService:
         )
 
         # Test restoration (should not raise exception)
-        await restoration_service.restore_user_packages()
+        await restoration_service.restore_user_packages(session=test_db)
 
         # Verify the method was called
         mock_package_manager.ensure_user_packages_installed.assert_called_once()
 
-        db_session.close()
+        await test_db.close()

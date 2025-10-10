@@ -1,18 +1,13 @@
 """Tests for schedule validation business logic in ScheduleService."""
 
 import pytest
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import AsyncMock
 
 from borgitory.services.scheduling.schedule_service import ScheduleService
 
 
 class TestScheduleValidationService:
     """Test suite for schedule validation business logic."""
-
-    @pytest.fixture
-    def mock_db(self) -> Mock:
-        """Create a mock database session."""
-        return Mock()
 
     @pytest.fixture
     def mock_scheduler_service(self) -> AsyncMock:
@@ -24,11 +19,9 @@ class TestScheduleValidationService:
         return mock
 
     @pytest.fixture
-    def schedule_service(
-        self, mock_db: Mock, mock_scheduler_service: AsyncMock
-    ) -> ScheduleService:
+    def schedule_service(self, mock_scheduler_service: AsyncMock) -> ScheduleService:
         """Create a ScheduleService instance with mocked dependencies."""
-        return ScheduleService(mock_db, mock_scheduler_service)
+        return ScheduleService(mock_scheduler_service)
 
     def test_validate_schedule_creation_data_valid_input(
         self, schedule_service: ScheduleService

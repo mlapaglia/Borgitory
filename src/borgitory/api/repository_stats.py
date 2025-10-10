@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from borgitory.api.cancel_on_disconnect import with_cancel_on_disconnect
-from borgitory.models.database import get_db, Repository
+from borgitory.models.database import Repository
+from borgitory.dependencies import get_db
 from borgitory.dependencies import RepositoryStatsServiceDep, get_templates
 from borgitory.services.repositories.repository_stats_service import RepositoryStats
 
@@ -14,10 +16,11 @@ templates = get_templates()
 
 @router.get("/stats/selector")
 async def get_stats_repository_selector(
-    request: Request, db: Session = Depends(get_db)
+    request: Request, db: AsyncSession = Depends(get_db)
 ) -> HTMLResponse:
     """Get repository selector with repositories populated for statistics"""
-    repositories = db.query(Repository).all()
+    results = await db.execute(select(Repository))
+    repositories = results.scalars().all()
 
     return templates.TemplateResponse(
         request,
@@ -40,11 +43,12 @@ async def get_stats_loading(request: Request, repository_id: int = 0) -> HTMLRes
 async def get_repository_statistics(
     repository_id: int,
     stats_svc: RepositoryStatsServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> RepositoryStats:
     """Get comprehensive repository statistics"""
 
-    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -67,15 +71,15 @@ async def get_repository_statistics_html(
     repository_id: int,
     request: Request,
     stats_svc: RepositoryStatsServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get repository statistics as HTML partial with cancellation support"""
-    repository = db.query(Repository).filter(Repository.id == repository_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
     try:
-        # Generate statistics (no timeout for now)
         stats = await stats_svc.get_repository_statistics(repository, db)
 
         return templates.TemplateResponse(
@@ -84,13 +88,11 @@ async def get_repository_statistics_html(
             {"repository": repository, "stats": stats},
         )
     except ValueError as e:
-        # Handle validation errors (e.g., no archives found)
         return HTMLResponse(
             content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{str(e)}</p>",
             status_code=400,
         )
     except Exception:
-        # Handle other errors - log exception for diagnostics, return only generic info to user
         logging.exception(
             "Exception occurred while generating repository statistics HTML (repository_id=%s)",
             repository_id,

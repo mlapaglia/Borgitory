@@ -1,13 +1,14 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.models.schemas import (
     RepositoryCheckConfigCreate,
     RepositoryCheckConfigUpdate,
 )
 from borgitory.models.database import RepositoryCheckConfig
 
-from borgitory.dependencies import TemplatesDep, RepositoryCheckConfigServiceDep
+from borgitory.dependencies import TemplatesDep, RepositoryCheckConfigServiceDep, get_db
 
 router = APIRouter()
 
@@ -18,9 +19,11 @@ async def create_repository_check_config(
     config: RepositoryCheckConfigCreate,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Create a new repository check configuration"""
-    success, created_config, error_msg = service.create_config(
+    success, created_config, error_msg = await service.create_config(
+        db=db,
         name=config.name,
         description=config.description,
         check_type=config.check_type,
@@ -52,11 +55,12 @@ async def create_repository_check_config(
 
 
 @router.get("/", response_class=HTMLResponse, response_model=None)
-def get_repository_check_configs(
+async def get_repository_check_configs(
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> List[RepositoryCheckConfig]:
     """Get all repository check configurations"""
-    return service.get_all_configs()
+    return await service.get_all_configs(db)
 
 
 @router.get("/form", response_class=HTMLResponse)
@@ -64,9 +68,10 @@ async def get_repository_check_form(
     request: Request,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get repository check form with all dropdowns populated"""
-    form_data = service.get_form_data()
+    form_data = await service.get_form_data(db)
 
     return templates.TemplateResponse(
         request,
@@ -79,6 +84,7 @@ async def get_repository_check_form(
 async def get_policy_form(
     request: Request,
     templates: TemplatesDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get policy creation form"""
     return templates.TemplateResponse(
@@ -89,14 +95,15 @@ async def get_policy_form(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_repository_check_configs_html(
+async def get_repository_check_configs_html(
     request: Request,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get repository check configurations as HTML"""
     try:
-        configs = service.get_all_configs()
+        configs = await service.get_all_configs(db)
         return templates.TemplateResponse(
             request,
             "partials/repository_check/config_list_content.html",
@@ -113,7 +120,7 @@ def get_repository_check_configs_html(
 
 
 @router.get("/toggle-custom-options", response_class=HTMLResponse)
-def toggle_custom_options(
+async def toggle_custom_options(
     request: Request,
     templates: TemplatesDep,
     check_config_id: str = "",
@@ -132,7 +139,7 @@ def toggle_custom_options(
 
 
 @router.get("/update-options", response_class=HTMLResponse)
-def update_check_options(
+async def update_check_options(
     request: Request,
     templates: TemplatesDep,
     check_type: str = "full",
@@ -173,11 +180,13 @@ def update_check_options(
 
 
 @router.get("/{config_id}", response_class=HTMLResponse, response_model=None)
-def get_repository_check_config(
-    config_id: int, service: RepositoryCheckConfigServiceDep
+async def get_repository_check_config(
+    config_id: int,
+    service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> RepositoryCheckConfig:
     """Get a specific repository check configuration"""
-    config = service.get_config_by_id(config_id)
+    config = await service.get_config_by_id(db, config_id)
     if not config:
         raise HTTPException(status_code=404, detail="Check policy not found")
     return config
@@ -189,10 +198,11 @@ async def get_repository_check_config_edit_form(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get edit form for a specific repository check configuration"""
     try:
-        config = service.get_config_by_id(config_id)
+        config = await service.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Check policy not found")
 
@@ -215,10 +225,13 @@ async def update_repository_check_config(
     update_data: RepositoryCheckConfigUpdate,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Update a repository check configuration"""
     update_dict = update_data.model_dump(exclude_unset=True)
-    success, updated_config, error_msg = service.update_config(config_id, update_dict)
+    success, updated_config, error_msg = await service.update_config(
+        db, config_id, update_dict
+    )
 
     if not success or not updated_config:
         return templates.TemplateResponse(
@@ -238,14 +251,17 @@ async def update_repository_check_config(
 
 
 @router.patch("/{config_id}", response_class=HTMLResponse, response_model=None)
-def patch_repository_check_config(
+async def patch_repository_check_config(
     config_id: int,
     update_data: RepositoryCheckConfigUpdate,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> RepositoryCheckConfig:
     """Update a repository check configuration (PATCH method for backwards compatibility)"""
     update_dict = update_data.model_dump(exclude_unset=True)
-    success, updated_config, error_msg = service.update_config(config_id, update_dict)
+    success, updated_config, error_msg = await service.update_config(
+        db, config_id, update_dict
+    )
 
     if not success:
         if error_msg and "not found" in error_msg:
@@ -267,9 +283,10 @@ async def enable_repository_check_config(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Enable a repository check configuration"""
-    success, success_msg, error_msg = service.enable_config(config_id)
+    success, success_msg, error_msg = await service.enable_config(db, config_id)
 
     if not success:
         return templates.TemplateResponse(
@@ -294,9 +311,10 @@ async def disable_repository_check_config(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Disable a repository check configuration"""
-    success, success_msg, error_msg = service.disable_config(config_id)
+    success, success_msg, error_msg = await service.disable_config(db, config_id)
 
     if not success:
         return templates.TemplateResponse(
@@ -321,9 +339,10 @@ async def delete_repository_check_config(
     config_id: int,
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Delete a repository check configuration"""
-    success, config_name, error_msg = service.delete_config(config_id)
+    success, config_name, error_msg = await service.delete_config(db, config_id)
 
     if not success:
         return templates.TemplateResponse(

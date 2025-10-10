@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import _TemplateResponse
-from sqlalchemy.orm import Session
 from typing import cast, List, Dict, Any, Optional
 import json
 
-from borgitory.models.database import get_db
 from borgitory.models.schemas import (
     ScheduleCreate,
     ScheduleUpdate,
@@ -16,6 +15,7 @@ from borgitory.dependencies import (
     ScheduleServiceDep,
     ConfigurationServiceDep,
     UpcomingBackupsServiceDep,
+    get_db,
 )
 from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.models.patterns import BackupPattern, PatternType, PatternStyle
@@ -37,10 +37,10 @@ async def get_schedules_form(
     request: Request,
     templates: TemplatesDep,
     config_service: ConfigurationServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get schedules form with all dropdowns populated"""
-    form_data = config_service.get_schedule_form_data()
+    form_data = await config_service.get_schedule_form_data(db)
 
     return templates.TemplateResponse(
         request,
@@ -54,6 +54,7 @@ async def create_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     try:
         json_data = await request.json()
@@ -84,6 +85,7 @@ async def create_schedule(
         )
 
     result = await schedule_service.create_schedule(
+        db,
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
@@ -113,15 +115,16 @@ async def create_schedule(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_schedules_html(
+async def get_schedules_html(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
 ) -> _TemplateResponse:
     """Get schedules as formatted HTML"""
-    schedules = schedule_service.get_schedules(skip=skip, limit=limit)
+    schedules = await schedule_service.get_schedules(db, skip=skip, limit=limit)
 
     return templates.TemplateResponse(
         request,
@@ -176,14 +179,15 @@ async def get_cron_expression_form(
 
 
 @router.get("/", response_class=HTMLResponse)
-def list_schedules(
+async def list_schedules(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     skip: int = 0,
     limit: int = 100,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
-    schedules = schedule_service.get_schedules(skip=skip, limit=limit)
+    schedules = await schedule_service.get_schedules(db, skip=skip, limit=limit)
     return templates.TemplateResponse(
         request,
         "partials/schedules/schedule_list_content.html",
@@ -192,13 +196,14 @@ def list_schedules(
 
 
 @router.get("/{schedule_id}", response_class=HTMLResponse)
-def get_schedule(
+async def get_schedule(
     schedule_id: int,
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
-    schedule = schedule_service.get_schedule_by_id(schedule_id)
+    schedule = await schedule_service.get_schedule_by_id(schedule_id, db)
     if schedule is None:
         return templates.TemplateResponse(
             request,
@@ -218,15 +223,15 @@ async def get_schedule_edit_form(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     config_service: ConfigurationServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get edit form for a specific schedule"""
     try:
-        schedule = schedule_service.get_schedule_by_id(schedule_id)
+        schedule = await schedule_service.get_schedule_by_id(schedule_id, db)
         if schedule is None:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
-        form_data = config_service.get_schedule_form_data()
+        form_data = await config_service.get_schedule_form_data(db)
         context = {**form_data, "schedule": schedule, "is_edit_mode": True}
 
         return templates.TemplateResponse(
@@ -242,6 +247,7 @@ async def update_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Update a schedule"""
     try:
@@ -263,7 +269,7 @@ async def update_schedule(
             {"error_message": f"Invalid form data: {str(e)}"},
         )
 
-    result = await schedule_service.update_schedule(schedule_id, update_data)
+    result = await schedule_service.update_schedule(schedule_id, db, update_data)
 
     if result.is_error or not result.schedule:
         return templates.TemplateResponse(
@@ -290,8 +296,9 @@ async def toggle_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    result = await schedule_service.toggle_schedule(schedule_id)
+    result = await schedule_service.toggle_schedule(schedule_id, db)
 
     if result.is_error:
         return templates.TemplateResponse(
@@ -303,7 +310,7 @@ async def toggle_schedule(
             else 500,
         )
 
-    schedules = schedule_service.get_all_schedules()
+    schedules = await schedule_service.get_all_schedules(db)
     return templates.TemplateResponse(
         request,
         "partials/schedules/schedule_list_content.html",
@@ -317,8 +324,9 @@ async def delete_schedule(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    result = await schedule_service.delete_schedule(schedule_id)
+    result = await schedule_service.delete_schedule(schedule_id, db)
 
     if not result.success:
         return templates.TemplateResponse(
@@ -345,9 +353,10 @@ async def run_schedule_manually(
     request: Request,
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Run a schedule manually"""
-    result = await schedule_service.run_schedule_manually(schedule_id)
+    result = await schedule_service.run_schedule_manually(schedule_id, db)
 
     if result.is_error:
         return templates.TemplateResponse(
@@ -360,7 +369,7 @@ async def run_schedule_manually(
         )
 
     # Get the schedule name for the success message
-    schedule = schedule_service.get_schedule_by_id(schedule_id)
+    schedule = await schedule_service.get_schedule_by_id(schedule_id, db)
     schedule_name = schedule.name if schedule else "Unknown"
 
     return templates.TemplateResponse(

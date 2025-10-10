@@ -3,7 +3,8 @@ Notification Task Executor - Handles notification task execution
 """
 
 import logging
-from typing import Optional, Any, Tuple
+from typing import Tuple
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
@@ -11,6 +12,7 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
+from borgitory.services.notifications.service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +25,14 @@ class NotificationTaskExecutor:
         job_executor: ProcessExecutorProtocol,
         output_manager: JobOutputManagerProtocol,
         event_broadcaster: JobEventBroadcasterProtocol,
+        session_maker: async_sessionmaker[AsyncSession],
+        notification_service: NotificationService,
     ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
+        self.session_maker = session_maker
+        self.notification_service = notification_service
 
     async def execute_notification_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -47,16 +53,7 @@ class NotificationTaskExecutor:
             return False
 
         try:
-            # Get database session factory from dependencies
-            db_session_factory = await self._get_db_session_factory()
-            if not db_session_factory:
-                logger.error("Database session factory not available")
-                task.status = TaskStatusEnum.FAILED
-                task.return_code = 1
-                task.error = "Database session factory not available"
-                return False
-
-            with db_session_factory() as db:
+            async with self.session_maker() as db:
                 from borgitory.models.database import NotificationConfig
                 from borgitory.models.database import Repository
                 from borgitory.services.notifications.types import (
@@ -65,12 +62,14 @@ class NotificationTaskExecutor:
                     NotificationPriority,
                     NotificationConfig as NotificationConfigType,
                 )
+                from sqlalchemy import select
 
-                config = (
-                    db.query(NotificationConfig)
-                    .filter(NotificationConfig.id == notification_config_id)
-                    .first()
+                result = await db.execute(
+                    select(NotificationConfig).where(
+                        NotificationConfig.id == notification_config_id
+                    )
                 )
+                config = result.scalar_one_or_none()
 
                 if not config:
                     logger.info("Notification configuration not found - skipping")
@@ -84,21 +83,11 @@ class NotificationTaskExecutor:
                     task.return_code = 0
                     return True
 
-                # Get notification service from dependencies
-                notification_service = await self._get_notification_service()
-                if not notification_service:
-                    logger.error(
-                        "NotificationService not available - ensure proper DI setup"
-                    )
-                    task.status = TaskStatusEnum.FAILED
-                    task.return_code = 1
-                    task.error = "NotificationService not available"
-                    return False
-
-                # Load and decrypt configuration
                 try:
-                    decrypted_config = notification_service.load_config_from_storage(
-                        config.provider, config.provider_config
+                    decrypted_config = (
+                        self.notification_service.load_config_from_storage(
+                            config.provider, config.provider_config
+                        )
                     )
                 except Exception as e:
                     logger.error(f"Failed to load notification config: {e}")
@@ -115,11 +104,10 @@ class NotificationTaskExecutor:
                     enabled=config.enabled,
                 )
 
-                repository = (
-                    db.query(Repository)
-                    .filter(Repository.id == job.repository_id)
-                    .first()
+                result = await db.execute(
+                    select(Repository).where(Repository.id == job.repository_id)
                 )
+                repository = result.scalar_one_or_none()
 
                 if repository:
                     repository_name = repository.name
@@ -185,17 +173,19 @@ class NotificationTaskExecutor:
                     },
                 )
 
-                result = await notification_service.send_notification(
+                notification_result = await self.notification_service.send_notification(
                     notification_config, notification_message
                 )
 
-                if result.success:
+                if notification_result.success:
                     result_message = "✓ Notification sent successfully"
                     task.output_lines.append(result_message)
-                    if result.message:
-                        task.output_lines.append(f"Response: {result.message}")
+                    if notification_result.message:
+                        task.output_lines.append(
+                            f"Response: {notification_result.message}"
+                        )
                 else:
-                    result_message = f"✗ Failed to send notification: {result.error or result.message}"
+                    result_message = f"✗ Failed to send notification: {notification_result.error or notification_result.message}"
                     task.output_lines.append(result_message)
 
                 self.event_broadcaster.broadcast_event(
@@ -206,14 +196,16 @@ class NotificationTaskExecutor:
 
                 task.status = (
                     TaskStatusEnum.COMPLETED
-                    if result.success
+                    if notification_result.success
                     else TaskStatusEnum.FAILED
                 )
-                task.return_code = 0 if result.success else 1
-                if not result.success:
-                    task.error = result.error or "Failed to send notification"
+                task.return_code = 0 if notification_result.success else 1
+                if not notification_result.success:
+                    task.error = (
+                        notification_result.error or "Failed to send notification"
+                    )
 
-                return bool(result.success)
+                return bool(notification_result.success)
 
         except Exception as e:
             logger.error(f"Error executing notification task: {e}")
@@ -291,13 +283,3 @@ class NotificationTaskExecutor:
                 f"Job ID: {job.id}"
             )
             return title, message, "success", 0
-
-    async def _get_notification_service(self) -> Optional[Any]:
-        """Get notification service - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None
-
-    async def _get_db_session_factory(self) -> Optional[Any]:
-        """Get database session factory - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None

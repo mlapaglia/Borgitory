@@ -12,6 +12,7 @@ class OsFileSystem(FileSystemInterface):
 
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
+        os.path.isfile(path)
 
     def is_dir(self, path: str) -> bool:
         return os.path.isdir(path)

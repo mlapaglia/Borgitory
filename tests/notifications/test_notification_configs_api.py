@@ -3,10 +3,10 @@ Tests for notification API endpoints - HTMX response format testing only
 Business logic tests are in test_notification_config_service.py
 """
 
-import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 from unittest.mock import patch
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.models.database import NotificationConfig
 from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -47,7 +47,6 @@ class TestNotificationConfigsAPIHTMX:
         assert pushover_info.label == "Pushover"
         assert hasattr(pushover_info, "description")
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_pushover(
         self, async_client: AsyncClient
     ) -> None:
@@ -63,7 +62,6 @@ class TestNotificationConfigsAPIHTMX:
         assert len(content) > 0
         assert "user_key" in content  # Should contain pushover-specific fields
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_discord(self, async_client: AsyncClient) -> None:
         """Test getting provider fields for Discord returns HTML."""
         response = await async_client.get(
@@ -76,7 +74,6 @@ class TestNotificationConfigsAPIHTMX:
         content = response.text
         assert len(content) > 0
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_no_provider(
         self, async_client: AsyncClient
     ) -> None:
@@ -86,7 +83,6 @@ class TestNotificationConfigsAPIHTMX:
         assert response.status_code == 200
         assert response.text == ""
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_unknown_provider(
         self, async_client: AsyncClient
     ) -> None:
@@ -99,7 +95,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "text/html" in response.headers["content-type"]
         assert "No template found" in response.text
 
-    @pytest.mark.asyncio
     async def test_create_config_html_response(self, async_client: AsyncClient) -> None:
         """Test config creation returns HTML response."""
         form_data = {
@@ -116,7 +111,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_create_config_validation_error(
         self, async_client: AsyncClient
     ) -> None:
@@ -139,17 +133,16 @@ class TestNotificationConfigsAPIHTMX:
             or "validation" in content.lower()
         )
 
-    @pytest.mark.asyncio
     async def test_enable_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config enable returns HTML response."""
         config = create_pushover_notification_config(
             name="enable-html-test", enabled=False
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.post(f"/api/notifications/{config.id}/enable")
 
@@ -158,17 +151,16 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_disable_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config disable returns HTML response."""
         config = create_pushover_notification_config(
             name="disable-html-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.post(f"/api/notifications/{config.id}/disable")
 
@@ -177,17 +169,16 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_test_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config test returns HTML response."""
         config = create_pushover_notification_config(
             name="test-config-html", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         # Mock the notification service test
         with patch(
@@ -200,17 +191,16 @@ class TestNotificationConfigsAPIHTMX:
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_edit_form_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting edit form returns HTML."""
         config = create_pushover_notification_config(
             name="edit-form-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.get(f"/api/notifications/{config.id}/edit")
 
@@ -221,17 +211,16 @@ class TestNotificationConfigsAPIHTMX:
         assert len(content) > 0
         assert config.name in content
 
-    @pytest.mark.asyncio
     async def test_update_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config update returns HTML response."""
         config = create_pushover_notification_config(
             name="update-html-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         form_data = {
             "name": "updated-name",
@@ -249,17 +238,16 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_delete_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config deletion returns HTML response."""
         config = create_pushover_notification_config(
             name="delete-html-test", enabled=True
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)
+        await test_db.commit()
+        await test_db.refresh(config)
 
         response = await async_client.delete(f"/api/notifications/{config.id}")
 
@@ -268,7 +256,6 @@ class TestNotificationConfigsAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "notificationUpdate"
 
-    @pytest.mark.asyncio
     async def test_get_notification_form_html_response(
         self, async_client: AsyncClient
     ) -> None:
@@ -282,7 +269,6 @@ class TestNotificationConfigsAPIHTMX:
         assert len(content) > 0
         assert "notification" in content.lower()
 
-    @pytest.mark.asyncio
     async def test_config_not_found_responses(self, async_client: AsyncClient) -> None:
         """Test various endpoints with non-existent config ID."""
         non_existent_id = 99999

@@ -2,8 +2,9 @@ from typing import Any, Generator
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.models.database import (
@@ -23,16 +24,12 @@ from borgitory.services.configuration_service import ConfigurationService
 from borgitory.services.upcoming_backups_service import format_time_until
 from borgitory.services.cron_description_service import CronDescriptionService
 
-client = TestClient(app)
-
 
 class TestSchedulesAPI:
     """Test the Schedules API endpoints - HTMX/HTTP behavior"""
 
     @pytest.fixture(scope="function")
-    def setup_test_dependencies(
-        self, test_db: Session
-    ) -> Generator[dict[str, Any], None, None]:
+    def setup_test_dependencies(self) -> Generator[dict[str, Any], None, None]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -42,8 +39,8 @@ class TestSchedulesAPI:
         mock_scheduler_service.get_scheduled_jobs.return_value = []
 
         # Create real services with test database
-        schedule_service = ScheduleService(test_db, mock_scheduler_service)
-        configuration_service = ConfigurationService(test_db)
+        schedule_service = ScheduleService(mock_scheduler_service)
+        configuration_service = ConfigurationService()
 
         # Override dependencies
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
@@ -64,22 +61,23 @@ class TestSchedulesAPI:
         app.dependency_overrides.clear()
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session) -> Repository:
+    async def sample_repository(self, test_db: AsyncSession) -> Repository:
         """Create a sample repository for testing."""
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
         repository.encrypted_passphrase = "test-encrypted-passphrase"
         test_db.add(repository)
-        test_db.commit()
-        test_db.refresh(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
         return repository
 
-    def test_get_schedules_form(
+    async def test_get_schedules_form(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test getting schedules form returns HTML template."""
         # Create some test configurations with required fields
@@ -116,20 +114,21 @@ class TestSchedulesAPI:
         notification_config.enabled = True
 
         test_db.add_all([prune_config, cloud_config, notification_config])
-        test_db.commit()
+        await test_db.commit()
 
-        response = client.get("/api/schedules/form")
+        response = await async_client.get("/api/schedules/form")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         # Verify it contains form elements
         assert "schedule" in response.text.lower() or "form" in response.text.lower()
 
-    def test_create_schedule_success(
+    async def test_create_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test successful schedule creation returns success template."""
         schedule_data = {
@@ -139,7 +138,7 @@ class TestSchedulesAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=schedule_data)
+        response = await async_client.post("/api/schedules/", json=schedule_data)
 
         assert response.status_code == 200  # TemplateResponse returns 200 by default
         assert "text/html" in response.headers.get("content-type", "")
@@ -148,14 +147,18 @@ class TestSchedulesAPI:
         assert "scheduleUpdate" in response.headers["HX-Trigger"]
 
         # Verify schedule was created in database
-        created_schedule = (
-            test_db.query(Schedule).filter(Schedule.name == "Test Schedule").first()
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "Test Schedule")
         )
+        created_schedule = result.scalar_one_or_none()
         assert created_schedule is not None
         assert created_schedule.repository_id == sample_repository.id
 
-    def test_create_schedule_repository_not_found(
-        self, setup_test_dependencies: dict[str, Any], test_db: Session
+    async def test_create_schedule_repository_not_found(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        async_client: AsyncClient,
     ) -> None:
         """Test schedule creation with non-existent repository returns error template."""
         schedule_data = {
@@ -165,18 +168,19 @@ class TestSchedulesAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=schedule_data)
+        response = await async_client.post("/api/schedules/", json=schedule_data)
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         # Should contain error message
         assert "repository" in response.text.lower() or "error" in response.text.lower()
 
-    def test_create_schedule_invalid_cron(
+    async def test_create_schedule_invalid_cron(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test schedule creation with invalid cron expression returns error template."""
         schedule_data = {
@@ -186,18 +190,19 @@ class TestSchedulesAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=schedule_data)
+        response = await async_client.post("/api/schedules/", json=schedule_data)
 
         assert response.status_code == 200  # Returns error template
         assert "text/html" in response.headers.get("content-type", "")
         # Should contain error info
         assert "cron" in response.text.lower() or "error" in response.text.lower()
 
-    def test_get_schedules_html(
+    async def test_get_schedules_html(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test getting schedules as HTML."""
         # Create test schedules
@@ -213,9 +218,9 @@ class TestSchedulesAPI:
         schedule2.cron_expression = "0 3 * * *"
         schedule2.source_path = "/data2"
         test_db.add_all([schedule1, schedule2])
-        test_db.commit()
+        await test_db.commit()
 
-        response = client.get("/api/schedules/html")
+        response = await async_client.get("/api/schedules/html")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
@@ -223,11 +228,12 @@ class TestSchedulesAPI:
         response_text = response.text.lower()
         assert "schedule-1" in response_text or "schedule-2" in response_text
 
-    def test_get_schedules_html_pagination(
+    async def test_get_schedules_html_pagination(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test getting schedules with pagination parameters."""
         # Create multiple schedules
@@ -238,15 +244,15 @@ class TestSchedulesAPI:
             schedule.cron_expression = "0 2 * * *"
             schedule.source_path = f"/data{i}"
             test_db.add(schedule)
-        test_db.commit()
+        await test_db.commit()
 
-        response = client.get("/api/schedules/html?skip=2&limit=2")
+        response = await async_client.get("/api/schedules/html?skip=2&limit=2")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_upcoming_backups_html(
-        self, setup_test_dependencies: dict[str, Any]
+    async def test_get_upcoming_backups_html(
+        self, setup_test_dependencies: dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test getting upcoming backups as HTML."""
         # Setup mock jobs with different datetime formats
@@ -266,42 +272,43 @@ class TestSchedulesAPI:
             "scheduler_service"
         ].get_scheduled_jobs.return_value = mock_jobs
 
-        response = client.get("/api/schedules/upcoming/html")
+        response = await async_client.get("/api/schedules/upcoming/html")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_get_upcoming_backups_html_error(
-        self, setup_test_dependencies: dict[str, Any]
+    async def test_get_upcoming_backups_html_error(
+        self, setup_test_dependencies: dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test getting upcoming backups HTML with scheduler error."""
         setup_test_dependencies[
             "scheduler_service"
         ].get_scheduled_jobs.side_effect = Exception("Scheduler error")
 
-        response = client.get("/api/schedules/upcoming/html")
+        response = await async_client.get("/api/schedules/upcoming/html")
 
         assert response.status_code == 200  # Should still return HTML error state
         assert "text/html" in response.headers.get("content-type", "")
         # Should contain error message
         assert "error" in response.text.lower()
 
-    def test_get_cron_expression_form(
-        self, setup_test_dependencies: dict[str, Any]
+    async def test_get_cron_expression_form(
+        self, setup_test_dependencies: dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test getting cron expression form."""
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron-expression-form?preset=0%202%20*%20*%20*"
         )
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_list_schedules(
+    async def test_list_schedules(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test listing schedules."""
         # Create test schedules
@@ -311,40 +318,39 @@ class TestSchedulesAPI:
         schedule1.cron_expression = "0 2 * * *"
         schedule1.source_path = "/data1"
         test_db.add(schedule1)
-        test_db.commit()
+        await test_db.commit()
 
-        response = client.get("/api/schedules/")
+        response = await async_client.get("/api/schedules/")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-    @pytest.mark.skip(
-        reason="Template path issues in test environment - service layer is tested separately"
-    )
     def test_get_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test getting specific schedule successfully."""
         pass
 
-    def test_get_schedule_not_found(
-        self, setup_test_dependencies: dict[str, Any]
+    async def test_get_schedule_not_found(
+        self, setup_test_dependencies: dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test getting non-existent schedule."""
-        response = client.get("/api/schedules/999")
+        response = await async_client.get("/api/schedules/999")
 
         assert response.status_code == 200  # Returns HTML error template
         assert "text/html" in response.headers.get("content-type", "")
         assert "error" in response.text.lower() or "not found" in response.text.lower()
 
-    def test_get_schedule_edit_form(
+    async def test_get_schedule_edit_form(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test getting schedule edit form."""
         schedule = Schedule()
@@ -353,21 +359,22 @@ class TestSchedulesAPI:
         schedule.cron_expression = "0 2 * * *"
         schedule.source_path = "/data"
         test_db.add(schedule)
-        test_db.commit()
-        test_db.refresh(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
 
-        response = client.get(f"/api/schedules/{schedule.id}/edit")
+        response = await async_client.get(f"/api/schedules/{schedule.id}/edit")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         # Should contain form elements for editing
         assert "form" in response.text.lower() or "edit" in response.text.lower()
 
-    def test_update_schedule_success(
+    async def test_update_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test successful schedule update."""
         schedule = Schedule()
@@ -376,30 +383,32 @@ class TestSchedulesAPI:
         schedule.cron_expression = "0 2 * * *"
         schedule.source_path = "/data"
         test_db.add(schedule)
-        test_db.commit()
-        test_db.refresh(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
 
         update_data = {"name": "updated-schedule", "cron_expression": "0 3 * * *"}
 
-        response = client.put(f"/api/schedules/{schedule.id}", json=update_data)
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}", json=update_data
+        )
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         assert "HX-Trigger" in response.headers
 
-        # Verify update in database
-        updated_schedule = (
-            test_db.query(Schedule).filter(Schedule.id == schedule.id).first()
-        )
-        assert updated_schedule is not None
-        assert updated_schedule.name == "updated-schedule"
-        assert updated_schedule.cron_expression == "0 3 * * *"
+        # Refresh the object to see changes made by the API
+        await test_db.refresh(schedule)
 
-    def test_toggle_schedule_success(
+        # Verify update in database
+        assert schedule.name == "updated-schedule"
+        assert schedule.cron_expression == "0 3 * * *"
+
+    async def test_toggle_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test successfully toggling schedule."""
         schedule = Schedule()
@@ -409,36 +418,36 @@ class TestSchedulesAPI:
         schedule.source_path = "/data"
         schedule.enabled = False
         test_db.add(schedule)
-        test_db.commit()
-        test_db.refresh(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
 
-        response = client.put(f"/api/schedules/{schedule.id}/toggle")
+        response = await async_client.put(f"/api/schedules/{schedule.id}/toggle")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
-        # Verify toggle in database
-        toggled_schedule = (
-            test_db.query(Schedule).filter(Schedule.id == schedule.id).first()
-        )
-        assert toggled_schedule is not None
-        assert toggled_schedule.enabled is True
+        # Refresh the object to see changes made by the API
+        await test_db.refresh(schedule)
 
-    def test_toggle_schedule_not_found(
-        self, setup_test_dependencies: dict[str, Any]
+        # Verify toggle in database
+        assert schedule.enabled is True
+
+    async def test_toggle_schedule_not_found(
+        self, setup_test_dependencies: dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test toggling non-existent schedule."""
-        response = client.put("/api/schedules/999/toggle")
+        response = await async_client.put("/api/schedules/999/toggle")
 
         assert response.status_code == 404
         assert "text/html" in response.headers.get("content-type", "")
         assert "error" in response.text.lower() or "not found" in response.text.lower()
 
-    def test_delete_schedule_success(
+    async def test_delete_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],
-        test_db: Session,
+        test_db: AsyncSession,
         sample_repository: Repository,
+        async_client: AsyncClient,
     ) -> None:
         """Test successfully deleting schedule."""
         schedule = Schedule()
@@ -447,40 +456,32 @@ class TestSchedulesAPI:
         schedule.cron_expression = "0 2 * * *"
         schedule.source_path = "/data"
         test_db.add(schedule)
-        test_db.commit()
-        test_db.refresh(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
         schedule_id = schedule.id
 
-        response = client.delete(f"/api/schedules/{schedule_id}")
+        response = await async_client.delete(f"/api/schedules/{schedule_id}")
 
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         assert "HX-Trigger" in response.headers
 
         # Verify deletion from database
-        deleted_schedule = (
-            test_db.query(Schedule).filter(Schedule.id == schedule_id).first()
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.id == schedule_id)
         )
+        deleted_schedule = result.scalar_one_or_none()
         assert deleted_schedule is None
 
-    def test_delete_schedule_not_found(
-        self, setup_test_dependencies: dict[str, Any]
+    async def test_delete_schedule_not_found(
+        self, setup_test_dependencies: dict[str, Any], async_client: AsyncClient
     ) -> None:
         """Test deleting non-existent schedule."""
-        response = client.delete("/api/schedules/999")
+        response = await async_client.delete("/api/schedules/999")
 
         assert response.status_code == 404
         assert "text/html" in response.headers.get("content-type", "")
         assert "error" in response.text.lower() or "not found" in response.text.lower()
-
-    @pytest.mark.skip(
-        reason="Template missing in test environment - functionality tested in service layer"
-    )
-    def test_get_active_scheduled_jobs(
-        self, setup_test_dependencies: dict[str, Any]
-    ) -> None:
-        """Test getting active scheduled jobs."""
-        pass
 
 
 class TestScheduleUtilityFunctions:

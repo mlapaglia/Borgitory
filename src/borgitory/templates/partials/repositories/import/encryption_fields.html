@@ -1,27 +1,6 @@
 <!-- Dynamic encryption fields based on encryption type -->
 <div class="space-y-4">
-    {% if encryption_type == "repokey" %}
-        <div id="passphrase-field">
-            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Passphrase
-            </label>
-            <input type="password"
-                   name="passphrase"
-                   class="input-modern mt-1"
-                   placeholder="Enter repository passphrase"
-                   required>
-        </div>
-    {% elif encryption_type == "keyfile" %}
-        <div id="passphrase-field">
-            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Passphrase
-            </label>
-            <input type="password"
-                   name="passphrase"
-                   class="input-modern mt-1"
-                   placeholder="Enter repository passphrase"
-                   required>
-        </div>
+    {% if encryption_type in [EncryptionType.KEYFILE, EncryptionType.KEYFILE_BLAKE2] %}
         <div id="keyfile-field">
             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                 Keyfile Content

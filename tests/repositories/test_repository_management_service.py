@@ -5,7 +5,7 @@ Tests the new repository management features following the established codebase 
 
 import pytest
 import json
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from typing import Any
 
 from borgitory.services.repositories.repository_service import RepositoryService
@@ -216,7 +216,6 @@ class TestRepositoryManagementBusinessLogic:
         repo.cache_dir = "/mnt/test/cache/dir"
         return repo
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_unlocked(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -230,20 +229,16 @@ class TestRepositoryManagementBusinessLogic:
 
         with (
             patch(
-                "borgitory.services.repositories.repository_service.secure_borg_command"
-            ) as mock_secure_cmd,
+                "borgitory.services.repositories.repository_service.create_borg_command"
+            ) as mock_create_cmd,
             patch("asyncio.create_subprocess_exec", return_value=mock_process),
             patch("asyncio.wait_for", return_value=(b"archive1\narchive2\n", b"")),
         ):
-            # Mock the secure_borg_command context manager
-            mock_context = AsyncMock()
-            mock_context.__aenter__.return_value = (
-                ["borg", "config", "--list", "/test/repo/path"],
-                {"BORG_PASSPHRASE": "test_passphrase"},
-                None,
-            )
-            mock_context.__aexit__.return_value = None
-            mock_secure_cmd.return_value = mock_context
+            # Mock create_borg_command to return a BorgCommandResult object
+            mock_borg_cmd = MagicMock()
+            mock_borg_cmd.command = ["borg", "config", "--list", "/test/repo/path"]
+            mock_borg_cmd.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+            mock_create_cmd.return_value = mock_borg_cmd
 
             result = await repository_service.check_repository_lock_status(
                 mock_repository
@@ -255,17 +250,15 @@ class TestRepositoryManagementBusinessLogic:
             assert result["message"] == "Repository is accessible"
             assert "error" not in result
 
-            # Verify secure_borg_command was called correctly
-            mock_secure_cmd.assert_called_once_with(
+            # Verify create_borg_command was called correctly
+            mock_create_cmd.assert_called_once_with(
                 base_command="borg config",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
-                keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=["--list"],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_locked_timeout(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -300,7 +293,6 @@ class TestRepositoryManagementBusinessLogic:
             or "locked" in result["message"].lower()
         )
 
-    @pytest.mark.asyncio
     async def test_check_repository_lock_status_error_with_lock_message(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -333,7 +325,6 @@ class TestRepositoryManagementBusinessLogic:
         assert "locked by another process" in result["message"]
         assert "error" in result
 
-    @pytest.mark.asyncio
     async def test_break_repository_lock_success(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -347,22 +338,18 @@ class TestRepositoryManagementBusinessLogic:
 
         with (
             patch(
-                "borgitory.services.repositories.repository_service.secure_borg_command"
-            ) as mock_secure_cmd,
+                "borgitory.services.repositories.repository_service.create_borg_command"
+            ) as mock_create_cmd,
             patch("asyncio.create_subprocess_exec", return_value=mock_process),
             patch(
                 "asyncio.wait_for", return_value=(b"Lock broken successfully\n", b"")
             ),
         ):
-            # Mock the secure_borg_command context manager
-            mock_context = AsyncMock()
-            mock_context.__aenter__.return_value = (
-                ["borg", "break-lock", "/test/repo/path"],
-                {"BORG_PASSPHRASE": "test_passphrase"},
-                None,
-            )
-            mock_context.__aexit__.return_value = None
-            mock_secure_cmd.return_value = mock_context
+            # Mock create_borg_command to return a BorgCommandResult object
+            mock_borg_cmd = MagicMock()
+            mock_borg_cmd.command = ["borg", "break-lock", "/test/repo/path"]
+            mock_borg_cmd.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+            mock_create_cmd.return_value = mock_borg_cmd
 
             result = await repository_service.break_repository_lock(mock_repository)
 
@@ -371,17 +358,15 @@ class TestRepositoryManagementBusinessLogic:
             assert "successfully" in result["message"].lower()
             assert "error" not in result
 
-            # Verify secure_borg_command was called correctly
-            mock_secure_cmd.assert_called_once_with(
+            # Verify create_borg_command was called correctly
+            mock_create_cmd.assert_called_once_with(
                 base_command="borg break-lock",
                 repository_path=mock_repository.path,
                 passphrase=mock_repository.get_passphrase(),
-                keyfile_content=mock_repository.get_keyfile_content(),
                 additional_args=[],
                 environment_overrides={"BORG_CACHE_DIR": "/mnt/test/cache/dir"},
             )
 
-    @pytest.mark.asyncio
     async def test_break_repository_lock_failure(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -413,7 +398,6 @@ class TestRepositoryManagementBusinessLogic:
         assert "failed" in result["message"].lower()
         assert result["error"] == "Permission denied"
 
-    @pytest.mark.asyncio
     async def test_get_repository_info_success(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -483,7 +467,6 @@ class TestRepositoryManagementBusinessLogic:
         assert result["archives_count"] == 2
         assert "repository.id" in result["config"]
 
-    @pytest.mark.asyncio
     async def test_export_repository_key_success(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:
@@ -517,7 +500,6 @@ class TestRepositoryManagementBusinessLogic:
         assert result["key_data"] == key_data
         assert result["filename"] == "test-repo_key.txt"
 
-    @pytest.mark.asyncio
     async def test_export_repository_key_failure(
         self, repository_service: RepositoryService, mock_repository: Any
     ) -> None:

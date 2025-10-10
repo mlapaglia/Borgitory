@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Optional
 import uuid
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse
 from starlette.responses import StreamingResponse
 from pydantic import BaseModel
@@ -17,6 +17,8 @@ from borgitory.models.job_results import (
 from borgitory.dependencies import JobServiceDep, get_browser_timezone_offset
 from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from borgitory.dependencies import TemplatesDep
+from borgitory.dependencies import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -105,10 +107,11 @@ async def create_backup(
     request: Request,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Start a backup job using JobService"""
 
-    result = await job_svc.create_backup_job(backup_request, JobType.MANUAL_BACKUP)
+    result = await job_svc.create_backup_job(db, backup_request, JobType.MANUAL_BACKUP)
 
     if isinstance(result, JobCreationResult):
         return templates.TemplateResponse(
@@ -131,10 +134,11 @@ async def create_prune_job(
     prune_request: PruneRequest,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Start an archive pruning job using JobService"""
 
-    result = await job_svc.create_prune_job(prune_request)
+    result = await job_svc.create_prune_job(db, prune_request)
 
     if isinstance(result, JobCreationResult):
         return templates.TemplateResponse(
@@ -157,10 +161,11 @@ async def create_check_job(
     check_request: CheckRequest,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Start a repository check job and return job_id for tracking"""
 
-    result = await job_svc.create_check_job(check_request)
+    result = await job_svc.create_check_job(db, check_request)
 
     if isinstance(result, JobCreationResult):
         return templates.TemplateResponse(
@@ -186,21 +191,22 @@ async def stream_all_jobs(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_jobs_html(
+async def get_jobs_html(
     request: Request,
     render_svc: JobRenderServiceDep,
-    job_svc: JobServiceDep,
     expand: str = "",
+    db: AsyncSession = Depends(get_db),
 ) -> str:
     """Get job history as HTML"""
 
     browser_tz_offset = get_browser_timezone_offset(request)
-    return render_svc.render_jobs_html(job_svc.db, expand, browser_tz_offset)
+    return await render_svc.render_jobs_html(db, expand, browser_tz_offset)
 
 
 @router.get("/current/html", response_class=HTMLResponse)
 def get_current_jobs_html(
-    request: Request, render_svc: JobRenderServiceDep
+    request: Request,
+    render_svc: JobRenderServiceDep,
 ) -> HTMLResponse:
     """Get current running jobs as HTML"""
 
@@ -300,14 +306,14 @@ async def toggle_job_details(
     request: Request,
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
-    job_svc: JobServiceDep,
     expanded: str = "false",
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Toggle job details visibility and return refreshed job item"""
     # Toggle the expand_details state - if currently false, expand it
     expand_details = expanded == "false"
 
-    template_job = render_svc.get_job_for_template(job_id, job_svc.db, expand_details)
+    template_job = await render_svc.get_job_for_template(job_id, db, expand_details)
     if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -325,10 +331,10 @@ async def get_job_details_static(
     request: Request,
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
-    job_svc: JobServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get static job details (used when job completes)"""
-    template_job = render_svc.get_job_for_template(job_id, job_svc.db)
+    template_job = await render_svc.get_job_for_template(job_id, db)
     if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -344,11 +350,11 @@ async def toggle_task_details(
     request: Request,
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
-    job_svc: JobServiceDep,
     expanded: str = "false",
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Toggle task details visibility and return updated task item"""
-    template_job = render_svc.get_job_for_template(job_id, job_svc.db)
+    template_job = await render_svc.get_job_for_template(job_id, db)
     if not template_job:
         raise HTTPException(status_code=404, detail="Job not found")
 

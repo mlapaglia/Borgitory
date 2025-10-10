@@ -38,20 +38,6 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                        Cache Directory (Optional)
-                    </label>
-                    {% set input_id = "import-cache-dir" %}
-                    {% set input_name = "cache_dir" %}
-                    {% set input_value = "" %}
-                    {% set placeholder = "/cache/borg" %}
-                    {% set required = false %}
-                    {% include "partials/shared/path_autocomplete.html" %}
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Custom cache directory for this repository (optional)
-                    </p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Encryption Type
                     </label>
                     <select name="encryption_type"
@@ -62,16 +48,48 @@
                             hx-include="this">
                         <option value="">Select encryption type...</option>
                         <option value="repokey">Repository Key (repokey)</option>
-                        <option value="keyfile">External Keyfile (keyfile)</option>
+                        <option value="repokey-blake2">Repository Key Blake2 (repokey-blake2)</option>
+                        <option value="keyfile">Keyfile (keyfile)</option>
+                        <option value="keyfile-blake2">Keyfile Blake2 (keyfile-blake2)</option>
+                        <option value="authenticated">Authenticated (authenticated)</option>
+                        <option value="authenticated-blake2">
+                            Authenticated Blake2 (authenticated-blake2)
+                        </option>
                         <option value="none">No Encryption (none)</option>
                     </select>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Choose the encryption method used by your repository
+                        Choose the <a href="https://borgbackup.readthedocs.io/en/stable/usage/init.html#more-encryption-modes"
+    target="_blank"
+    class="text-blue-600 hover:text-blue-700">encryption method</a> for your existing repository
                     </p>
                 </div>
                 <!-- Container for dynamic encryption fields -->
                 <div id="encryption-fields-container">
                     <!-- Fields will be loaded here via HTMX -->
+                </div>
+                <div id="passphrase-field">
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Passphrase
+                    </label>
+                    <input type="password"
+                           name="passphrase"
+                           class="input-modern mt-1"
+                           placeholder="Enter repository passphrase"
+                           required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Cache Directory (Optional)
+                    </label>
+                    {% set input_id = "import-cache-dir" %}
+                    {% set input_name = "cache_dir" %}
+                    {% set input_value = "" %}
+                    {% set placeholder = default_directories.cache_dir if default_directories else "Leave empty for default" %}
+                    {% set required = false %}
+                    {% include "partials/shared/path_autocomplete.html" %}
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Custom cache directory for Borg operations. Leave empty to use default.
+                    </p>
                 </div>
                 <button type="submit"
                         class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">

@@ -5,12 +5,13 @@ from typing import Dict, List, Callable, Optional, TypedDict
 from dataclasses import dataclass
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, and_
 
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import secure_borg_command
+from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
 
@@ -164,27 +165,27 @@ class RepositoryStatsService:
     async def execute_borg_list(self, repository: Repository) -> List[str]:
         """Execute borg list command to get archive names using the new command executor"""
         try:
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg list",
                 repository_path=str(repository.path),
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--short"],
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                )
-                if result.success:
-                    archives = [
-                        line.strip()
-                        for line in result.stdout.strip().split("\n")
-                        if line.strip()
-                    ]
-                    return archives
-                else:
-                    logger.error(f"Failed to list archives: {result.stderr}")
-                    return []
+            )
+
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+            )
+            if result.success:
+                archives = [
+                    line.strip()
+                    for line in result.stdout.strip().split("\n")
+                    if line.strip()
+                ]
+                return archives
+            else:
+                logger.error(f"Failed to list archives: {result.stderr}")
+                return []
         except Exception as e:
             logger.error(f"Error executing borg list: {e}")
             raise  # Let exceptions bubble up for proper error handling
@@ -194,39 +195,36 @@ class RepositoryStatsService:
     ) -> "ArchiveInfo | None":
         """Execute borg info command to get archive details using the new command executor"""
         try:
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg info",
                 repository_path="",
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
                 additional_args=["--json", f"{repository.path}::{archive_name}"],
-            ) as (command, env, _):
-                result = await self.command_executor.execute_command(
-                    command=command,
-                    env=env,
-                )
-                if result.success:
-                    info_data = json.loads(result.stdout)
-                    if info_data.get("archives"):
-                        archive_data = info_data["archives"][0]
-                        return ArchiveInfo(
-                            name=archive_data["name"],
-                            start=archive_data["start"],
-                            end=archive_data["end"],
-                            duration=archive_data["duration"],
-                            original_size=archive_data["stats"]["original_size"],
-                            compressed_size=archive_data["stats"]["compressed_size"],
-                            deduplicated_size=archive_data["stats"][
-                                "deduplicated_size"
-                            ],
-                            nfiles=archive_data["stats"]["nfiles"],
-                        )
-                    else:
-                        logger.error(f"No archive data found for {archive_name}")
-                        return None
+            )
+            result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+            )
+            if result.success:
+                info_data = json.loads(result.stdout)
+                if info_data.get("archives"):
+                    archive_data = info_data["archives"][0]
+                    return ArchiveInfo(
+                        name=archive_data["name"],
+                        start=archive_data["start"],
+                        end=archive_data["end"],
+                        duration=archive_data["duration"],
+                        original_size=archive_data["stats"]["original_size"],
+                        compressed_size=archive_data["stats"]["compressed_size"],
+                        deduplicated_size=archive_data["stats"]["deduplicated_size"],
+                        nfiles=archive_data["stats"]["nfiles"],
+                    )
                 else:
-                    logger.error(f"Failed to get archive info: {result.stderr}")
+                    logger.error(f"No archive data found for {archive_name}")
                     return None
+            else:
+                logger.error(f"Failed to get archive info: {result.stderr}")
+                return None
         except Exception as e:
             logger.error(f"Error executing borg info: {e}")
             raise  # Let exceptions bubble up for proper error handling
@@ -234,36 +232,16 @@ class RepositoryStatsService:
     async def get_repository_statistics(
         self,
         repository: Repository,
-        db: Session,
-        progress_callback: Optional[Callable[[str, int], None]] = None,
+        db: AsyncSession,
     ) -> RepositoryStats:
         """Gather comprehensive repository statistics"""
         try:
-            if progress_callback:
-                progress_callback("Initializing repository analysis...", 5)
-
-            # Get list of all archives
-            if progress_callback:
-                progress_callback("Scanning repository for archives...", 10)
             archives = await self.execute_borg_list(repository)
             if not archives:
                 raise ValueError("No archives found in repository")
 
-            if progress_callback:
-                progress_callback(
-                    f"Found {len(archives)} archives. Analyzing archive details...", 15
-                )
-
-            # Get detailed info for each archive
             archive_stats = []
             for i, archive in enumerate(archives):
-                if progress_callback:
-                    # Progress from 15% to 60% during archive analysis
-                    archive_progress = 15 + int((i / len(archives)) * 45)
-                    progress_callback(
-                        f"Analyzing archive {i + 1}/{len(archives)}: {archive}",
-                        archive_progress,
-                    )
                 archive_info = await self.execute_borg_info(repository, archive)
                 if archive_info:
                     archive_stats.append(archive_info)
@@ -271,32 +249,15 @@ class RepositoryStatsService:
             if not archive_stats:
                 raise ValueError("Could not retrieve archive information")
 
-            # Sort archives by date
             archive_stats.sort(key=lambda x: str(x.get("start", "")))
 
-            if progress_callback:
-                progress_callback("Building size and compression statistics...", 65)
+            file_type_stats = await self._get_file_type_stats(repository, archives)
 
-            # Get file type statistics
-            if progress_callback:
-                progress_callback("Analyzing file types and extensions...", 70)
-            file_type_stats = await self._get_file_type_stats(
-                repository, archives, progress_callback
-            )
-
-            if progress_callback:
-                progress_callback("Calculating job execution time statistics...", 80)
-
-            # Get execution time statistics
             execution_time_stats = await self._get_execution_time_stats(repository, db)
             execution_time_chart = self._build_execution_time_chart(
                 execution_time_stats
             )
 
-            if progress_callback:
-                progress_callback("Calculating success/failure statistics...", 85)
-
-            # Get success/failure statistics
             success_failure_stats = await self._get_success_failure_stats(
                 repository, db
             )
@@ -307,10 +268,6 @@ class RepositoryStatsService:
                 repository, db
             )
 
-            if progress_callback:
-                progress_callback("Finalizing statistics and building charts...", 90)
-
-            # Build statistics
             stats = RepositoryStats(
                 repository_path=repository.path,
                 total_archives=len(archive_stats),
@@ -327,9 +284,6 @@ class RepositoryStatsService:
                 timeline_success_failure=timeline_success_failure,
                 summary=self._build_summary_stats(archive_stats),
             )
-
-            if progress_callback:
-                progress_callback("Statistics analysis complete!", 100)
 
             return stats
 
@@ -495,75 +449,74 @@ class RepositoryStatsService:
                 )
             try:
                 # Get file listing with sizes
-                async with secure_borg_command(
+                borg_command = create_borg_command(
                     base_command="borg list",
                     repository_path="",
                     passphrase=repository.get_passphrase(),
-                    keyfile_content=repository.get_keyfile_content(),
                     additional_args=[
                         f"{repository.path}::{archive_name}",
                         "--format={size} {path}{NL}",
                     ],
-                ) as (command, env, _):
-                    process = await self.command_executor.create_subprocess(
-                        command=command,
-                        env=env,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
+                )
+                process = await self.command_executor.create_subprocess(
+                    command=borg_command.command,
+                    env=borg_command.environment,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
-                    stdout, stderr = await process.communicate()
+                stdout, stderr = await process.communicate()
 
-                    if process.returncode == 0:
-                        # Parse file types and sizes
-                        ext_count: Dict[str, int] = {}
-                        ext_size: Dict[str, int] = {}
+                if process.returncode == 0:
+                    # Parse file types and sizes
+                    ext_count: Dict[str, int] = {}
+                    ext_size: Dict[str, int] = {}
 
-                        for line in stdout.decode().strip().split("\n"):
-                            if not line.strip():
+                    for line in stdout.decode().strip().split("\n"):
+                        if not line.strip():
+                            continue
+                        parts = line.strip().split(" ", 1)
+                        if len(parts) == 2:
+                            try:
+                                size = int(parts[0])
+                                path = parts[1]
+
+                                # Extract file extension
+                                if "." in path and not path.endswith("/"):
+                                    ext = path.split(".")[-1].lower()
+                                    if (
+                                        ext and len(ext) <= 10
+                                    ):  # Reasonable extension length
+                                        ext_count[ext] = ext_count.get(ext, 0) + 1
+                                        ext_size[ext] = ext_size.get(ext, 0) + size
+                            except (ValueError, IndexError):
                                 continue
-                            parts = line.strip().split(" ", 1)
-                            if len(parts) == 2:
-                                try:
-                                    size = int(parts[0])
-                                    path = parts[1]
 
-                                    # Extract file extension
-                                    if "." in path and not path.endswith("/"):
-                                        ext = path.split(".")[-1].lower()
-                                        if (
-                                            ext and len(ext) <= 10
-                                        ):  # Reasonable extension length
-                                            ext_count[ext] = ext_count.get(ext, 0) + 1
-                                            ext_size[ext] = ext_size.get(ext, 0) + size
-                                except (ValueError, IndexError):
-                                    continue
+                    # Add to timeline
+                    archive_date = (
+                        archive_name.split("backup-")[-1][:10]
+                        if "backup-" in archive_name
+                        else archive_name[:10]
+                    )
+                    file_type_timeline["labels"].append(archive_date)
 
-                        # Add to timeline
-                        archive_date = (
-                            archive_name.split("backup-")[-1][:10]
-                            if "backup-" in archive_name
-                            else archive_name[:10]
-                        )
-                        file_type_timeline["labels"].append(archive_date)
+                    # Store data for each extension
+                    for ext in ext_count:
+                        if ext not in file_type_timeline["count_data"]:
+                            file_type_timeline["count_data"][ext] = []
+                            file_type_timeline["size_data"][ext] = []
+                        file_type_timeline["count_data"][ext].append(ext_count[ext])
+                        file_type_timeline["size_data"][ext].append(
+                            round(ext_size[ext] / (1024 * 1024), 2)
+                        )  # Convert to MB
 
-                        # Store data for each extension
-                        for ext in ext_count:
-                            if ext not in file_type_timeline["count_data"]:
-                                file_type_timeline["count_data"][ext] = []
-                                file_type_timeline["size_data"][ext] = []
-                            file_type_timeline["count_data"][ext].append(ext_count[ext])
-                            file_type_timeline["size_data"][ext].append(
-                                round(ext_size[ext] / (1024 * 1024), 2)
-                            )  # Convert to MB
-
-                        # Fill missing data points for consistency
-                        for ext in file_type_timeline["count_data"]:
-                            while len(file_type_timeline["count_data"][ext]) < len(
-                                file_type_timeline["labels"]
-                            ):
-                                file_type_timeline["count_data"][ext].insert(-1, 0)
-                                file_type_timeline["size_data"][ext].insert(-1, 0)
+                    # Fill missing data points for consistency
+                    for ext in file_type_timeline["count_data"]:
+                        while len(file_type_timeline["count_data"][ext]) < len(
+                            file_type_timeline["labels"]
+                        ):
+                            file_type_timeline["count_data"][ext].insert(-1, 0)
+                            file_type_timeline["size_data"][ext].insert(-1, 0)
 
             except Exception as e:
                 logger.error(
@@ -697,19 +650,18 @@ class RepositoryStatsService:
         return summary
 
     async def _get_execution_time_stats(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: AsyncSession
     ) -> List[ExecutionTimeStats]:
         """Calculate execution time statistics for different task types"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_
         from collections import defaultdict
 
         try:
             # Query completed jobs and tasks for this repository
-            completed_tasks = (
-                db.query(JobTask.task_type, JobTask.started_at, JobTask.completed_at)
+            result = await db.execute(
+                select(JobTask.task_type, JobTask.started_at, JobTask.completed_at)
                 .join(Job, Job.id == JobTask.job_id)
-                .filter(
+                .where(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.status == TaskStatusEnum.COMPLETED,
@@ -717,8 +669,8 @@ class RepositoryStatsService:
                         JobTask.completed_at.isnot(None),
                     )
                 )
-                .all()
             )
+            completed_tasks = result.all()
 
             # Group by task type and calculate durations in Python
             task_durations = defaultdict(list)
@@ -824,19 +776,18 @@ class RepositoryStatsService:
         return chart_data
 
     async def _get_success_failure_stats(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: AsyncSession
     ) -> List[SuccessFailureStats]:
         """Calculate success/failure statistics for different task types"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_
         from collections import defaultdict
 
         try:
             # Query all completed and failed tasks for this repository
-            task_results = (
-                db.query(JobTask.task_type, JobTask.status)
+            result = await db.execute(
+                select(JobTask.task_type, JobTask.status)
                 .join(Job, Job.id == JobTask.job_id)
-                .filter(
+                .where(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.status.in_(
@@ -844,8 +795,8 @@ class RepositoryStatsService:
                         ),
                     )
                 )
-                .all()
             )
+            task_results = result.all()
 
             # Group by task type and count successes/failures
             task_counts: defaultdict[str, dict[str, int]] = defaultdict(
@@ -927,11 +878,10 @@ class RepositoryStatsService:
         return chart_data
 
     async def _get_timeline_success_failure_data(
-        self, repository: Repository, db: Session
+        self, repository: Repository, db: AsyncSession
     ) -> TimelineSuccessFailureData:
         """Get timeline data for successful vs failed backups over time"""
         from borgitory.models.database import Job, JobTask
-        from sqlalchemy import and_, func
         from collections import defaultdict
         from datetime import timedelta
 
@@ -939,10 +889,10 @@ class RepositoryStatsService:
             # Get backup tasks from the last 30 days
             thirty_days_ago = now_utc() - timedelta(days=30)
 
-            backup_results = (
-                db.query(func.date(JobTask.completed_at).label("date"), JobTask.status)
+            result = await db.execute(
+                select(func.date(JobTask.completed_at).label("date"), JobTask.status)
                 .join(Job, Job.id == JobTask.job_id)
-                .filter(
+                .where(
                     and_(
                         Job.repository_id == repository.id,
                         JobTask.task_type.in_(["backup", "scheduled_backup"]),
@@ -954,18 +904,20 @@ class RepositoryStatsService:
                     )
                 )
                 .order_by("date")
-                .all()
             )
+            backup_results = result.all()
 
             # Group by date and count successes/failures
             daily_counts: defaultdict[str, dict[str, int]] = defaultdict(
                 lambda: {"successful": 0, "failed": 0}
             )
-            for result in backup_results:
-                date_str = str(result.date) if result.date else "unknown"
-                if result.status == TaskStatusEnum.COMPLETED:
+
+            for row in backup_results:
+                date_value, status = row  # Unpack the tuple
+                date_str = str(date_value) if date_value else "unknown"
+                if status == TaskStatusEnum.COMPLETED:
                     daily_counts[date_str]["successful"] += 1
-                elif result.status == TaskStatusEnum.FAILED:
+                elif status == TaskStatusEnum.FAILED:
                     daily_counts[date_str]["failed"] += 1
 
             # Sort dates and create chart data

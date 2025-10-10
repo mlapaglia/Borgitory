@@ -91,7 +91,6 @@ class TestDiscordProvider:
         # Should use default AiohttpClient
         assert provider.http_client.__class__.__name__ == "AiohttpClient"
 
-    @pytest.mark.asyncio
     async def test_send_notification_success(self, discord_provider, mock_http_client):
         """Test successful notification sending"""
         # Setup mock response
@@ -133,7 +132,6 @@ class TestDiscordProvider:
         assert embed["fields"][0]["name"] == "Job Id"
         assert embed["fields"][0]["value"] == "test-123"
 
-    @pytest.mark.asyncio
     async def test_send_notification_http_error(
         self, discord_provider, mock_http_client
     ):
@@ -159,7 +157,6 @@ class TestDiscordProvider:
         assert result.error == "Bad Request"
         assert result.metadata["status_code"] == 400
 
-    @pytest.mark.asyncio
     async def test_send_notification_exception(
         self, discord_provider, mock_http_client
     ):
@@ -183,7 +180,6 @@ class TestDiscordProvider:
         assert result.message == "Exception occurred"
         assert result.error == "Network error"
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(self, discord_provider, mock_http_client):
         """Test successful connection test"""
         # Setup mock response
@@ -197,7 +193,6 @@ class TestDiscordProvider:
         assert result is True
         mock_http_client.post.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_test_connection_failure(self, discord_provider, mock_http_client):
         """Test failed connection test"""
         # Setup mock error response

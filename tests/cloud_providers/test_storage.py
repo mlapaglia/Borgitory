@@ -455,7 +455,6 @@ class TestS3Storage:
         assert fields == ["access_key", "secret_key"]
         assert isinstance(fields, list)
 
-    @pytest.mark.asyncio
     async def test_upload_repository_success(
         self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -490,7 +489,6 @@ class TestS3Storage:
         assert events[3].type == SyncEventType.COMPLETED
         assert "completed successfully" in events[3].message
 
-    @pytest.mark.asyncio
     async def test_upload_repository_without_callback(
         self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -504,7 +502,6 @@ class TestS3Storage:
         # Should not raise exception
         await s3_storage.upload_repository("/test/repo", "backups/")
 
-    @pytest.mark.asyncio
     async def test_upload_repository_error(
         self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -534,7 +531,6 @@ class TestS3Storage:
         assert "S3 upload failed" in events[1].message
         assert events[1].error == "Network timeout"
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(
         self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -552,7 +548,6 @@ class TestS3Storage:
             endpoint_url=None,
         )
 
-    @pytest.mark.asyncio
     async def test_test_connection_failure(
         self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -562,7 +557,6 @@ class TestS3Storage:
         result = await s3_storage.test_connection()
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_test_connection_exception(
         self, s3_storage: S3Storage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -643,7 +637,6 @@ class TestSFTPStorage:
         assert fields == ["password", "private_key"]
         assert isinstance(fields, list)
 
-    @pytest.mark.asyncio
     async def test_upload_repository_success(
         self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -668,7 +661,6 @@ class TestSFTPStorage:
         assert "backup.example.com" in events[0].message
         assert events[3].type == SyncEventType.COMPLETED
 
-    @pytest.mark.asyncio
     async def test_upload_repository_error(
         self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -696,7 +688,6 @@ class TestSFTPStorage:
         assert events[1].type == SyncEventType.ERROR
         assert events[1].error == "SSH connection refused"
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(
         self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -715,7 +706,6 @@ class TestSFTPStorage:
             private_key=None,
         )
 
-    @pytest.mark.asyncio
     async def test_test_connection_failure(
         self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:
@@ -725,7 +715,6 @@ class TestSFTPStorage:
         result = await sftp_storage.test_connection()
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_test_connection_exception(
         self, sftp_storage: SFTPStorage, mock_rclone_service: AsyncMock
     ) -> None:

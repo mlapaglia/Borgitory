@@ -6,15 +6,16 @@ import pytest
 import uuid
 from typing import Generator
 from unittest.mock import Mock, AsyncMock
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 
 from borgitory.main import app
-from borgitory.models.database import Repository, Job
+from borgitory.models.database import Repository, Job, StringUUID
 from borgitory.models.job_results import (
     JobCreationResult,
     JobCreationError,
@@ -39,24 +40,24 @@ class TestJobsAPI:
     """Test class for jobs API endpoints."""
 
     @pytest.fixture
-    def sample_repository(self, test_db: Session) -> Repository:
+    async def sample_repository(self, test_db: AsyncSession) -> Repository:
         """Create a sample repository for testing."""
         repo = Repository()
         repo.name = "test-repo"
         repo.path = "/tmp/test-repo"
         repo.set_passphrase("test-passphrase")
         test_db.add(repo)
-        test_db.commit()
-        test_db.refresh(repo)
+        await test_db.commit()
+        await test_db.refresh(repo)
         return repo
 
     @pytest.fixture
-    def sample_database_job(
-        self, test_db: Session, sample_repository: Repository
+    async def sample_database_job(
+        self, test_db: AsyncSession, sample_repository: Repository
     ) -> Job:
         """Create a sample database job for testing."""
         job = Job()
-        job.id = uuid.uuid4()
+        job.id = StringUUID(uuid.uuid4().hex)
         job.repository_id = sample_repository.id
         job.type = "backup"
         job.status = JobStatusEnum.COMPLETED
@@ -67,8 +68,8 @@ class TestJobsAPI:
         job.total_tasks = 1
         job.completed_tasks = 1
         test_db.add(job)
-        test_db.commit()
-        test_db.refresh(job)
+        await test_db.commit()
+        await test_db.refresh(job)
         return job
 
     @pytest.fixture
@@ -159,7 +160,6 @@ class TestJobsAPI:
 
     # Test job creation endpoints
 
-    @pytest.mark.asyncio
     async def test_create_backup_success(
         self,
         async_client: AsyncClient,
@@ -186,7 +186,6 @@ class TestJobsAPI:
         assert "text/html" in response.headers["content-type"]
         setup_dependencies["job_service"].create_backup_job.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_backup_repository_not_found(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -210,7 +209,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_create_backup_general_error(
         self,
         async_client: AsyncClient,
@@ -237,7 +235,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_create_prune_success(
         self,
         async_client: AsyncClient,
@@ -264,7 +261,6 @@ class TestJobsAPI:
         assert "text/html" in response.headers["content-type"]
         setup_dependencies["job_service"].create_prune_job.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_prune_error(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -288,7 +284,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_create_check_success(
         self,
         async_client: AsyncClient,
@@ -314,7 +309,6 @@ class TestJobsAPI:
         assert "text/html" in response.headers["content-type"]
         setup_dependencies["job_service"].create_check_job.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_check_error(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -337,7 +331,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_jobs_html(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -352,7 +345,6 @@ class TestJobsAPI:
         assert "text/html" in response.headers["content-type"]
         setup_dependencies["job_render_service"].render_jobs_html.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_current_jobs_html(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -369,7 +361,6 @@ class TestJobsAPI:
             "job_render_service"
         ].render_current_jobs_html.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_job_not_found(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -380,7 +371,6 @@ class TestJobsAPI:
 
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
     async def test_get_job_status_success(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -414,7 +404,6 @@ class TestJobsAPI:
             status_data.id
         )
 
-    @pytest.mark.asyncio
     async def test_get_job_status_error(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -430,7 +419,6 @@ class TestJobsAPI:
 
     # Test streaming endpoints
 
-    @pytest.mark.asyncio
     async def test_stream_all_jobs(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -449,7 +437,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         setup_dependencies["job_stream_service"].stream_all_jobs.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_stream_job_output(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -471,7 +458,6 @@ class TestJobsAPI:
             "job_stream_service"
         ].stream_job_output.assert_called_once_with(job_id)
 
-    @pytest.mark.asyncio
     async def test_stream_task_output(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -493,7 +479,6 @@ class TestJobsAPI:
             "job_stream_service"
         ].stream_task_output.assert_called_once_with(job_id, 1)
 
-    @pytest.mark.asyncio
     async def test_toggle_job_details(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -542,7 +527,6 @@ class TestJobsAPI:
             "job_render_service"
         ].get_job_for_template.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_toggle_job_details_not_found(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -554,7 +538,6 @@ class TestJobsAPI:
 
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
     async def test_get_job_details_static(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -598,7 +581,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_toggle_task_details(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -666,7 +648,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_toggle_task_details_task_not_found(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -681,7 +662,6 @@ class TestJobsAPI:
 
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
     async def test_copy_job_output(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -692,7 +672,6 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert response.json() == {"message": "Output copied to clipboard"}
 
-    @pytest.mark.asyncio
     async def test_copy_task_output(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -705,7 +684,6 @@ class TestJobsAPI:
 
     # Test request validation
 
-    @pytest.mark.asyncio
     async def test_backup_request_validation(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -729,7 +707,6 @@ class TestJobsAPI:
         response = await async_client.post("/api/jobs/backup", json=invalid_request)
         assert response.status_code == 422
 
-    @pytest.mark.asyncio
     async def test_prune_request_validation(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:
@@ -743,7 +720,6 @@ class TestJobsAPI:
         response = await async_client.post("/api/jobs/prune", json=invalid_request)
         assert response.status_code == 422
 
-    @pytest.mark.asyncio
     async def test_check_request_validation(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
     ) -> None:

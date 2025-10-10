@@ -5,9 +5,10 @@ Tests the full flow from clicking edit button to rendering provider-specific for
 
 import pytest
 from typing import Dict, Any
-from unittest.mock import Mock
+from unittest.mock import Mock, ANY
 from fastapi.testclient import TestClient
 
+from borgitory.dependencies import get_notification_config_service
 from borgitory.main import app
 from borgitory.services.notifications.config_service import NotificationConfigService
 
@@ -90,9 +91,6 @@ class TestNotificationEditIntegration:
             config_data["decrypted"],
         )
 
-        # Override the dependency
-        from borgitory.dependencies import get_notification_config_service
-
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
@@ -137,8 +135,8 @@ class TestNotificationEditIntegration:
         assert "Cancel" in html_content
         assert 'hx-get="/api/notifications/form"' in html_content
 
-        # Verify service was called correctly
-        mock_service.get_config_with_decrypted_data.assert_called_once_with(1)
+        # Verify service was called correctly (db session is first param)
+        mock_service.get_config_with_decrypted_data.assert_called_once_with(ANY, 1)
 
     def test_discord_edit_form_renders_correctly(
         self,

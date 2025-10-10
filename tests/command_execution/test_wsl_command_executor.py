@@ -126,7 +126,6 @@ class TestWSLCommandExecutor:
 
         assert result == command
 
-    @pytest.mark.asyncio
     async def test_execute_command_success(self, executor: WSLCommandExecutor) -> None:
         """Test successful command execution."""
         mock_process = Mock()
@@ -152,7 +151,6 @@ class TestWSLCommandExecutor:
             assert args["stdout"] == asyncio.subprocess.PIPE
             assert args["stderr"] == asyncio.subprocess.PIPE
 
-    @pytest.mark.asyncio
     async def test_execute_command_failure(self, executor: WSLCommandExecutor) -> None:
         """Test failed command execution."""
         mock_process = Mock()
@@ -168,7 +166,6 @@ class TestWSLCommandExecutor:
             assert result.stderr == "error message"
             assert result.error == "error message"
 
-    @pytest.mark.asyncio
     async def test_execute_command_with_input(
         self, executor: WSLCommandExecutor
     ) -> None:
@@ -189,7 +186,6 @@ class TestWSLCommandExecutor:
             args = mock_create.call_args[1]
             assert args["stdin"] == asyncio.subprocess.PIPE
 
-    @pytest.mark.asyncio
     async def test_execute_command_timeout(self, executor: WSLCommandExecutor) -> None:
         """Test command execution timeout."""
         mock_process = Mock()
@@ -207,7 +203,6 @@ class TestWSLCommandExecutor:
                 mock_process.kill.assert_called_once()
                 mock_process.wait.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_command_exception(
         self, executor: WSLCommandExecutor
     ) -> None:
@@ -222,7 +217,6 @@ class TestWSLCommandExecutor:
             assert result.error is not None
             assert "WSL command execution failed: Permission denied" in result.error
 
-    @pytest.mark.asyncio
     async def test_execute_command_with_all_params(
         self, executor: WSLCommandExecutor
     ) -> None:
@@ -242,7 +236,6 @@ class TestWSLCommandExecutor:
             assert result.success is True
             assert result.command == ["borg", "list"]
 
-    @pytest.mark.asyncio
     async def test_execute_command_no_such_file_warning_suppressed(
         self, executor: WSLCommandExecutor
     ) -> None:
@@ -263,7 +256,6 @@ class TestWSLCommandExecutor:
                 # Should not log warning for "No such file or directory"
                 mock_logger.warning.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_create_subprocess(self, executor: WSLCommandExecutor) -> None:
         """Test subprocess creation for streaming."""
         mock_process = Mock()
@@ -293,7 +285,6 @@ class TestWSLCommandExecutor:
             # For FIFO streaming, stderr is redirected to stdout
             assert kwargs["stderr"] == asyncio.subprocess.STDOUT
 
-    @pytest.mark.asyncio
     async def test_create_subprocess_default_pipes(
         self, executor: WSLCommandExecutor
     ) -> None:
@@ -335,7 +326,6 @@ class TestWSLCommandExecutor:
         assert "borg create --stats ::backup-{now} /home/user/data" in shell_command
         assert " && " in shell_command  # Commands should be chained
 
-    @pytest.mark.asyncio
     async def test_execute_command_utf8_handling(
         self, executor: WSLCommandExecutor
     ) -> None:
@@ -354,7 +344,6 @@ class TestWSLCommandExecutor:
             assert result.success is True
             assert result.stdout == utf8_content
 
-    @pytest.mark.asyncio
     async def test_execute_command_invalid_utf8_handling(
         self, executor: WSLCommandExecutor
     ) -> None:

@@ -2,7 +2,6 @@
 Tests for JobOutputManager - job output collection, storage, and streaming
 """
 
-import pytest
 import uuid
 from datetime import timedelta
 
@@ -29,7 +28,6 @@ class TestJobOutputManager:
         assert job_output.total_lines == 0
         assert job_id in self.output_manager._job_outputs
 
-    @pytest.mark.asyncio
     async def test_add_output_line(self) -> None:
         """Test adding output lines to a job"""
         job_id = uuid.uuid4()
@@ -49,7 +47,6 @@ class TestJobOutputManager:
         assert line["type"] == "stdout"
         assert line["metadata"]["key"] == "value"
 
-    @pytest.mark.asyncio
     async def test_add_output_line_auto_create(self) -> None:
         """Test adding output line automatically creates job output"""
         job_id = uuid.uuid4()
@@ -60,7 +57,6 @@ class TestJobOutputManager:
         assert job_output is not None
         assert job_output.total_lines == 1
 
-    @pytest.mark.asyncio
     async def test_add_output_line_with_progress(self) -> None:
         """Test adding output line with progress information"""
         job_id = uuid.uuid4()
@@ -74,7 +70,6 @@ class TestJobOutputManager:
         assert job_output.current_progress["bytes_processed"] == 1000
         assert job_output.current_progress["percentage"] == 50
 
-    @pytest.mark.asyncio
     async def test_max_lines_limit(self) -> None:
         """Test that output lines respect max limit"""
         job_id = uuid.uuid4()
@@ -93,7 +88,6 @@ class TestJobOutputManager:
         assert lines[0]["text"] == "Line 5"  # First kept line
         assert lines[-1]["text"] == "Line 14"  # Last line
 
-    @pytest.mark.asyncio
     async def test_get_job_output_stream(self) -> None:
         """Test getting formatted job output stream"""
         job_id = uuid.uuid4()
@@ -109,7 +103,6 @@ class TestJobOutputManager:
         assert output_stream.lines[0].text == "Line 1"
         assert output_stream.lines[1].text == "Line 2"
 
-    @pytest.mark.asyncio
     async def test_get_job_output_stream_nonexistent(self) -> None:
         """Test getting output stream for nonexistent job"""
         output_stream = await self.output_manager.get_job_output_stream("nonexistent")
@@ -118,7 +111,6 @@ class TestJobOutputManager:
         assert output_stream.total_lines == 0
         assert output_stream.progress == {}
 
-    @pytest.mark.asyncio
     async def test_stream_job_output(self) -> None:
         """Test streaming job output"""
         job_id = uuid.uuid4()
@@ -184,7 +176,6 @@ class TestJobOutputManager:
         assert all_outputs["job1"]["job_id"] == "job1"
         assert all_outputs["job2"]["job_id"] == "job2"
 
-    @pytest.mark.asyncio
     async def test_format_output_for_display(self) -> None:
         """Test formatting output for display"""
         job_id = uuid.uuid4()

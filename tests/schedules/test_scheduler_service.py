@@ -1,6 +1,6 @@
 import uuid
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from borgitory.utils.datetime_utils import now_utc
 
 from borgitory.services.scheduling.scheduler_service import SchedulerService
@@ -12,9 +12,11 @@ class TestSchedulerService:
     def setup_method(self) -> None:
         """Set up test fixtures"""
         mock_job_manager = Mock()
-        self.scheduler_service = SchedulerService(job_manager=mock_job_manager)
+        mock_job_service = Mock()
+        self.scheduler_service = SchedulerService(
+            job_manager=mock_job_manager, job_service=mock_job_service
+        )
 
-    @pytest.mark.asyncio
     async def test_start_scheduler(self) -> None:
         """Test starting the scheduler"""
         with (
@@ -29,7 +31,6 @@ class TestSchedulerService:
             mock_reload.assert_called_once()
             assert self.scheduler_service._running is True
 
-    @pytest.mark.asyncio
     async def test_start_scheduler_already_running(self) -> None:
         """Test starting scheduler when already running"""
         self.scheduler_service._running = True
@@ -40,7 +41,6 @@ class TestSchedulerService:
             # Should not call start again
             mock_start.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_stop_scheduler(self) -> None:
         """Test stopping the scheduler"""
         self.scheduler_service._running = True
@@ -53,7 +53,6 @@ class TestSchedulerService:
             mock_shutdown.assert_called_once_with(wait=True)
             assert self.scheduler_service._running is False
 
-    @pytest.mark.asyncio
     async def test_stop_scheduler_not_running(self) -> None:
         """Test stopping scheduler when not running"""
         self.scheduler_service._running = False
@@ -66,7 +65,6 @@ class TestSchedulerService:
             # Should not call shutdown if not running
             mock_shutdown.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_add_schedule_success(self) -> None:
         """Test successfully adding a schedule"""
         self.scheduler_service._running = True
@@ -94,7 +92,6 @@ class TestSchedulerService:
             mock_add_job.assert_called_once()
             mock_update.assert_called_once_with(schedule_id, job_id)
 
-    @pytest.mark.asyncio
     async def test_add_schedule_invalid_cron(self) -> None:
         """Test adding schedule with invalid cron expression"""
         self.scheduler_service._running = True
@@ -109,7 +106,6 @@ class TestSchedulerService:
 
         assert "Failed to add schedule" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_add_schedule_scheduler_not_running(self) -> None:
         """Test adding schedule when scheduler is not running"""
         self.scheduler_service._running = False
@@ -119,7 +115,6 @@ class TestSchedulerService:
 
         assert "Scheduler is not running" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_remove_schedule_success(self) -> None:
         """Test successfully removing a schedule"""
         self.scheduler_service._running = True
@@ -132,7 +127,6 @@ class TestSchedulerService:
 
             mock_remove.assert_called_once_with(f"backup_schedule_{schedule_id}")
 
-    @pytest.mark.asyncio
     async def test_remove_schedule_not_found(self) -> None:
         """Test removing a schedule that doesn't exist"""
         self.scheduler_service._running = True
@@ -146,7 +140,6 @@ class TestSchedulerService:
             # Should not raise exception
             await self.scheduler_service.remove_schedule(schedule_id)
 
-    @pytest.mark.asyncio
     async def test_update_schedule_enabled(self) -> None:
         """Test updating an enabled schedule"""
         self.scheduler_service._running = True
@@ -172,7 +165,6 @@ class TestSchedulerService:
                 schedule_id, schedule_name, cron_expression
             )
 
-    @pytest.mark.asyncio
     async def test_update_schedule_disabled(self) -> None:
         """Test updating a disabled schedule"""
         self.scheduler_service._running = True
@@ -197,7 +189,6 @@ class TestSchedulerService:
             # Should not add when disabled
             mock_add.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_get_scheduled_jobs(self) -> None:
         """Test getting scheduled jobs"""
         self.scheduler_service._running = True
@@ -224,7 +215,6 @@ class TestSchedulerService:
             assert jobs[0]["name"] == "Daily Backup"
             assert jobs[0]["next_run"] == mock_job1.next_run_time
 
-    @pytest.mark.asyncio
     async def test_get_scheduled_jobs_scheduler_not_running(self) -> None:
         """Test getting jobs when scheduler is not running"""
         self.scheduler_service._running = False
@@ -233,10 +223,8 @@ class TestSchedulerService:
 
         assert jobs == []
 
-    @pytest.mark.asyncio
     async def test_reload_schedules_success(self) -> None:
         """Test successfully reloading schedules from database"""
-        mock_db = Mock()
         mock_schedule1 = Mock()
         mock_schedule1.id = 123
         mock_schedule1.name = "Schedule 1"
@@ -247,20 +235,26 @@ class TestSchedulerService:
         mock_schedule2.name = "Schedule 2"
         mock_schedule2.cron_expression = "0 4 * * *"
 
-        mock_db.query.return_value.filter.return_value.all.return_value = [
-            mock_schedule1,
-            mock_schedule2,
-        ]
+        # Mock SQLAlchemy 2.0 query pattern
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [mock_schedule1, mock_schedule2]
+        mock_result = Mock()
+        mock_result.scalars.return_value = mock_scalars
+
+        mock_db = Mock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db.__aexit__ = AsyncMock(return_value=None)
 
         with (
             patch(
-                "borgitory.services.scheduling.scheduler_service.get_db_session"
-            ) as mock_get_db,
+                "borgitory.models.database.async_session_maker"
+            ) as mock_session_maker,
             patch.object(
                 self.scheduler_service, "_add_schedule_internal", new_callable=AsyncMock
             ) as mock_add,
         ):
-            mock_get_db.return_value.__enter__.return_value = mock_db
+            mock_session_maker.return_value = mock_db
 
             await self.scheduler_service._reload_schedules()
 
@@ -268,7 +262,6 @@ class TestSchedulerService:
             mock_add.assert_any_call(123, "Schedule 1", "0 2 * * *", persist=False)
             mock_add.assert_any_call(456, "Schedule 2", "0 4 * * *", persist=False)
 
-    @pytest.mark.asyncio
     async def test_update_next_run_time_success(self) -> None:
         """Test updating next run time in database"""
         schedule_id = 123
@@ -278,20 +271,23 @@ class TestSchedulerService:
         mock_job = Mock()
         mock_job.next_run_time = next_run_time
 
-        mock_db = Mock()
         mock_schedule = Mock()
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_schedule
-        )
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_schedule
+
+        mock_db = Mock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db.__aexit__ = AsyncMock(return_value=None)
 
         with (
             patch.object(self.scheduler_service.scheduler, "get_job") as mock_get_job,
             patch(
-                "borgitory.services.scheduling.scheduler_service.get_db_session"
-            ) as mock_get_db,
+                "borgitory.models.database.async_session_maker"
+            ) as mock_session_maker,
         ):
             mock_get_job.return_value = mock_job
-            mock_get_db.return_value.__enter__.return_value = mock_db
+            mock_session_maker.return_value = mock_db
 
             await self.scheduler_service._update_next_run_time(schedule_id, job_id)
 

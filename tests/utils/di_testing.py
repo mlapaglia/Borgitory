@@ -359,30 +359,6 @@ class DependencyTestHelper:
         except Exception as e:
             raise AssertionError(f"Service creation failed: {e}")
 
-    @staticmethod
-    def verify_dependency_override_works(
-        dependency_func: Callable[..., T],
-        mock_service: T,
-        test_endpoint: str = "/api/debug/info",
-    ) -> None:
-        """
-        Verify that dependency override works correctly.
-
-        Args:
-            dependency_func: The dependency function to override
-            mock_service: The mock service to use as override
-            test_endpoint: API endpoint to test (default: debug endpoint)
-
-        Raises:
-            AssertionError: If dependency override doesn't work
-        """
-        with override_dependency(dependency_func, lambda: mock_service) as client:
-            # Test that the endpoint can be called (basic smoke test)
-            response = client.get(test_endpoint)
-            # We don't assert status code since some endpoints require auth
-            # The important thing is that the dependency injection worked
-            assert response is not None, "No response received"
-
 
 def create_test_overrides_for_hybrid_services() -> Dict[
     Callable[..., Any], Callable[..., Any]

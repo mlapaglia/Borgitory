@@ -168,6 +168,7 @@ class DiscordProvider(NotificationProvider):
     ) -> None:
         super().__init__(config)
         self.config: DiscordConfig = config
+        self._http_client_provided = http_client is not None
         self.http_client = http_client or AiohttpClient()
 
     async def send_notification(
@@ -297,6 +298,11 @@ class DiscordProvider(NotificationProvider):
             NotificationType.INFO: 0x0099FF,  # Blue
         }
         return color_map.get(notification_type, 0x0099FF)
+
+    async def cleanup(self) -> None:
+        """Clean up HTTP client resources if we own them"""
+        if not self._http_client_provided and hasattr(self.http_client, "close"):
+            await self.http_client.close()
 
 
 # Register the provider directly

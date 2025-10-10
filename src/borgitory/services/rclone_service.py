@@ -1,8 +1,8 @@
 import asyncio
 import logging
 import subprocess
-import tempfile
 import os
+import tempfile
 import time
 from typing import (
     AsyncGenerator,
@@ -18,7 +18,14 @@ from typing import (
 
 from borgitory.models.database import Repository
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.cloud_providers.storage.s3_storage import (
+    S3Storage,
+    S3StorageConfig,
+)
+from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
+from borgitory.protocols.file_protocols import FileServiceProtocol
+from contextlib import asynccontextmanager, AsyncExitStack
+from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
@@ -73,16 +80,6 @@ class SMBConfig(TypedDict):
 CloudProviderConfig = Union[S3Config, SFTPConfig, SMBConfig]
 
 
-class ConnectionTestResult(TypedDict, total=False):
-    """Type definition for connection test results"""
-
-    status: Literal["success", "failed", "warning", "error"]
-    message: str
-    output: Optional[str]
-    details: Optional[Dict[str, Union[str, int, bool, None]]]
-    can_write: Optional[bool]
-
-
 class SyncResult(TypedDict, total=False):
     """Type definition for sync operation results"""
 
@@ -91,280 +88,14 @@ class SyncResult(TypedDict, total=False):
     stats: Optional[Dict[str, Union[str, int, float]]]
 
 
-class ProgressData(TypedDict, total=False):
-    """Type definition for progress data from rclone operations"""
-
-    type: str
-    transferred: Optional[str]
-    total: Optional[str]
-    percentage: Optional[float]
-    speed: Optional[str]
-    eta: Optional[str]
-    command: Optional[str]
-    pid: Optional[int]
-    return_code: Optional[int]
-    status: Optional[str]
-    message: Optional[str]
-    stream: Optional[str]
-
-
 class RcloneService:
-    def __init__(self, command_executor: CommandExecutorProtocol) -> None:
+    def __init__(
+        self,
+        command_executor: CommandExecutorProtocol,
+        file_service: FileServiceProtocol,
+    ) -> None:
         self.command_executor = command_executor
-
-    def _build_s3_flags(
-        self,
-        access_key_id: str,
-        secret_access_key: str,
-        region: str = "us-east-1",
-        endpoint_url: Optional[str] = None,
-        storage_class: str = "STANDARD",
-    ) -> List[str]:
-        """Build S3 configuration flags for rclone command"""
-        flags = [
-            "--s3-access-key-id",
-            access_key_id,
-            "--s3-secret-access-key",
-            secret_access_key,
-            "--s3-provider",
-            "AWS",
-            "--s3-region",
-            region,
-            "--s3-storage-class",
-            storage_class,
-        ]
-
-        # Add endpoint URL if specified (for S3-compatible services)
-        if endpoint_url:
-            flags.extend(["--s3-endpoint", endpoint_url])
-
-        return flags
-
-    async def sync_repository_to_s3(
-        self,
-        repository: Repository,
-        access_key_id: str,
-        secret_access_key: str,
-        bucket_name: str,
-        path_prefix: str = "",
-        region: str = "us-east-1",
-        endpoint_url: Optional[str] = None,
-        storage_class: str = "STANDARD",
-    ) -> AsyncGenerator[ProgressData, None]:
-        """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
-
-        # Build S3 path
-        s3_path = f":s3:{bucket_name}"
-        if path_prefix:
-            s3_path = f"{s3_path}/{path_prefix}"
-
-        # Build rclone command with S3 backend flags
-        command = [
-            "rclone",
-            "sync",
-            repository.path,
-            s3_path,
-            "--progress",
-            "--stats",
-            "1s",
-            "--verbose",
-        ]
-
-        # Add S3 configuration flags
-        s3_flags = self._build_s3_flags(
-            access_key_id, secret_access_key, region, endpoint_url, storage_class
-        )
-        command.extend(s3_flags)
-
-        try:
-            process = await self.command_executor.create_subprocess(
-                command=command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            yield cast(
-                ProgressData,
-                {"type": "started", "command": " ".join(command), "pid": process.pid},
-            )
-
-            async def read_stream(
-                stream: Optional[asyncio.StreamReader], stream_type: str
-            ) -> AsyncGenerator[ProgressData, None]:
-                if stream is None:
-                    return
-                while True:
-                    line = await stream.readline()
-                    if not line:
-                        break
-
-                    decoded_line = line.decode("utf-8").strip()
-                    progress_data = self.parse_rclone_progress(decoded_line)
-
-                    if progress_data:
-                        yield cast(ProgressData, {"type": "progress", **progress_data})
-                    else:
-                        yield cast(
-                            ProgressData,
-                            {
-                                "type": "log",
-                                "stream": stream_type,
-                                "message": decoded_line,
-                            },
-                        )
-
-            async for item in self._merge_async_generators(
-                read_stream(process.stdout, "stdout"),
-                read_stream(process.stderr, "stderr"),
-            ):
-                yield item
-
-            return_code = await process.wait()
-
-            yield cast(
-                ProgressData,
-                {
-                    "type": "completed",
-                    "return_code": return_code,
-                    "status": "success" if return_code == 0 else "failed",
-                },
-            )
-
-        except Exception as e:
-            yield cast(ProgressData, {"type": "error", "message": str(e)})
-
-    async def test_s3_connection(
-        self,
-        access_key_id: str,
-        secret_access_key: str,
-        bucket_name: str,
-        region: str = "us-east-1",
-        endpoint_url: Optional[str] = None,
-        storage_class: str = "STANDARD",
-    ) -> ConnectionTestResult:
-        """Test S3 connection by checking bucket access"""
-        try:
-            s3_path = f":s3:{bucket_name}"
-
-            # Build rclone command with S3 backend flags
-            command = [
-                "rclone",
-                "lsd",
-                s3_path,
-                "--max-depth",
-                "1",
-                "--verbose",
-            ]
-
-            # Add S3 configuration flags
-            s3_flags = self._build_s3_flags(
-                access_key_id, secret_access_key, region, endpoint_url, storage_class
-            )
-            command.extend(s3_flags)
-
-            result = await self.command_executor.execute_command(
-                command=command,
-                timeout=30.0,  # Reasonable timeout for connection test
-            )
-
-            if result.success:
-                test_result = await self._test_s3_write_permissions(
-                    access_key_id, secret_access_key, bucket_name
-                )
-
-                if test_result.get("status") == "success":
-                    return {
-                        "status": "success",
-                        "message": "Connection successful - bucket accessible and writable",
-                        "output": result.stdout,
-                        "details": {"read_test": "passed", "write_test": "passed"},
-                    }
-                else:
-                    return {
-                        "status": "warning",
-                        "message": f"Bucket is readable but may have write permission issues: {test_result.get('message', 'Unknown error')}",
-                        "output": result.stdout,
-                        "details": {"read_test": "passed", "write_test": "failed"},
-                    }
-            else:
-                error_message = result.stderr.lower()
-                if "no such bucket" in error_message or "nosuchbucket" in error_message:
-                    return {
-                        "status": "failed",
-                        "message": f"Bucket '{bucket_name}' does not exist or is not accessible",
-                    }
-                elif (
-                    "invalid access key" in error_message
-                    or "access denied" in error_message
-                ):
-                    return {
-                        "status": "failed",
-                        "message": "Access denied - check your AWS credentials",
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "message": f"Connection failed: {result.stderr}",
-                    }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Test failed with exception: {str(e)}",
-            }
-
-    async def _test_s3_write_permissions(
-        self, access_key_id: str, secret_access_key: str, bucket_name: str
-    ) -> ConnectionTestResult:
-        """Test write permissions by creating and deleting a small test file"""
-        try:
-            test_content = f"borgitory-test-{now_utc().isoformat()}"
-            test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
-
-            with tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".txt"
-            ) as temp_file:
-                temp_file.write(test_content)
-                temp_file_path = temp_file.name
-
-            try:
-                s3_path = f":s3:{bucket_name}/{test_filename}"
-
-                upload_command = ["rclone", "copy", temp_file_path, s3_path]
-
-                s3_flags = self._build_s3_flags(access_key_id, secret_access_key)
-                upload_command.extend(s3_flags)
-
-                upload_result = await self.command_executor.execute_command(
-                    command=upload_command, timeout=30.0
-                )
-
-                if upload_result.success:
-                    delete_command = ["rclone", "delete", s3_path]
-                    delete_command.extend(s3_flags)
-
-                    await self.command_executor.execute_command(
-                        command=delete_command, timeout=30.0
-                    )
-
-                    return {
-                        "status": "success",
-                        "message": "Write permissions verified",
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "message": f"Cannot write to bucket: {upload_result.stderr}",
-                    }
-
-            finally:
-                try:
-                    os.unlink(temp_file_path)
-                except OSError:
-                    pass
-
-        except Exception as e:
-            return {"status": "failed", "message": f"Write test failed: {str(e)}"}
+        self.file_service = file_service
 
     def parse_rclone_progress(
         self, line: str
@@ -402,30 +133,31 @@ class RcloneService:
 
         return None
 
-    def _build_sftp_flags(
+    @asynccontextmanager
+    async def _build_sftp_flags(
         self,
         host: str,
         username: str,
         port: int = 22,
         password: Optional[str] = None,
         private_key: Optional[str] = None,
-    ) -> List[str]:
+    ) -> AsyncIterator[List[str]]:
         """Build SFTP configuration flags for rclone command"""
         flags = ["--sftp-host", host, "--sftp-user", username, "--sftp-port", str(port)]
 
-        if password:
-            obscured_password = self._obscure_password(password)
-            flags.extend(["--sftp-pass", obscured_password])
-        elif private_key:
-            with tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".pem"
-            ) as key_file:
-                key_file.write(private_key)
-                key_file_path = key_file.name
+        async with AsyncExitStack() as stack:
+            if password:
+                obscured_password = self._obscure_password(password)
+                flags.extend(["--sftp-pass", obscured_password])
+            elif private_key:
+                key_file_path = await stack.enter_async_context(
+                    self.file_service.create_temp_file(
+                        suffix=".pem", content=private_key.encode("utf-8")
+                    )
+                )
+                flags.extend(["--sftp-key-file", key_file_path])
 
-            flags.extend(["--sftp-key-file", key_file_path])
-
-        return flags
+            yield flags
 
     def _obscure_password(self, password: str) -> str:
         """Obscure password using rclone's method"""
@@ -462,12 +194,10 @@ class RcloneService:
     ) -> AsyncGenerator[ProgressData, None]:
         """Sync a Borg repository to SFTP using Rclone with SFTP backend"""
 
-        # Build SFTP path
         sftp_path = f":sftp:{remote_path}"
         if path_prefix:
             sftp_path = f"{sftp_path}/{path_prefix}"
 
-        # Build rclone command with SFTP backend flags
         command = [
             "rclone",
             "sync",
@@ -479,84 +209,75 @@ class RcloneService:
             "--verbose",
         ]
 
-        # Add SFTP configuration flags
-        sftp_flags = self._build_sftp_flags(host, username, port, password, private_key)
-        command.extend(sftp_flags)
-
-        key_file_path = None
         try:
-            if "--sftp-key-file" in sftp_flags:
-                key_file_idx = sftp_flags.index("--sftp-key-file")
-                if key_file_idx + 1 < len(sftp_flags):
-                    key_file_path = sftp_flags[key_file_idx + 1]
+            async with self._build_sftp_flags(
+                host, username, port, password, private_key
+            ) as sftp_flags:
+                command.extend(sftp_flags)
 
-            process = await self.command_executor.create_subprocess(
-                command=command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+                process = await self.command_executor.create_subprocess(
+                    command=command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
 
-            yield cast(
-                ProgressData,
-                {
-                    "type": "started",
-                    "command": " ".join(
-                        [c for c in command if not c.startswith("--sftp-pass")]
-                    ),  # Hide password
-                    "pid": process.pid,
-                },
-            )
+                yield cast(
+                    ProgressData,
+                    {
+                        "type": "started",
+                        "command": " ".join(
+                            [c for c in command if not c.startswith("--sftp-pass")]
+                        ),
+                        "pid": process.pid,
+                    },
+                )
 
-            async def read_stream(
-                stream: Optional[asyncio.StreamReader], stream_type: str
-            ) -> AsyncGenerator[ProgressData, None]:
-                if stream is None:
-                    return
-                while True:
-                    line = await stream.readline()
-                    if not line:
-                        break
+                async def read_stream(
+                    stream: Optional[asyncio.StreamReader], stream_type: str
+                ) -> AsyncGenerator[ProgressData, None]:
+                    if stream is None:
+                        return
+                    while True:
+                        line = await stream.readline()
+                        if not line:
+                            break
 
-                    decoded_line = line.decode("utf-8").strip()
-                    progress_data = self.parse_rclone_progress(decoded_line)
+                        decoded_line = line.decode("utf-8").strip()
+                        progress_data = self.parse_rclone_progress(decoded_line)
 
-                    if progress_data:
-                        yield cast(ProgressData, {"type": "progress", **progress_data})
-                    else:
-                        yield cast(
-                            ProgressData,
-                            {
-                                "type": "log",
-                                "stream": stream_type,
-                                "message": decoded_line,
-                            },
-                        )
+                        if progress_data:
+                            yield cast(
+                                ProgressData, {"type": "progress", **progress_data}
+                            )
+                        else:
+                            yield cast(
+                                ProgressData,
+                                {
+                                    "type": "log",
+                                    "stream": stream_type,
+                                    "message": decoded_line,
+                                },
+                            )
 
-            async for item in self._merge_async_generators(
-                read_stream(process.stdout, "stdout"),
-                read_stream(process.stderr, "stderr"),
-            ):
-                yield item
+                async for item in self._merge_async_generators(
+                    read_stream(process.stdout, "stdout"),
+                    read_stream(process.stderr, "stderr"),
+                ):
+                    yield item
 
-            return_code = await process.wait()
+                return_code = await process.wait()
 
-            yield cast(
-                ProgressData,
-                {
-                    "type": "completed",
-                    "return_code": return_code,
-                    "status": "success" if return_code == 0 else "failed",
-                },
-            )
+                yield cast(
+                    ProgressData,
+                    {
+                        "type": "completed",
+                        "return_code": return_code,
+                        "status": "success" if return_code == 0 else "failed",
+                    },
+                )
 
         except Exception as e:
             yield cast(ProgressData, {"type": "error", "message": str(e)})
-        finally:
-            if key_file_path:
-                try:
-                    os.unlink(key_file_path)
-                except OSError:
-                    pass
 
     async def test_sftp_connection(
         self,
@@ -568,92 +289,82 @@ class RcloneService:
         private_key: Optional[str] = None,
     ) -> ConnectionTestResult:
         """Test SFTP connection by listing remote directory"""
-        key_file_path = None
         try:
             sftp_path = f":sftp:{remote_path}"
 
             command = ["rclone", "lsd", sftp_path, "--max-depth", "1", "--verbose"]
 
-            sftp_flags = self._build_sftp_flags(
+            async with self._build_sftp_flags(
                 host, username, port, password, private_key
-            )
-            command.extend(sftp_flags)
+            ) as sftp_flags:
+                command.extend(sftp_flags)
 
-            if "--sftp-key-file" in sftp_flags:
-                key_file_idx = sftp_flags.index("--sftp-key-file")
-                if key_file_idx + 1 < len(sftp_flags):
-                    key_file_path = sftp_flags[key_file_idx + 1]
-
-            result = await self.command_executor.execute_command(
-                command=command, timeout=30.0
-            )
-
-            if result.success:
-                test_result = await self._test_sftp_write_permissions(
-                    host, username, remote_path, port, password, private_key
+                result = await self.command_executor.execute_command(
+                    command=command, timeout=30.0
                 )
 
-                if test_result.get("status") == "success":
-                    return {
-                        "status": "success",
-                        "message": "SFTP connection successful - remote directory accessible and writable",
-                        "output": result.stdout,
-                        "details": {
-                            "read_test": "passed",
-                            "write_test": "passed",
-                            "host": host,
-                            "port": port,
-                        },
-                    }
+                if result.success:
+                    test_result = await self._test_sftp_write_permissions(
+                        host, username, remote_path, port, password, private_key
+                    )
+
+                    if test_result.get("status") == "success":
+                        return ConnectionTestResult(
+                            status="success",
+                            message="SFTP connection successful - remote directory accessible and writable",
+                            output=result.stdout,
+                            details={
+                                "read_test": "passed",
+                                "write_test": "passed",
+                                "host": host,
+                                "port": port,
+                            },
+                        )
+
+                    else:
+                        return ConnectionTestResult(
+                            status="warning",
+                            message=f"SFTP directory is readable but may have write permission issues: {test_result.get('message')}",
+                            output=result.stdout,
+                            details={
+                                "read_test": "passed",
+                                "write_test": "failed",
+                                "host": host,
+                                "port": port,
+                            },
+                        )
+
                 else:
-                    return {
-                        "status": "warning",
-                        "message": f"SFTP directory is readable but may have write permission issues: {test_result.get('message')}",
-                        "output": result.stdout,
-                        "details": {
-                            "read_test": "passed",
-                            "write_test": "failed",
-                            "host": host,
-                            "port": port,
-                        },
-                    }
-            else:
-                error_message = result.stderr.lower()
-                if "connection refused" in error_message:
-                    return {
-                        "status": "failed",
-                        "message": f"Connection refused to {host}:{port} - check host and port",
-                    }
-                elif (
-                    "authentication failed" in error_message
-                    or "permission denied" in error_message
-                ):
-                    return {
-                        "status": "failed",
-                        "message": "Authentication failed - check username, password, or SSH key",
-                    }
-                elif "no such file or directory" in error_message:
-                    return {
-                        "status": "failed",
-                        "message": f"Remote path '{remote_path}' does not exist",
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "message": f"SFTP connection failed: {result.stderr}",
-                    }
+                    error_message = result.stderr.lower()
+                    if "connection refused" in error_message:
+                        return ConnectionTestResult(
+                            status="failed",
+                            message=f"Connection refused to {host}:{port} - check host and port",
+                        )
+                    elif (
+                        "authentication failed" in error_message
+                        or "permission denied" in error_message
+                    ):
+                        return ConnectionTestResult(
+                            status="failed",
+                            message="Authentication failed - check username, password, or SSH key",
+                        )
+                    elif "no such file or directory" in error_message:
+                        return ConnectionTestResult(
+                            status="failed",
+                            message=f"Remote path '{remote_path}' does not exist",
+                        )
+                    else:
+                        return ConnectionTestResult(
+                            status="failed",
+                            message=f"SFTP connection failed: {result.stderr}",
+                        )
 
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Test failed with exception: {str(e)}",
-            }
-        finally:
-            if key_file_path:
-                try:
-                    os.unlink(key_file_path)
-                except OSError:
-                    pass
+            return ConnectionTestResult(
+                status="error",
+                message=f"Test failed with exception: {str(e)}",
+            )
 
     async def _test_sftp_write_permissions(
         self,
@@ -674,55 +385,44 @@ class RcloneService:
             test_content = f"borgitory-test-{now_utc().isoformat()}"
             test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
 
-            with tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".txt"
-            ) as temp_file:
-                temp_file.write(test_content)
-                temp_file_path = temp_file.name
-
-            try:
+            async with self.file_service.create_temp_file(
+                suffix=".txt", content=test_content.encode("utf-8")
+            ) as temp_file_path:
                 sftp_path = f":sftp:{remote_path}/{test_filename}"
 
                 upload_command = ["rclone", "copy", temp_file_path, sftp_path]
 
-                sftp_flags = self._build_sftp_flags(
+                async with self._build_sftp_flags(
                     host, username, port, password, private_key
-                )
-                upload_command.extend(sftp_flags)
+                ) as sftp_flags:
+                    upload_command.extend(sftp_flags)
 
-                if "--sftp-key-file" in sftp_flags:
-                    key_file_idx = sftp_flags.index("--sftp-key-file")
-                    if key_file_idx + 1 < len(sftp_flags):
-                        key_file_path = sftp_flags[key_file_idx + 1]
+                    if "--sftp-key-file" in sftp_flags:
+                        key_file_idx = sftp_flags.index("--sftp-key-file")
+                        if key_file_idx + 1 < len(sftp_flags):
+                            key_file_path = sftp_flags[key_file_idx + 1]
 
-                upload_result = await self.command_executor.execute_command(
-                    command=upload_command, timeout=30.0
-                )
-
-                if upload_result.success:
-                    delete_command = ["rclone", "delete", sftp_path]
-                    delete_command.extend(sftp_flags)
-
-                    await self.command_executor.execute_command(
-                        command=delete_command, timeout=30.0
+                    upload_result = await self.command_executor.execute_command(
+                        command=upload_command, timeout=30.0
                     )
 
-                    return {
-                        "status": "success",
-                        "message": "Write permissions verified",
-                    }
-                else:
-                    return {
-                        "status": "failed",
-                        "message": f"Cannot write to SFTP directory: {upload_result.stderr}",
-                    }
+                    if upload_result.success:
+                        delete_command = ["rclone", "delete", sftp_path]
+                        delete_command.extend(sftp_flags)
 
-            finally:
-                if temp_file_path:
-                    try:
-                        os.unlink(temp_file_path)
-                    except OSError:
-                        pass
+                        await self.command_executor.execute_command(
+                            command=delete_command, timeout=30.0
+                        )
+
+                        return {
+                            "status": "success",
+                            "message": "Write permissions verified",
+                        }
+                    else:
+                        return {
+                            "status": "failed",
+                            "message": f"Cannot write to SFTP directory: {upload_result.stderr}",
+                        }
 
         except Exception as e:
             return {"status": "failed", "message": f"Write test failed: {str(e)}"}
@@ -767,26 +467,16 @@ class RcloneService:
             provider = str(config.get("provider", "")).lower()
 
             if provider == "s3":
-                bucket_name = config.get("bucket_name")
-                access_key_id = config.get("access_key_id")
-                secret_access_key = config.get("secret_access_key")
+                s3_storage = S3Storage(
+                    cast(S3StorageConfig, config),
+                    self.command_executor,
+                    self.file_service,
+                )
                 path_prefix = str(config.get("path_prefix", ""))
 
-                if not all([bucket_name, access_key_id, secret_access_key]):
-                    return {
-                        "success": False,
-                        "error": "Missing required S3 configuration (bucket_name, access_key_id, secret_access_key)",
-                    }
-
-                mock_repo = Repository()
-                mock_repo.path = source_path
-
                 stats: Dict[str, Union[str, int, float]] = {}
-                async for progress_data in self.sync_repository_to_s3(
-                    repository=mock_repo,
-                    access_key_id=str(access_key_id),
-                    secret_access_key=str(secret_access_key),
-                    bucket_name=str(bucket_name),
+                async for progress_data in s3_storage.sync_repository_to_s3(
+                    repository_path=source_path,
                     path_prefix=path_prefix,
                 ):
                     if progress_callback:

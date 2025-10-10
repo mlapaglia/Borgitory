@@ -3,10 +3,14 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="description" content="Borgitory - A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities.">
-        <meta name="keywords" content="borgbackup, backup, web-interface, scheduling, cloud-sync, archive-management, data-protection">
+        <meta name="description"
+              content="Borgitory - A comprehensive web-based management interface for BorgBackup repositories with real-time monitoring, automated scheduling, and cloud synchronization capabilities.">
+        <meta name="keywords"
+              content="borgbackup, backup, web-interface, scheduling, cloud-sync, archive-management, data-protection">
         <title>
-            {% block title %}Borgitory - BorgBackup Manager{% endblock title %}
+            {% block title %}
+                Borgitory - BorgBackup Manager
+            {% endblock title %}
         </title>
         <!-- Favicon -->
         <link rel="apple-touch-icon"
@@ -132,7 +136,8 @@
             </div>
         </nav>
         <main>
-            {% block content %}{% endblock content %}
+            {% block content %}
+            {% endblock content %}
         </main>
         <div id="notification-area" class="fixed top-4 right-4 z-50"></div>
         <!-- Timezone Detection Script -->

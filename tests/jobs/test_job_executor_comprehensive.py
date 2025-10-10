@@ -24,7 +24,6 @@ class TestJobExecutorPruneTask:
 
         return JobExecutor(LinuxCommandExecutor())
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_success_basic(
         self, executor: JobExecutor
     ) -> None:
@@ -64,7 +63,6 @@ class TestJobExecutorPruneTask:
         assert result.error is None
         assert b"Prune completed successfully" in result.stdout
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_with_all_retention_options(
         self, executor: JobExecutor
     ) -> None:
@@ -117,7 +115,6 @@ class TestJobExecutorPruneTask:
         assert "--stats" in command_args
         assert repository_path in command_args
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_with_optional_flags(
         self, executor: JobExecutor
     ) -> None:
@@ -158,7 +155,6 @@ class TestJobExecutorPruneTask:
         assert "--force" in command_args
         assert "--dry-run" in command_args
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_failure(self, executor: JobExecutor) -> None:
         """Test prune task failure handling"""
         repository_path = "/test/repo"
@@ -184,7 +180,6 @@ class TestJobExecutorPruneTask:
         assert result.return_code == 1
         assert b"Repository locked" in result.stderr
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_with_output_callback(
         self, executor: JobExecutor
     ) -> None:
@@ -222,7 +217,6 @@ class TestJobExecutorPruneTask:
         # Verify callback was passed to monitor_process_output
         assert callback_passed[0] is True
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_exception_handling(
         self, executor: JobExecutor
     ) -> None:

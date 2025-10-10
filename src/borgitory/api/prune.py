@@ -6,6 +6,8 @@ import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends
 from starlette.templating import _TemplateResponse
 
 from borgitory.models.schemas import (
@@ -17,6 +19,7 @@ from borgitory.dependencies import (
     TemplatesDep,
     PruneServiceDep,
     get_browser_timezone_offset,
+    get_db,
 )
 
 router = APIRouter()
@@ -28,9 +31,10 @@ async def get_prune_form(
     request: Request,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get manual prune form with repositories populated"""
-    form_data = service.get_form_data()
+    form_data = await service.get_form_data(db)
 
     return templates.TemplateResponse(
         request,
@@ -70,9 +74,10 @@ async def create_prune_config(
     prune_config: PruneConfigCreate,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Create a new prune configuration"""
-    result = service.create_prune_config(prune_config)
+    result = await service.create_prune_config(db, prune_config)
 
     if result.success and result.config:
         response = templates.TemplateResponse(
@@ -92,14 +97,15 @@ async def create_prune_config(
 
 
 @router.get("/", response_class=HTMLResponse)
-def get_prune_configs(
+async def get_prune_configs(
     request: Request,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> str:
     """Get prune configurations as formatted HTML"""
     try:
-        processed_configs = service.get_configs_with_descriptions()
+        processed_configs = await service.get_configs_with_descriptions(db)
 
         browser_tz_offset = get_browser_timezone_offset(request)
         return templates.get_template("partials/prune/config_list_content.html").render(
@@ -120,9 +126,10 @@ async def enable_prune_config(
     config_id: int,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Enable a prune configuration"""
-    result = service.enable_prune_config(config_id)
+    result = await service.enable_prune_config(db, config_id)
 
     if result.success and result.config:
         response = templates.TemplateResponse(
@@ -147,9 +154,10 @@ async def disable_prune_config(
     config_id: int,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Disable a prune configuration"""
-    result = service.disable_prune_config(config_id)
+    result = await service.disable_prune_config(db, config_id)
 
     if result.success and result.config:
         response = templates.TemplateResponse(
@@ -174,9 +182,10 @@ async def get_prune_config_edit_form(
     config_id: int,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get edit form for a specific prune configuration"""
-    config = service.get_prune_config_by_id(config_id)
+    config = await service.get_prune_config_by_id(db, config_id)
 
     if not config:
         from fastapi import HTTPException
@@ -198,9 +207,10 @@ async def update_prune_config(
     config_update: PruneConfigUpdate,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Update a prune configuration"""
-    result = service.update_prune_config(config_id, config_update)
+    result = await service.update_prune_config(db, config_id, config_update)
 
     if result.success and result.config:
         response = templates.TemplateResponse(
@@ -225,9 +235,10 @@ async def delete_prune_config(
     config_id: int,
     templates: TemplatesDep,
     service: PruneServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Delete a prune configuration"""
-    result = service.delete_prune_config(config_id)
+    result = await service.delete_prune_config(db, config_id)
 
     if result.success:
         response = templates.TemplateResponse(

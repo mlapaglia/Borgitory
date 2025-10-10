@@ -4,7 +4,7 @@ Test suite for streaming edge cases and error scenarios
 
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, AsyncMock
 import asyncio
 from typing import Any
 
@@ -26,7 +26,6 @@ class TestStreamingErrorHandling:
     def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
-    @pytest.mark.asyncio
     async def test_task_streaming_nonexistent_job(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -37,27 +36,19 @@ class TestStreamingErrorHandling:
         # No jobs in manager
         mock_job_manager.jobs = {}
 
-        # Should fall back to database lookup
-        with patch("borgitory.models.database.SessionLocal") as mock_session_local:
-            mock_session = Mock()
-            mock_session_local.return_value = mock_session
-            mock_session.query().filter().first.return_value = (
-                None  # No job in DB either
-            )
+        # Service should handle missing job gracefully by returning error
+        events = []
+        async for event in job_stream_service._task_output_event_generator(
+            job_id, task_order
+        ):
+            events.append(event)
+            if len(events) >= 1:
+                break
 
-            events = []
-            async for event in job_stream_service._task_output_event_generator(
-                job_id, task_order
-            ):
-                events.append(event)
-                if len(events) >= 1:
-                    break
+        # Should indicate job not found
+        assert len(events) >= 1
+        assert f"Job {job_id} not found" in events[0]
 
-            # Should indicate job not found
-            assert len(events) >= 1
-            assert f"Job {job_id} not found" in events[0]
-
-    @pytest.mark.asyncio
     async def test_task_streaming_job_with_mock_tasks(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -82,7 +73,6 @@ class TestStreamingErrorHandling:
         assert len(events) >= 1
         assert "object of type 'Mock' has no len()" in events[0]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_invalid_task_order(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -107,7 +97,6 @@ class TestStreamingErrorHandling:
         assert len(events) >= 1
         assert f"Task {task_order} not found" in events[0]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_handles_timeout(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -141,7 +130,6 @@ class TestStreamingErrorHandling:
         assert len(events) >= 1
         assert any("heartbeat" in event for event in events)
 
-    @pytest.mark.asyncio
     async def test_database_streaming_connection_error(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -149,23 +137,20 @@ class TestStreamingErrorHandling:
         job_id = uuid.uuid4()
         task_order = 0
 
-        # Job not found in manager, should try database
+        # Job not found in manager, should return error
         mock_job_manager.jobs = {}
 
-        with patch("borgitory.models.database.SessionLocal") as mock_session_local:
-            mock_session_local.side_effect = Exception("Database connection failed")
+        events = []
+        async for event in job_stream_service._task_output_event_generator(
+            job_id, task_order
+        ):
+            events.append(event)
+            if len(events) >= 1:
+                break
 
-            events = []
-            async for event in job_stream_service._task_output_event_generator(
-                job_id, task_order
-            ):
-                events.append(event)
-                if len(events) >= 1:
-                    break
-
-            # Should handle error gracefully
-            assert len(events) >= 1
-            assert f"Job {job_id} not found" in events[0]
+        # Should handle error gracefully
+        assert len(events) >= 1
+        assert "error" in events[0].lower()
 
 
 class TestStreamingPerformance:
@@ -237,7 +222,6 @@ class TestEventFiltering:
     def job_stream_service(self, mock_job_manager: Mock) -> JobStreamService:
         return JobStreamService(job_manager=mock_job_manager)
 
-    @pytest.mark.asyncio
     async def test_event_filtering_correct_job_and_task(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:

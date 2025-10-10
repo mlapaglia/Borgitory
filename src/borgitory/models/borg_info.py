@@ -336,3 +336,15 @@ class RepositoryInitializationResult:
     def failure_result(cls, message: str) -> "RepositoryInitializationResult":
         """Create a failed initialization result."""
         return cls(success=False, message=message)
+
+
+@dataclass
+class BorgDefaultDirectories:
+    """Default directories used by Borg based on environment variable resolution."""
+
+    base_dir: str
+    cache_dir: str
+    config_dir: str
+    security_dir: str
+    keys_dir: str
+    temp_dir: str

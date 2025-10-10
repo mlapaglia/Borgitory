@@ -273,6 +273,7 @@ class NotificationService:
         Returns:
             True if connection successful, False otherwise
         """
+        provider = None
         try:
             # Filter out None values for provider creation
             filtered_config: ConfigDict = {
@@ -287,6 +288,9 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Connection test failed: {str(e)}")
             return False
+        finally:
+            if provider is not None:
+                await provider.cleanup()
 
     def get_connection_info(self, config: NotificationConfig) -> str:
         """

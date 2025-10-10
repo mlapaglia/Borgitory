@@ -57,7 +57,7 @@ class DatabaseOperationsProtocol(ABC):
     """Protocol for database operations."""
 
     @abstractmethod
-    def get_current_revision(self) -> Optional[str]:
+    async def get_current_revision(self) -> Optional[str]:
         """Get the current database revision."""
         pass
 

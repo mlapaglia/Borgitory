@@ -5,31 +5,24 @@ Comprehensive tests for JobManager - covering missing lines and functionality
 import pytest
 import uuid
 import asyncio
-from typing import Generator, AsyncGenerator
+from typing import AsyncGenerator, cast
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
-from borgitory.protocols.job_event_broadcaster_protocol import (
-    JobEventBroadcasterProtocol,
-)
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
-from contextlib import contextmanager
-
-from sqlalchemy.orm import Session
+from contextlib import asynccontextmanager
 
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.jobs.job_models import (
     JobManagerConfig,
-    JobManagerDependencies,
     BorgJob,
     BorgJobTask,
     TaskTypeEnum,
     TaskStatusEnum,
 )
-from borgitory.services.jobs.job_manager_factory import (
-    JobManagerFactory,
-    get_default_job_manager_dependencies,
-    get_test_job_manager_dependencies,
-)
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.models.database import Repository
@@ -132,7 +125,7 @@ class TestJobManagerFactory:
         assert deps.database_manager is not None
 
         # Test that it uses default session factory
-        assert deps.db_session_factory is not None
+        assert deps.async_session_maker is not None
 
     def test_create_dependencies_with_config(self) -> None:
         """Test creating dependencies with custom config"""
@@ -156,23 +149,13 @@ class TestJobManagerFactory:
 
         deps = JobManagerFactory.create_for_testing(
             mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
+            mock_async_session_maker=mock_db_session,
             mock_rclone_service=mock_rclone,
         )
 
         assert deps.subprocess_executor is mock_subprocess
-        assert deps.db_session_factory is mock_db_session
+        assert deps.async_session_maker is mock_db_session
         assert deps.rclone_service is mock_rclone
-
-    def test_create_minimal(self) -> None:
-        """Test creating minimal dependencies"""
-        deps = JobManagerFactory.create_minimal()
-
-        assert deps is not None
-        assert deps.queue_manager is not None
-        assert deps.output_manager is not None
-        # Should have reduced limits
-        assert deps.queue_manager.max_concurrent_backups == 1
 
 
 class TestJobManagerTaskExecution:
@@ -181,15 +164,15 @@ class TestJobManagerTaskExecution:
     @pytest.fixture
     def job_manager_with_db(
         self,
-        test_db: Session,
+        test_db: AsyncSession,
         mock_output_manager: Mock,
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
     ) -> JobManager:
         """Create job manager with real database session and mocked services"""
 
-        @contextmanager
-        def db_session_factory() -> Generator[Session, None, None]:
+        @asynccontextmanager
+        async def db_session_factory() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield test_db
             finally:
@@ -200,13 +183,19 @@ class TestJobManagerTaskExecution:
             mock_event_broadcaster=mock_event_broadcaster
         )
 
-        # Override with real database session
-        deps.db_session_factory = db_session_factory
+        # Override with real database session (cast to expected type for type checker)
+        deps.async_session_maker = cast(
+            async_sessionmaker[AsyncSession], db_session_factory
+        )
 
         # Create a real database manager that uses the real database session
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        real_db_manager = JobDatabaseManager(db_session_factory=db_session_factory)
+        real_db_manager = JobDatabaseManager(
+            async_session_maker=cast(
+                async_sessionmaker[AsyncSession], db_session_factory
+            )
+        )
         deps.database_manager = real_db_manager
 
         manager = JobManager(dependencies=deps)
@@ -238,12 +227,12 @@ class TestJobManagerTaskExecution:
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
         mock_notification_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> JobManager:
         """Create job manager with injected mock dependencies"""
 
-        @contextmanager
-        def mock_db_session_factory() -> Generator[Session, None, None]:
+        @asynccontextmanager
+        async def mock_db_session_factory() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield test_db
             finally:
@@ -255,7 +244,9 @@ class TestJobManagerTaskExecution:
         )
 
         # Override with real database session and specific mocks
-        deps.db_session_factory = mock_db_session_factory
+        deps.async_session_maker = cast(
+            async_sessionmaker[AsyncSession], mock_db_session_factory
+        )
         deps.job_executor = mock_job_executor
         deps.database_manager = mock_database_manager
         deps.output_manager = mock_output_manager
@@ -298,7 +289,6 @@ class TestJobManagerTaskExecution:
 
         return job_manager
 
-    @pytest.mark.asyncio
     async def test_create_composite_job(
         self, job_manager_with_mocks: JobManager, sample_repository: Repository
     ) -> None:
@@ -344,7 +334,6 @@ class TestJobManagerTaskExecution:
         assert job.tasks[0].task_name == "Backup data"
         assert job.tasks[1].task_type == "prune"
 
-    @pytest.mark.asyncio
     async def test_execute_composite_job_success(
         self, job_manager_with_mocks: JobManager, sample_repository: Repository
     ) -> None:
@@ -367,7 +356,7 @@ class TestJobManagerTaskExecution:
 
         # Mock individual task execution to succeed
         async def mock_backup_task(
-            job: BorgJob, task: BorgJobTask, task_index: int
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
         ) -> bool:
             task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
@@ -375,7 +364,7 @@ class TestJobManagerTaskExecution:
             return True
 
         async def mock_prune_task(
-            job: BorgJob, task: BorgJobTask, task_index: int
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
         ) -> bool:
             task.status = TaskStatusEnum.COMPLETED
             task.return_code = 0
@@ -394,7 +383,6 @@ class TestJobManagerTaskExecution:
         assert task1.status == "completed"
         assert task2.status == "completed"
 
-    @pytest.mark.asyncio
     async def test_execute_composite_job_critical_failure(
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
@@ -432,7 +420,7 @@ class TestJobManagerTaskExecution:
 
         # Mock backup to fail (critical)
         async def mock_backup_fail(
-            job: BorgJob, task: BorgJobTask, task_index: int
+            job: BorgJob, task: BorgJobTask, task_index: int = 0
         ) -> bool:
             task.status = TaskStatusEnum.FAILED
             task.return_code = 1
@@ -477,21 +465,24 @@ class TestJobManagerTaskExecution:
         )
 
         # Get the database session from the job manager
-        db_session_factory = job_manager_with_db.dependencies.db_session_factory
+        db_session_factory = job_manager_with_db.dependencies.async_session_maker
         assert db_session_factory is not None
 
-        with db_session_factory() as db:
-            # Query the database for the job and its tasks
-            db_job = db.query(DatabaseJob).filter(DatabaseJob.id == job_id).first()
+        async with db_session_factory() as db:
+            # Query the database for the job and its tasks using SQLAlchemy 2.0 syntax
+            result = await db.execute(
+                select(DatabaseJob).where(DatabaseJob.id == job_id)
+            )
+            db_job = result.scalar_one_or_none()
             assert db_job is not None, f"Job {job_id} should be persisted in database"
 
             # Query for the tasks
-            db_tasks = (
-                db.query(DatabaseTask)
-                .filter(DatabaseTask.job_id == job_id)
+            tasks_result = await db.execute(
+                select(DatabaseTask)
+                .where(DatabaseTask.job_id == job_id)
                 .order_by(DatabaseTask.task_order)
-                .all()
             )
+            db_tasks = list(tasks_result.scalars().all())
             assert len(db_tasks) == 2, (
                 f"Expected 2 tasks in database, got {len(db_tasks)}"
             )
@@ -517,7 +508,6 @@ class TestJobManagerTaskExecution:
             assert db_job.status == JobStatusEnum.FAILED
             assert db_job.finished_at is not None
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -575,7 +565,6 @@ class TestJobManagerTaskExecution:
         assert task.return_code == 0
         # Task execution should complete successfully
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_success_with_proper_di(
         self,
         job_manager_with_mocks: JobManager,
@@ -642,7 +631,6 @@ class TestJobManagerTaskExecution:
         mock_job_executor.start_process.assert_called_once()
         mock_job_executor.monitor_process_output.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_failure(
         self,
         job_manager_with_mocks: JobManager,
@@ -696,7 +684,6 @@ class TestJobManagerTaskExecution:
         assert task.error is not None
         assert "Backup failed" in task.error
 
-    @pytest.mark.asyncio
     async def test_execute_backup_task_with_dry_run(
         self,
         job_manager_with_secure_command_mock: JobManager,
@@ -759,7 +746,6 @@ class TestJobManagerTaskExecution:
         # The --dry-run flag is verified in the logs - we can see it in the "Final additional_args" log line
         # This test verifies that the dry_run parameter is properly processed and the task completes successfully
 
-    @pytest.mark.asyncio
     async def test_execute_prune_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -811,7 +797,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_check_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -860,7 +845,6 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_cloud_sync_task_success(
         self,
         job_manager_with_mocks: JobManager,
@@ -911,12 +895,11 @@ class TestJobManagerTaskExecution:
         assert task.status == "completed"
         assert task.return_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_notification_task_success(
         self,
         job_manager_with_mocks: JobManager,
         mock_notification_service: Mock,
-        test_db: Session,
+        test_db: AsyncSession,
     ) -> None:
         """Test successful notification task execution"""
         # Create a notification configuration in the database
@@ -936,8 +919,8 @@ class TestJobManagerTaskExecution:
             + '"}'
         )
         test_db.add(notification_config)
-        test_db.commit()
-        test_db.refresh(notification_config)
+        await test_db.commit()
+        await test_db.refresh(notification_config)
 
         job_id = uuid.uuid4()
         task = BorgJobTask(
@@ -985,7 +968,6 @@ class TestJobManagerTaskExecution:
         # Verify notification service was called
         mock_notification_service.send_notification.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_notification_task_no_config(
         self, job_manager_with_mocks: JobManager
     ) -> None:
@@ -1066,27 +1048,31 @@ class TestJobManagerDatabaseIntegration:
     @pytest.fixture
     def job_manager_with_db(
         self,
-        test_db: Session,
+        test_db: AsyncSession,
         mock_output_manager: Mock,
         mock_queue_manager: Mock,
         mock_event_broadcaster: Mock,
     ) -> JobManager:
         """Create job manager with real database session"""
 
-        @contextmanager
-        def db_session_factory() -> Generator[Session, None, None]:
+        @asynccontextmanager
+        async def db_session_factory() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield test_db
             finally:
                 pass
 
         deps = JobManagerFactory.create_for_testing()
-        deps.db_session_factory = db_session_factory
+        deps.async_session_maker = cast(
+            async_sessionmaker[AsyncSession], db_session_factory
+        )
 
         # Create a real database manager instead of using the mock
         from borgitory.services.jobs.job_database_manager import JobDatabaseManager
 
-        deps.database_manager = JobDatabaseManager(db_session_factory)
+        deps.database_manager = JobDatabaseManager(
+            cast(async_sessionmaker[AsyncSession], db_session_factory)
+        )
 
         manager = JobManager(dependencies=deps)
 
@@ -1097,7 +1083,6 @@ class TestJobManagerDatabaseIntegration:
 
         return manager
 
-    @pytest.mark.asyncio
     async def test_get_repository_data_success(
         self, job_manager_with_db: JobManager, sample_repository: Repository
     ) -> None:
@@ -1105,7 +1090,9 @@ class TestJobManagerDatabaseIntegration:
         # Mock the get_passphrase method to avoid encryption issues
         sample_repository.get_passphrase = Mock(return_value="test-passphrase")  # type: ignore[method-assign]
 
-        result = await job_manager_with_db._get_repository_data(sample_repository.id)
+        result = await job_manager_with_db.database_manager.get_repository_data(
+            sample_repository.id
+        )
 
         assert result is not None
         assert result["id"] == sample_repository.id
@@ -1113,12 +1100,11 @@ class TestJobManagerDatabaseIntegration:
         assert result["path"] == "/tmp/test-repo"
         assert result["passphrase"] == "test-passphrase"
 
-    @pytest.mark.asyncio
     async def test_get_repository_data_not_found(
         self, job_manager_with_db: JobManager
     ) -> None:
         """Test getting repository data for non-existent repository"""
-        result = await job_manager_with_db._get_repository_data(99999)
+        result = await job_manager_with_db.database_manager.get_repository_data(99999)
         assert result is None
 
 
@@ -1150,7 +1136,6 @@ class TestJobManagerStreamingAndUtility:
         )
         return job_manager
 
-    @pytest.mark.asyncio
     async def test_stream_job_output(self, job_manager: JobManager) -> None:
         """Test streaming job output"""
 
@@ -1168,7 +1153,6 @@ class TestJobManagerStreamingAndUtility:
         assert output_list[0]["line"] == "output line 1"
         assert output_list[1]["progress"]["percent"] == 50  # type: ignore[index]
 
-    @pytest.mark.asyncio
     async def test_stream_job_output_no_manager(self) -> None:
         """Test streaming output when no output manager"""
         manager = JobManager()
@@ -1176,7 +1160,7 @@ class TestJobManagerStreamingAndUtility:
         from unittest.mock import Mock
         from typing import AsyncGenerator
 
-        async def empty_stream() -> AsyncGenerator[dict, None]:
+        async def empty_stream() -> AsyncGenerator[dict[str, object], None]:
             return
             yield  # This line will never be reached, but makes it a proper async generator
 
@@ -1218,7 +1202,6 @@ class TestJobManagerStreamingAndUtility:
         assert jobs[job2_id] is job2
         assert jobs is not job_manager.jobs  # Should return copy
 
-    @pytest.mark.asyncio
     async def test_get_job_output_stream(self, job_manager: JobManager) -> None:
         """Test getting job output stream data"""
         job_id = uuid.uuid4()
@@ -1243,7 +1226,6 @@ class TestJobManagerStreamingAndUtility:
         assert result.progress["percent"] == 75
         assert result.total_lines == 2
 
-    @pytest.mark.asyncio
     async def test_get_job_output_stream_no_output(
         self, job_manager: JobManager
     ) -> None:
@@ -1268,7 +1250,6 @@ class TestJobManagerStreamingAndUtility:
         count = job_manager.get_active_jobs_count()
         assert count == 3  # 2 running + 1 queued
 
-    @pytest.mark.asyncio
     async def test_cancel_job_success(self, job_manager: JobManager) -> None:
         """Test cancelling a job successfully"""
         job = Mock(status="running")
@@ -1286,7 +1267,6 @@ class TestJobManagerStreamingAndUtility:
         assert job.completed_at is not None
         assert job_id not in job_manager._processes
 
-    @pytest.mark.asyncio
     async def test_cancel_job_not_cancellable(self, job_manager: JobManager) -> None:
         """Test cancelling job in non-cancellable state"""
         job = Mock(status="completed")
@@ -1296,41 +1276,7 @@ class TestJobManagerStreamingAndUtility:
         result = await job_manager.cancel_job(job_id)
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_cancel_job_not_found(self, job_manager: JobManager) -> None:
         """Test cancelling non-existent job"""
         result = await job_manager.cancel_job(uuid.uuid4())
         assert result is False
-
-
-class TestJobManagerFactoryFunctions:
-    """Test module-level factory functions"""
-
-    def test_get_default_job_manager_dependencies(self) -> None:
-        """Test getting default dependencies"""
-        deps = get_default_job_manager_dependencies()
-
-        assert isinstance(deps, JobManagerDependencies)
-        assert deps.job_executor is not None
-        assert deps.output_manager is not None
-        assert deps.queue_manager is not None
-
-    def test_get_test_job_manager_dependencies(self) -> None:
-        """Test getting test dependencies"""
-        mock_subprocess = AsyncMock()
-        mock_db_session = Mock()
-        mock_rclone = Mock()
-
-        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
-
-        deps = get_test_job_manager_dependencies(
-            mock_event_broadcaster=mock_event_broadcaster,
-            mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
-            mock_rclone_service=mock_rclone,
-        )
-
-        assert deps.event_broadcaster is mock_event_broadcaster
-        assert deps.subprocess_executor is mock_subprocess
-        assert deps.db_session_factory is mock_db_session
-        assert deps.rclone_service is mock_rclone

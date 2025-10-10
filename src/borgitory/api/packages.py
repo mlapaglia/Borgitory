@@ -6,9 +6,10 @@ Provides functionality to search, install, and manage Debian packages.
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import _TemplateResponse
 
-from borgitory.dependencies import PackageManagerServiceDep, TemplatesDep
+from borgitory.dependencies import PackageManagerServiceDep, TemplatesDep, get_db
 from borgitory.models.database import User
 from borgitory.api.auth import get_current_user
 
@@ -75,13 +76,14 @@ async def list_installed_packages(
     templates: TemplatesDep,
     package_service: PackageManagerServiceDep,
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """List all installed packages."""
 
     try:
         packages = await package_service.list_installed_packages()
 
-        user_packages = package_service.get_user_installed_packages()
+        user_packages = await package_service.get_user_installed_packages(session)
         user_package_names = {pkg.package_name for pkg in user_packages}
 
         for package in packages:
@@ -108,6 +110,7 @@ async def install_packages(
     templates: TemplatesDep,
     package_service: PackageManagerServiceDep,
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Install selected packages."""
 
@@ -128,7 +131,7 @@ async def install_packages(
                 {"error": "No packages selected for installation"},
             )
 
-        success, message = await package_service.install_packages(packages)
+        success, message = await package_service.install_packages(session, packages)
 
         if success:
             # Return success message with HX-Trigger to clear selections
@@ -159,6 +162,7 @@ async def remove_packages(
     templates: TemplatesDep,
     package_service: PackageManagerServiceDep,
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Remove selected packages."""
 
@@ -179,7 +183,7 @@ async def remove_packages(
                 {"error": "No packages selected for removal"},
             )
 
-        success, message = await package_service.remove_packages(packages)
+        success, message = await package_service.remove_packages(session, packages)
 
         if success:
             return templates.TemplateResponse(

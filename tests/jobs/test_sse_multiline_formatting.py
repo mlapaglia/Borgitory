@@ -66,7 +66,6 @@ class TestSSEMultilineFormatting:
         mock.stream_all_job_updates = mock_stream
         return mock
 
-    @pytest.mark.asyncio
     async def test_sse_multiline_html_formatting(
         self, mock_templates: Mock, mock_job_manager_with_running_job: Mock
     ) -> None:
@@ -109,7 +108,6 @@ class TestSSEMultilineFormatting:
             f"Last chunk should be SSE terminator: {sse_chunks[-1]!r}"
         )
 
-    @pytest.mark.asyncio
     async def test_sse_no_unescaped_newlines_in_data(
         self, mock_templates: Mock, mock_job_manager_with_running_job: Mock
     ) -> None:
@@ -147,7 +145,6 @@ class TestSSEMultilineFormatting:
                     f"Chunk {i}: {chunk!r}"
                 )
 
-    @pytest.mark.asyncio
     async def test_sse_error_html_formatting(
         self, mock_job_manager_with_running_job: Mock
     ) -> None:
@@ -225,7 +222,6 @@ class TestSSEMultilineFormatting:
         assert "<div" in html_content, "Should contain div elements"
         assert "space-y-3" in html_content, "Should contain expected CSS classes"
 
-    @pytest.mark.asyncio
     async def test_sse_streaming_updates_formatting(
         self, mock_templates: Mock, mock_job_manager_with_running_job: Mock
     ) -> None:

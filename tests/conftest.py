@@ -10,16 +10,17 @@ from unittest.mock import Mock
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 # Set SECRET_KEY before importing the app to avoid RuntimeError
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
 
+from borgitory.dependencies import get_db
 from borgitory.main import app
-from borgitory.models.database import Base, get_db, CloudSyncConfig
+from borgitory.models.database import Base, CloudSyncConfig
 
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401
@@ -63,43 +64,44 @@ def event_loop() -> Generator[Any, None, None]:
     loop.close()
 
 
-@pytest.fixture
-def test_db() -> Generator[Session, None, None]:
+@pytest_asyncio.fixture
+async def test_db() -> AsyncGenerator[AsyncSession, None]:
     """Create a test database with proper isolation."""
-    # Use in-memory SQLite for testing
-    SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+    # Use in-memory SQLite for testing with async
+    SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-    engine = create_engine(
+    engine = create_async_engine(
         SQLALCHEMY_DATABASE_URL,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    TestingSessionLocal = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
 
     # Create ALL tables at once
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    def override_get_db() -> Generator[Session, None, None]:
-        db_session = TestingSessionLocal()
-        try:
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with TestingSessionLocal() as db_session:
             yield db_session
-        finally:
-            db_session.close()
 
     # Set up the dependency override
     app.dependency_overrides[get_db] = override_get_db
 
     # Create a session for the test to return
-    test_session = TestingSessionLocal()
-    try:
-        yield test_session
-    finally:
-        # Clean up after test
-        test_session.rollback()  # Roll back any uncommitted changes
-        test_session.close()
-        # Close the engine to ensure all connections are closed
-        engine.dispose()
-        app.dependency_overrides.clear()
+    async with TestingSessionLocal() as test_session:
+        try:
+            yield test_session
+        finally:
+            # Clean up after test
+            await test_session.rollback()
+            await test_session.close()
+
+    # Close the engine to ensure all connections are closed
+    await engine.dispose()
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

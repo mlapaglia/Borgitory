@@ -3,7 +3,6 @@ Tests for JobEventBroadcaster - SSE streaming and event distribution
 """
 
 import uuid
-import pytest
 import asyncio
 from unittest.mock import patch
 
@@ -141,7 +140,6 @@ class TestJobEventBroadcaster:
         assert self.broadcaster._recent_events[-1].data is not None
         assert self.broadcaster._recent_events[-1].data["progress"] == 59
 
-    @pytest.mark.asyncio
     async def test_stream_events_for_client(self) -> None:
         """Test streaming events for a specific client"""
         queue = asyncio.Queue(maxsize=2)
@@ -157,7 +155,6 @@ class TestJobEventBroadcaster:
         assert event1["data"] == "event1"
         assert event2["data"] == "event2"
 
-    @pytest.mark.asyncio
     async def test_stream_events_timeout_keepalive(self) -> None:
         """Test streaming events sends keepalive on timeout"""
         empty_queue = asyncio.Queue()
@@ -171,7 +168,6 @@ class TestJobEventBroadcaster:
         assert event["type"] == "keepalive"
         assert "timestamp" in event
 
-    @pytest.mark.asyncio
     async def test_stream_all_events(self) -> None:
         """Test streaming all events creates and manages client subscription"""
         # Create a real queue with test events instead of mocking
@@ -229,7 +225,6 @@ class TestJobEventBroadcaster:
         assert history[-1]["data"]["step"] == 4
         assert history[0]["data"]["step"] == 2
 
-    @pytest.mark.asyncio
     async def test_initialize(self) -> None:
         """Test broadcaster initialization"""
         await self.broadcaster.initialize()
@@ -240,7 +235,6 @@ class TestJobEventBroadcaster:
         assert not self.broadcaster._cleanup_task.done()
         assert not self.broadcaster._keepalive_task.done()
 
-    @pytest.mark.asyncio
     async def test_shutdown(self) -> None:
         """Test broadcaster shutdown"""
         await self.broadcaster.initialize()

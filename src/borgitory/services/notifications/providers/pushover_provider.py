@@ -68,6 +68,7 @@ class PushoverProvider(NotificationProvider):
     ) -> None:
         super().__init__(config)
         self.config: PushoverConfig = config
+        self._http_client_provided = http_client is not None
         self.http_client = http_client or AiohttpClient()
 
     async def send_notification(
@@ -115,7 +116,6 @@ class PushoverProvider(NotificationProvider):
                             metadata={"response": response_text},
                         )
                 except Exception as e:
-                    # Even if JSON parsing fails, if status is 200, consider it success
                     logger.info(
                         f"Pushover notification sent (JSON parse error): {message.title} - {e}"
                     )
@@ -206,6 +206,11 @@ class PushoverProvider(NotificationProvider):
             return "intermission"  # Warning sound
         else:
             return self.config.sound  # Use configured default
+
+    async def cleanup(self) -> None:
+        """Clean up HTTP client resources if we own them"""
+        if not self._http_client_provided and hasattr(self.http_client, "close"):
+            await self.http_client.close()
 
 
 # Register the provider directly

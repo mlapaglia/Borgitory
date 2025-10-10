@@ -5,18 +5,19 @@ from fastapi import (
     Depends,
     HTTPException,
     Form,
-    File,
-    UploadFile,
     Request,
 )
 from fastapi.responses import HTMLResponse, StreamingResponse, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from borgitory.models.database import Repository, User, get_db
+from borgitory.models.database import Repository, User
+from borgitory.models.enums import EncryptionType
 from borgitory.models.schemas import (
     Repository as RepositorySchema,
     RepositoryCreate,
     RepositoryUpdate,
+    RepositoryResponse,
 )
 from borgitory.dependencies import (
     BorgServiceDep,
@@ -24,6 +25,7 @@ from borgitory.dependencies import (
     TemplatesDep,
     RepositoryServiceDep,
     PathServiceDep,
+    get_db,
 )
 from borgitory.models.repository_dtos import (
     CreateRepositoryRequest,
@@ -53,7 +55,7 @@ async def create_repository(
     request: Request,
     repo: RepositoryCreate,
     repo_svc: RepositoryServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Create a new repository - thin controller using business logic service."""
@@ -61,8 +63,8 @@ async def create_repository(
     create_request = CreateRepositoryRequest(
         name=repo.name,
         path=repo.path,
-        passphrase=repo.passphrase or "",
-        user_id=current_user.id,
+        passphrase=repo.passphrase,
+        encryption_type=repo.encryption_type,
         cache_dir=repo.cache_dir,
     )
 
@@ -73,23 +75,25 @@ async def create_repository(
     return RepositoryResponseHandler.handle_create_response(request, result)
 
 
-@router.get("/", response_model=List[RepositorySchema])
-def list_repositories(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+@router.get("/", response_model=List[RepositoryResponse])
+async def list_repositories(
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
 ) -> List[Repository]:
-    repositories = db.query(Repository).offset(skip).limit(limit).all()
-    return repositories
+    result = await db.execute(select(Repository).offset(skip).limit(limit))
+    repositories = result.scalars().all()
+    return list(repositories)
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_repositories_html(
+async def get_repositories_html(
     request: Request,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Get repositories as HTML for frontend display"""
     try:
-        repositories = db.query(Repository).all()
+        result = await db.execute(select(Repository))
+        repositories = result.scalars().all()
         return templates.TemplateResponse(
             request,
             "partials/repositories/list_content.html",
@@ -180,11 +184,14 @@ async def list_directories_autocomplete(
 
 @router.get("/import-form", response_class=HTMLResponse)
 async def get_import_form(
-    request: Request, templates: TemplatesDep
+    request: Request, templates: TemplatesDep, path_service: PathServiceDep
 ) -> _TemplateResponse:
     """Get the import repository form"""
+    default_directories = await path_service.get_default_directories()
     return templates.TemplateResponse(
-        request, "partials/repositories/import/form_import.html"
+        request,
+        "partials/repositories/import/form_import.html",
+        {"default_directories": default_directories},
     )
 
 
@@ -202,13 +209,52 @@ async def get_import_encryption_fields(
     )
 
 
+@router.get("/create-encryption-fields", response_class=HTMLResponse)
+async def get_create_encryption_fields(
+    request: Request,
+    templates: TemplatesDep,
+    encryption_type: str = "",
+) -> _TemplateResponse:
+    """Get the appropriate encryption fields based on encryption type selection for create form."""
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/import/encryption_fields.html",
+        {"encryption_type": encryption_type},
+    )
+
+
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(
-    request: Request, templates: TemplatesDep
+    request: Request, templates: TemplatesDep, path_service: PathServiceDep
 ) -> _TemplateResponse:
     """Get the create repository form"""
+    default_directories = await path_service.get_default_directories()
     return templates.TemplateResponse(
-        request, "partials/repositories/create/form_create.html"
+        request,
+        "partials/repositories/create/form_create.html",
+        {"default_directories": default_directories},
+    )
+
+
+@router.get("/{repo_id}/edit", response_class=HTMLResponse)
+async def get_edit_form(
+    repo_id: int,
+    request: Request,
+    templates: TemplatesDep,
+    path_service: PathServiceDep,
+    db: AsyncSession = Depends(get_db),
+) -> _TemplateResponse:
+    """Get the edit repository form"""
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    default_directories = await path_service.get_default_directories()
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/create/form_create.html",
+        {"repository": repository, "default_directories": default_directories},
     )
 
 
@@ -219,21 +265,18 @@ async def import_repository(
     name: str = Form(...),
     path: str = Form(...),
     passphrase: str = Form(...),
-    keyfile: UploadFile = File(None),
-    encryption_type: str = Form(None),
+    encryption_type: EncryptionType = Form(None),
     keyfile_content: str = Form(None),
     cache_dir: str = Form(None),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Import an existing Borg repository - thin controller using business logic service."""
     import_request = ImportRepositoryRequest(
         name=name,
         path=path.strip(),
         passphrase=passphrase,
-        keyfile=keyfile,
         encryption_type=encryption_type,
         keyfile_content=keyfile_content,
-        user_id=None,  # Import doesn't require user ID currently
         cache_dir=cache_dir.strip(),
     )
 
@@ -243,32 +286,28 @@ async def import_repository(
 
 
 @router.get("/{repo_id}", response_model=RepositorySchema)
-def get_repository(repo_id: int, db: Session = Depends(get_db)) -> Repository:
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
-    if repository is None:
-        raise HTTPException(status_code=404, detail="Repository not found")
-    return repository
-
-
-@router.put("/{repo_id}", response_model=RepositorySchema)
-def update_repository(
-    repo_id: int, repo_update: RepositoryUpdate, db: Session = Depends(get_db)
+async def get_repository(
+    repo_id: int, db: AsyncSession = Depends(get_db)
 ) -> Repository:
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
-
-    update_data = repo_update.model_dump(exclude_unset=True)
-
-    if "passphrase" in update_data:
-        repository.set_passphrase(update_data.pop("passphrase"))
-
-    for field, value in update_data.items():
-        setattr(repository, field, value)
-
-    db.commit()
-    db.refresh(repository)
     return repository
+
+
+@router.put("/{repo_id}", response_class=HTMLResponse)
+async def update_repository(
+    repo_id: int,
+    request: Request,
+    repo_update: RepositoryUpdate,
+    repo_svc: RepositoryServiceDep,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> HTMLResponse:
+    """Update a repository - thin controller using business logic service."""
+    result = await repo_svc.update_repository(repo_id, repo_update, db)
+    return RepositoryResponseHandler.handle_update_response(request, result)
 
 
 @router.get("/{repo_id}/lock-status", response_class=HTMLResponse)
@@ -277,10 +316,11 @@ async def check_repository_lock_status(
     request: Request,
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Check if a repository is currently locked."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -303,10 +343,11 @@ async def get_repository_details_modal(
     repo_id: int,
     request: Request,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get the repository details modal."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -331,10 +372,11 @@ async def get_break_lock_button(
     request: Request,
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get the break lock button if repository is locked."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -357,10 +399,11 @@ async def get_break_lock_button_modal(
     request: Request,
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get the break lock button for modal if repository is locked."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -383,17 +426,19 @@ async def break_repository_lock(
     request: Request,
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Break a repository lock and return updated repository list."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
     await repo_svc.break_repository_lock(repository)
 
     # Return the updated repository list
-    repositories = db.query(Repository).all()
+    result = await db.execute(select(Repository))
+    repositories = result.scalars().all()
     return templates.TemplateResponse(
         request,
         "partials/repositories/list_content.html",
@@ -409,10 +454,11 @@ async def break_repository_lock_modal(
     request: Request,
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Break a repository lock from modal and return updated lock status."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -439,10 +485,11 @@ async def get_repository_borg_info(
     request: Request,
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get detailed repository information from borg info command."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -459,23 +506,26 @@ async def get_repository_borg_info(
 async def export_repository_key(
     repo_id: int,
     repo_svc: RepositoryServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Export repository key as a downloadable file."""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if not repository:
         raise HTTPException(status_code=404, detail="Repository not found")
 
-    result = await repo_svc.export_repository_key(repository)
+    repo_key_result = await repo_svc.export_repository_key(repository)
 
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=result["error_message"])
+    if not repo_key_result["success"]:
+        raise HTTPException(status_code=500, detail=repo_key_result["error_message"])
 
     # Return the key as a downloadable text file
     return Response(
-        content=result["key_data"],
+        content=repo_key_result["key_data"],
         media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{repo_key_result["filename"]}"'
+        },
     )
 
 
@@ -485,7 +535,7 @@ async def delete_repository(
     request: Request,
     repo_svc: RepositoryServiceDep,
     delete_borg_repo: bool = False,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Delete a repository - thin controller using business logic service."""
     delete_request = DeleteRepositoryRequest(
@@ -504,7 +554,7 @@ async def list_archives(
     request: Request,
     repo_id: int,
     repo_svc: RepositoryServiceDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """List repository archives - thin controller using business logic service."""
     result = await repo_svc.list_archives(repo_id, db)
@@ -516,11 +566,12 @@ async def list_archives(
 async def get_archives_repository_selector(
     request: Request,
     templates: TemplatesDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     preselect_repo: str = "",
 ) -> _TemplateResponse:
     """Get repository selector for archives with repositories populated"""
-    repositories = db.query(Repository).all()
+    result = await db.execute(select(Repository))
+    repositories = result.scalars().all()
 
     return templates.TemplateResponse(
         request,
@@ -568,7 +619,7 @@ async def get_archives_list(
     borg_svc: BorgServiceDep,
     templates: TemplatesDep,
     repository_id: str = "",
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Get archives list or empty state"""
     if not repository_id or repository_id == "":
@@ -578,7 +629,8 @@ async def get_archives_list(
 
     try:
         repo_id = int(repository_id)
-        repository = db.query(Repository).filter(Repository.id == repo_id).first()
+        result = await db.execute(select(Repository).where(Repository.id == repo_id))
+        repository = result.scalar_one_or_none()
         if repository is None:
             raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -675,10 +727,11 @@ async def load_archive_contents_with_spinner(
     archive_name: str,
     templates: TemplatesDep,
     path: str = Form(""),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual directory contents"""
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -697,9 +750,10 @@ async def get_archive_contents(
     borg_svc: BorgServiceDep,
     templates: TemplatesDep,
     path: str = "",
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 
@@ -733,9 +787,10 @@ async def extract_file(
     archive_name: str,
     file: str,
     archive_manager: ArchiveManagerDep,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
-    repository = db.query(Repository).filter(Repository.id == repo_id).first()
+    result = await db.execute(select(Repository).where(Repository.id == repo_id))
+    repository = result.scalar_one_or_none()
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
 

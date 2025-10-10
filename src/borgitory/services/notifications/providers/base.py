@@ -93,3 +93,12 @@ class NotificationProvider(ABC):
             Dictionary with 'provider_name' and 'provider_details' (HTML string)
         """
         pass
+
+    async def cleanup(self) -> None:
+        """
+        Clean up provider resources (connections, sessions, etc.).
+
+        Override this method if your provider needs cleanup.
+        Default implementation does nothing.
+        """
+        pass

@@ -6,7 +6,7 @@
     {% for dir in directories %}
         <div class="autocomplete-item px-3 py-2 {% if dir.has_permission_error %}cursor-not-allowed opacity-60 bg-red-50 dark:bg-red-900/20{% else %}cursor-pointer{% endif %} {% if not dir.has_permission_error %}{% if dir.is_borg_repo %}bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-700{% elif dir.is_borg_cache %}bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 border-green-200 dark:border-green-700{% else %}hover:bg-gray-100 dark:hover:bg-gray-600{% endif %}{% endif %} border-b border-gray-100 dark:border-gray-600 last:border-b-0"
              data-path="{{ dir.path_with_separator }}"
-             {% if not dir.has_permission_error %} hx-on:click=" event.preventDefault(); event.stopPropagation(); const targetInput = document.getElementById('{{ target_input }}'); if (targetInput) { targetInput.value = this.dataset.path; // Trigger immediate autocomplete request bypassing the 300ms delay htmx.trigger(targetInput, 'autocomplete-immediate'); } " {% endif %}>
+             {% if not dir.has_permission_error %} hx-on:click=" event.preventDefault(); event.stopPropagation(); const targetInput = document.getElementById('{{ target_input }}'); if (targetInput) { targetInput.value = this.dataset.path; htmx.trigger(targetInput, 'autocomplete-immediate'); }" {% endif %}>
             <div class="flex items-center justify-between min-w-0">
                 <div class="flex items-center space-x-2 min-w-0 flex-1">
                     {% if dir.has_permission_error %}

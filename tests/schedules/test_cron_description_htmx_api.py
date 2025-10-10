@@ -1,21 +1,16 @@
 """Tests for cron description HTMX API endpoints."""
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from unittest.mock import Mock, patch
-from sqlalchemy.orm import Session
 
-from borgitory.main import app
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from borgitory.models.database import User
 
 
 class TestCronDescriptionHTMXAPI:
     """Test suite for cron description HTMX endpoints."""
-
-    @pytest.fixture
-    def client(self) -> TestClient:
-        """Create test client."""
-        return TestClient(app)
 
     @pytest.fixture
     def mock_templates(self) -> Mock:
@@ -25,22 +20,22 @@ class TestCronDescriptionHTMXAPI:
         return mock
 
     @pytest.fixture
-    def setup_auth(self, test_db: Session) -> User:
+    async def setup_auth(self, test_db: AsyncSession) -> User:
         """Set up authentication for tests."""
         # Create a test user
         user = User()
         user.username = "testuser"
         user.set_password("testpass")
         test_db.add(user)
-        test_db.commit()
-        test_db.refresh(user)
+        await test_db.commit()
+        await test_db.refresh(user)
         return user
 
-    def test_describe_cron_expression_valid_expression(
-        self, client: TestClient
+    async def test_describe_cron_expression_valid_expression(
+        self, async_client: AsyncClient
     ) -> None:
         """Test cron description endpoint with valid cron expression."""
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=0 2 * * *"
         )
 
@@ -52,8 +47,8 @@ class TestCronDescriptionHTMXAPI:
         assert "2:00 AM" in html_content or "02:00" in html_content
         assert "Schedule:" in html_content
 
-    def test_describe_cron_expression_complex_valid_expressions(
-        self, client: TestClient
+    async def test_describe_cron_expression_complex_valid_expressions(
+        self, async_client: AsyncClient
     ) -> None:
         """Test cron description endpoint with various valid expressions."""
         test_cases = [
@@ -64,7 +59,7 @@ class TestCronDescriptionHTMXAPI:
         ]
 
         for cron_expr, expected_text in test_cases:
-            response = client.get(
+            response = await async_client.get(
                 f"/api/schedules/cron/describe?custom_cron_input={cron_expr}"
             )
 
@@ -73,11 +68,11 @@ class TestCronDescriptionHTMXAPI:
             # Check that we get some description (exact text may vary by cron-descriptor version)
             assert "Schedule:" in html_content or len(html_content.strip()) > 10
 
-    def test_describe_cron_expression_invalid_expression(
-        self, client: TestClient
+    async def test_describe_cron_expression_invalid_expression(
+        self, async_client: AsyncClient
     ) -> None:
         """Test cron description endpoint with invalid cron expression."""
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=invalid cron"
         )
 
@@ -86,31 +81,35 @@ class TestCronDescriptionHTMXAPI:
         assert "Error:" in html_content
         assert "Invalid" in html_content or "invalid" in html_content
 
-    def test_describe_cron_expression_empty_input(self, client: TestClient) -> None:
+    async def test_describe_cron_expression_empty_input(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test cron description endpoint with empty input."""
-        response = client.get("/api/schedules/cron/describe?custom_cron_input=")
+        response = await async_client.get(
+            "/api/schedules/cron/describe?custom_cron_input="
+        )
 
         assert response.status_code == 200
         html_content = response.text.strip()
         # Should return minimal content for empty input
         assert len(html_content) < 100
 
-    def test_describe_cron_expression_missing_parameter(
-        self, client: TestClient
+    async def test_describe_cron_expression_missing_parameter(
+        self, async_client: AsyncClient
     ) -> None:
         """Test cron description endpoint without query parameter."""
-        response = client.get("/api/schedules/cron/describe")
+        response = await async_client.get("/api/schedules/cron/describe")
 
         assert response.status_code == 200
         html_content = response.text.strip()
         # Should handle missing parameter gracefully
         assert len(html_content) < 100
 
-    def test_describe_cron_expression_whitespace_handling(
-        self, client: TestClient
+    async def test_describe_cron_expression_whitespace_handling(
+        self, async_client: AsyncClient
     ) -> None:
         """Test cron description endpoint with whitespace."""
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=  0 2 * * *  "
         )
 
@@ -118,10 +117,12 @@ class TestCronDescriptionHTMXAPI:
         html_content = response.text
         assert "2:00 AM" in html_content or "02:00" in html_content
 
-    def test_describe_cron_expression_url_encoding(self, client: TestClient) -> None:
+    async def test_describe_cron_expression_url_encoding(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test cron description endpoint with URL encoded input."""
         # "0 2 * * *" URL encoded
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=0%202%20*%20*%20*"
         )
 
@@ -129,8 +130,8 @@ class TestCronDescriptionHTMXAPI:
         html_content = response.text
         assert "2:00 AM" in html_content or "02:00" in html_content
 
-    def test_describe_cron_expression_special_characters(
-        self, client: TestClient
+    async def test_describe_cron_expression_special_characters(
+        self, async_client: AsyncClient
     ) -> None:
         """Test cron description endpoint with special cron characters."""
         test_cases = [
@@ -141,7 +142,7 @@ class TestCronDescriptionHTMXAPI:
         ]
 
         for cron_expr in test_cases:
-            response = client.get(
+            response = await async_client.get(
                 f"/api/schedules/cron/describe?custom_cron_input={cron_expr}"
             )
 
@@ -150,7 +151,9 @@ class TestCronDescriptionHTMXAPI:
             # Should get a valid description
             assert "Schedule:" in html_content or len(html_content.strip()) > 10
 
-    def test_describe_cron_expression_edge_cases(self, client: TestClient) -> None:
+    async def test_describe_cron_expression_edge_cases(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test cron description endpoint with edge cases."""
         edge_cases = [
             "0 0 * * *",  # Midnight daily
@@ -160,7 +163,7 @@ class TestCronDescriptionHTMXAPI:
         ]
 
         for cron_expr in edge_cases:
-            response = client.get(
+            response = await async_client.get(
                 f"/api/schedules/cron/describe?custom_cron_input={cron_expr}"
             )
 
@@ -171,14 +174,14 @@ class TestCronDescriptionHTMXAPI:
     @patch(
         "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
-    def test_describe_cron_expression_service_integration(
-        self, mock_service: Mock, client: TestClient
+    async def test_describe_cron_expression_service_integration(
+        self, mock_service: Mock, async_client: AsyncClient
     ) -> None:
         """Test that the endpoint integrates correctly with the service."""
         # Mock service response
         mock_service.return_value = {"description": "Mocked description", "error": None}
 
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=0 2 * * *"
         )
 
@@ -192,8 +195,8 @@ class TestCronDescriptionHTMXAPI:
     @patch(
         "borgitory.services.cron_description_service.CronDescriptionService.get_human_description"
     )
-    def test_describe_cron_expression_service_error_handling(
-        self, mock_service: Mock, client: TestClient
+    async def test_describe_cron_expression_service_error_handling(
+        self, mock_service: Mock, async_client: AsyncClient
     ) -> None:
         """Test endpoint handles service errors correctly."""
         # Mock service to return error
@@ -202,7 +205,9 @@ class TestCronDescriptionHTMXAPI:
             "error": "Mocked error message",
         }
 
-        response = client.get("/api/schedules/cron/describe?custom_cron_input=invalid")
+        response = await async_client.get(
+            "/api/schedules/cron/describe?custom_cron_input=invalid"
+        )
 
         # Verify service was called
         mock_service.assert_called_once_with("invalid")
@@ -213,9 +218,11 @@ class TestCronDescriptionHTMXAPI:
         assert "Error:" in html_content
         assert "Mocked error message" in html_content
 
-    def test_describe_cron_expression_response_format(self, client: TestClient) -> None:
+    async def test_describe_cron_expression_response_format(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test that the response is properly formatted HTML for HTMX."""
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=0 2 * * *"
         )
 
@@ -229,32 +236,23 @@ class TestCronDescriptionHTMXAPI:
             "text-sm" in html_content or len(html_content.strip()) < 50
         )  # Either styled content or empty
 
-    def test_describe_cron_expression_concurrent_requests(
-        self, client: TestClient
+    async def test_describe_cron_expression_concurrent_requests(
+        self, async_client: AsyncClient
     ) -> None:
         """Test that multiple concurrent requests work correctly."""
-        import threading
+        import asyncio
 
-        results = []
-
-        def make_request(cron_expr: str) -> None:
-            response = client.get(
+        async def make_request(cron_expr: str) -> tuple[str, int, str]:
+            response = await async_client.get(
                 f"/api/schedules/cron/describe?custom_cron_input={cron_expr}"
             )
-            results.append((cron_expr, response.status_code, response.text))
+            return (cron_expr, response.status_code, response.text)
 
-        # Create multiple threads with different cron expressions
-        threads = []
+        # Create multiple tasks with different cron expressions
         expressions = ["0 2 * * *", "*/5 * * * *", "0 12 * * 0", "invalid"]
 
-        for expr in expressions:
-            thread = threading.Thread(target=make_request, args=(expr,))
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
+        # Run all requests concurrently using asyncio.gather
+        results = await asyncio.gather(*[make_request(expr) for expr in expressions])
 
         # Verify all requests succeeded
         assert len(results) == len(expressions)
@@ -265,9 +263,11 @@ class TestCronDescriptionHTMXAPI:
             else:
                 assert "Schedule:" in content or len(content.strip()) < 50
 
-    def test_describe_cron_expression_caching_headers(self, client: TestClient) -> None:
+    async def test_describe_cron_expression_caching_headers(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test that appropriate caching headers are set for HTMX responses."""
-        response = client.get(
+        response = await async_client.get(
             "/api/schedules/cron/describe?custom_cron_input=0 2 * * *"
         )
 

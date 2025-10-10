@@ -6,8 +6,8 @@ These tests use real dependencies and minimal mocking to exercise actual code pa
 import pytest
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import Mock
-from sqlalchemy.orm import Session
+from unittest.mock import Mock, MagicMock, AsyncMock
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.templating import Jinja2Templates
 from typing import AsyncGenerator
 
@@ -21,7 +21,7 @@ from borgitory.services.jobs.job_render_service import (
     TaskDisplayData,
     JobProgress,
 )
-from borgitory.models.database import Job, JobTask, Repository
+from borgitory.models.database import Job, JobTask, Repository, StringUUID
 from borgitory.models.enums import JobType
 from borgitory.services.jobs.job_models import (
     BorgJob,
@@ -46,7 +46,7 @@ class TestJobDataConverterCoverage:
         # Create a real Job object with tasks
         test_job_id = uuid.uuid4()
         db_job = Job()
-        db_job.id = test_job_id
+        db_job.id = StringUUID(test_job_id.hex)
         db_job.type = JobType.BACKUP
         db_job.status = JobStatusEnum.COMPLETED
         db_job.started_at = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -59,7 +59,7 @@ class TestJobDataConverterCoverage:
         # Add tasks
         task1 = JobTask()
         task1.id = 1
-        task1.job_id = test_job_id
+        task1.job_id = StringUUID(test_job_id.hex)
         task1.task_name = "Backup Files"
         task1.task_type = TaskTypeEnum.BACKUP
         task1.task_order = 0
@@ -71,7 +71,7 @@ class TestJobDataConverterCoverage:
 
         task2 = JobTask()
         task2.id = 2
-        task2.job_id = test_job_id
+        task2.job_id = StringUUID(test_job_id.hex)
         task2.task_name = "Sync to Cloud"
         task2.task_type = TaskTypeEnum.CLOUD_SYNC
         task2.task_order = 1
@@ -117,7 +117,7 @@ class TestJobDataConverterCoverage:
 
         test_job_id = uuid.uuid4()
         db_job = Job()
-        db_job.id = test_job_id
+        db_job.id = StringUUID(test_job_id.hex)
         db_job.type = JobType.PRUNE
         db_job.status = JobStatusEnum.PENDING
         db_job.started_at = datetime.now(timezone.utc)
@@ -143,7 +143,7 @@ class TestJobDataConverterCoverage:
         repository.id = 1
 
         db_job = Job()
-        db_job.id = uuid.uuid4()
+        db_job.id = StringUUID(uuid.uuid4().hex)
         db_job.type = JobType.BACKUP
         db_job.status = JobStatusEnum.RUNNING
         db_job.repository = repository
@@ -369,12 +369,12 @@ class TestJobRenderServiceCoverage:
         return job_manager
 
     @pytest.fixture
-    def mock_db_session(self) -> Mock:
+    def mock_db_session(self) -> MagicMock:
         """Create a mock database session"""
-        session = Mock(spec=Session)
+        session = Mock(spec=AsyncSession)
         return session
 
-    def test_render_jobs_html_with_jobs(
+    async def test_render_jobs_html_with_jobs(
         self, mock_templates: Mock, mock_job_manager: Mock, mock_db_session: Mock
     ) -> None:
         """Test render_jobs_html with database jobs"""
@@ -386,7 +386,7 @@ class TestJobRenderServiceCoverage:
         repository.id = 1
 
         db_job = Job()
-        db_job.id = uuid.uuid4()
+        db_job.id = StringUUID(uuid.uuid4().hex)
         db_job.type = JobType.BACKUP
         db_job.status = JobStatusEnum.COMPLETED
         db_job.started_at = datetime.now(timezone.utc)
@@ -394,14 +394,17 @@ class TestJobRenderServiceCoverage:
         db_job.repository = repository
         db_job.tasks = []
 
-        # Mock the query chain
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [db_job]
+        # Mock the execute chain for SQLAlchemy 2.0: result.unique().scalars().all()
+        mock_all = Mock()
+        mock_all.all.return_value = [db_job]
 
-        mock_db_session.query.return_value = mock_query
+        mock_scalars = Mock()
+        mock_scalars.scalars.return_value = mock_all
+
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_scalars
+
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
 
         # Create service and test
         service = JobRenderService(
@@ -409,51 +412,54 @@ class TestJobRenderServiceCoverage:
             templates=mock_templates,
         )
 
-        result = service.render_jobs_html(mock_db_session, expand="")
+        result = await service.render_jobs_html(mock_db_session, expand="")
 
         # Verify database was queried
-        mock_db_session.query.assert_called_once_with(Job)
+        mock_db_session.execute.assert_called_once()
 
         # Verify HTML was generated
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_render_jobs_html_empty_state(
+    async def test_render_jobs_html_empty_state(
         self, mock_templates: Mock, mock_job_manager: Mock, mock_db_session: Mock
     ) -> None:
         """Test render_jobs_html with no jobs returns empty state"""
-        # Mock empty query result
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
+        # Mock empty execute result for SQLAlchemy 2.0: result.unique().scalars().all()
+        mock_all = Mock()
+        mock_all.all.return_value = []
 
-        mock_db_session.query.return_value = mock_query
+        mock_scalars = Mock()
+        mock_scalars.scalars.return_value = mock_all
+
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_scalars
+
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
 
         service = JobRenderService(
             job_manager=mock_job_manager,
             templates=mock_templates,
         )
 
-        service.render_jobs_html(mock_db_session)
+        await service.render_jobs_html(mock_db_session)
 
         # Verify empty state template was used
         mock_templates.get_template.assert_called_with("partials/jobs/empty_state.html")
 
-    def test_render_jobs_html_error_handling(
+    async def test_render_jobs_html_error_handling(
         self, mock_templates: Mock, mock_job_manager: Mock, mock_db_session: Mock
     ) -> None:
         """Test render_jobs_html error handling"""
-        # Make database query raise an exception
-        mock_db_session.query.side_effect = Exception("Database error")
+        # Make database execute raise an exception for SQLAlchemy 2.0
+        mock_db_session.execute = AsyncMock(side_effect=Exception("Database error"))
 
         service = JobRenderService(
             job_manager=mock_job_manager,
             templates=mock_templates,
         )
 
-        service.render_jobs_html(mock_db_session)
+        await service.render_jobs_html(mock_db_session)
 
         # Verify error template was used
         mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
@@ -528,7 +534,6 @@ class TestJobRenderServiceCoverage:
         # Verify error template was used
         mock_templates.get_template.assert_called_with("partials/jobs/error_state.html")
 
-    @pytest.mark.asyncio
     async def test_stream_current_jobs_html(
         self, mock_templates: Mock, mock_job_manager: Mock
     ) -> None:
@@ -559,7 +564,6 @@ class TestJobRenderServiceCoverage:
         assert len(results) >= 1
         assert all("data:" in chunk for chunk in results)
 
-    @pytest.mark.asyncio
     async def test_stream_current_jobs_html_error_handling(
         self, mock_templates: Mock, mock_job_manager: Mock
     ) -> None:

@@ -4,7 +4,6 @@ Tests the business logic directly without mocking core components
 """
 
 import uuid
-import pytest
 from unittest.mock import Mock, AsyncMock
 
 from borgitory.models.job_results import JobStatusEnum
@@ -26,7 +25,6 @@ class TestJobManagerStop:
         self.job_manager = JobManager()
         self.job_manager._initialized = True
 
-    @pytest.mark.asyncio
     async def test_stop_job_not_found(self) -> None:
         """Test stopping non-existent job"""
         # Act
@@ -37,7 +35,6 @@ class TestJobManagerStop:
         assert result["error"] == "Job not found"
         assert result["error_code"] == "JOB_NOT_FOUND"
 
-    @pytest.mark.asyncio
     async def test_stop_job_invalid_status_completed(self) -> None:
         """Test stopping job that's already completed"""
         # Arrange
@@ -59,7 +56,6 @@ class TestJobManagerStop:
         assert result["error"] == "Cannot stop job in status: JobStatusEnum.COMPLETED"
         assert result["error_code"] == "INVALID_STATUS"
 
-    @pytest.mark.asyncio
     async def test_stop_job_invalid_status_failed(self) -> None:
         """Test stopping job that's already failed"""
         # Arrange
@@ -81,7 +77,6 @@ class TestJobManagerStop:
         assert result["error"] == "Cannot stop job in status: JobStatusEnum.FAILED"
         assert result["error_code"] == "INVALID_STATUS"
 
-    @pytest.mark.asyncio
     async def test_stop_simple_running_job_no_process(self) -> None:
         """Test stopping simple running job with no active process"""
         # Arrange
@@ -119,7 +114,6 @@ class TestJobManagerStop:
             job_id, "stopped", job.completed_at
         )
 
-    @pytest.mark.asyncio
     async def test_stop_running_job_with_process(self) -> None:
         """Test stopping running job with active process"""
         # Arrange
@@ -164,7 +158,6 @@ class TestJobManagerStop:
         assert job.status == JobStatusEnum.STOPPED
         assert job.error == "Manually stopped by user"
 
-    @pytest.mark.asyncio
     async def test_stop_running_job_process_termination_fails(self) -> None:
         """Test stopping running job when process termination fails"""
         # Arrange
@@ -202,7 +195,6 @@ class TestJobManagerStop:
         # Process should still be in the dict since termination failed
         assert job_id in self.job_manager._processes
 
-    @pytest.mark.asyncio
     async def test_stop_queued_job(self) -> None:
         """Test stopping queued job"""
         # Arrange
@@ -234,7 +226,6 @@ class TestJobManagerStop:
         assert job.status == JobStatusEnum.STOPPED
         assert job.error == "Manually stopped by user"
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_with_tasks(self) -> None:
         """Test stopping composite job with multiple tasks"""
         # Arrange
@@ -306,7 +297,6 @@ class TestJobManagerStop:
         assert task4.error == "Skipped due to manual job stop"
         assert task4.completed_at is not None
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_with_process_and_tasks(self) -> None:
         """Test stopping composite job with active process and remaining tasks"""
         # Arrange
@@ -368,7 +358,6 @@ class TestJobManagerStop:
         assert task2.status == TaskStatusEnum.SKIPPED
         assert task2.error == "Skipped due to manual job stop"
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_no_remaining_tasks(self) -> None:
         """Test stopping composite job on last task"""
         # Arrange
@@ -417,7 +406,6 @@ class TestJobManagerStop:
         assert task1.status == TaskStatusEnum.COMPLETED  # Unchanged
         assert task2.status == TaskStatusEnum.STOPPED  # Current task stopped
 
-    @pytest.mark.asyncio
     async def test_stop_job_event_broadcasting(self) -> None:
         """Test that stop job broadcasts the correct event"""
         # Arrange
@@ -462,7 +450,6 @@ class TestJobManagerStop:
         assert event_data["current_task_killed"] is False
         assert "stopped_at" in event_data
 
-    @pytest.mark.asyncio
     async def test_stop_job_no_database_manager(self) -> None:
         """Test stopping job when database manager is None"""
         # Arrange
@@ -485,7 +472,6 @@ class TestJobManagerStop:
         assert job.status == "stopped"
         # Should not raise any errors even without database manager
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_task_index_out_of_bounds(self) -> None:
         """Test stopping composite job with invalid current_task_index"""
         # Arrange
@@ -523,7 +509,6 @@ class TestJobManagerStop:
         assert result["tasks_skipped"] == 0  # No tasks to skip
         assert job.status == "stopped"
 
-    @pytest.mark.asyncio
     async def test_stop_composite_job_no_tasks(self) -> None:
         """Test stopping composite job with no tasks"""
         # Arrange

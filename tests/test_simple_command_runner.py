@@ -55,7 +55,6 @@ class TestSimpleCommandRunner:
         assert runner_custom.max_retries == 5
         assert runner_custom.log_commands is False
 
-    @pytest.mark.asyncio
     async def test_run_command_success(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -81,7 +80,6 @@ class TestSimpleCommandRunner:
         assert result.error is None
         mock_executor.execute_command.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_run_command_failure(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -107,7 +105,6 @@ class TestSimpleCommandRunner:
         assert result.duration == 2.0
         assert result.error == "error message"
 
-    @pytest.mark.asyncio
     async def test_run_command_timeout(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -132,7 +129,6 @@ class TestSimpleCommandRunner:
         assert result.error is not None
         assert "timed out" in result.error
 
-    @pytest.mark.asyncio
     async def test_run_command_with_env(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -158,7 +154,6 @@ class TestSimpleCommandRunner:
         call_args = mock_executor.execute_command.call_args
         assert call_args[1]["env"] == env_vars
 
-    @pytest.mark.asyncio
     async def test_run_command_custom_timeout(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -181,7 +176,6 @@ class TestSimpleCommandRunner:
         call_args = mock_executor.execute_command.call_args
         assert call_args[1]["timeout"] == 60.0
 
-    @pytest.mark.asyncio
     async def test_run_command_exception_handling(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -197,7 +191,6 @@ class TestSimpleCommandRunner:
         assert "Failed to execute command" in result.error
         assert "Executor failed" in result.error
 
-    @pytest.mark.asyncio
     async def test_run_command_with_binary_output(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -216,7 +209,6 @@ class TestSimpleCommandRunner:
         assert result.success is True
         assert result.stdout == "binary\x00data\xff"
 
-    @pytest.mark.asyncio
     async def test_run_command_empty_output(
         self, runner: SimpleCommandRunner, mock_executor: Mock
     ) -> None:
@@ -236,7 +228,6 @@ class TestSimpleCommandRunner:
         assert result.stdout == ""
         assert result.stderr == ""
 
-    @pytest.mark.asyncio
     async def test_run_command_logging_enabled(self) -> None:
         """Test command execution with logging enabled."""
         config = CommandRunnerConfig(log_commands=True)
@@ -258,7 +249,6 @@ class TestSimpleCommandRunner:
         result = await runner.run_command(["echo", "test"])
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_run_command_failure_logging(self) -> None:
         """Test command execution failure with logging enabled."""
         config = CommandRunnerConfig(log_commands=True)

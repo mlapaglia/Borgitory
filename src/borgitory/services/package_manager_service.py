@@ -8,7 +8,8 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.protocols.command_protocols import CommandRunnerProtocol
 from borgitory.models.database import UserInstalledPackage
 from borgitory.utils.datetime_utils import now_utc
@@ -34,10 +35,8 @@ class PackageManagerService:
     def __init__(
         self,
         command_runner: CommandRunnerProtocol,
-        db_session: Optional[Session] = None,
     ):
         self.command_runner = command_runner
-        self.db_session = db_session
         self._package_cache: Dict[str, PackageInfo] = {}
         self._cache_updated = False
 
@@ -84,7 +83,9 @@ class PackageManagerService:
             logger.error(f"Error getting package info for {package_name}: {e}")
             return None
 
-    async def install_packages(self, packages: List[str]) -> Tuple[bool, str]:
+    async def install_packages(
+        self, session: AsyncSession, packages: List[str]
+    ) -> Tuple[bool, str]:
         """Install packages using apt-get."""
         validated_packages = self._validate_package_names(packages)
 
@@ -109,7 +110,8 @@ class PackageManagerService:
                 for package_name in validated_packages:
                     package_info = await self.get_package_info(package_name)
                     if package_info and package_info.installed:
-                        self._save_installed_package(
+                        await self._save_installed_package(
+                            session=session,
                             package_name=package_name,
                             version=package_info.version,
                             install_command=install_command,
@@ -124,7 +126,9 @@ class PackageManagerService:
             logger.error(f"Error installing packages {packages}: {e}")
             return False, f"Installation error: {str(e)}"
 
-    async def remove_packages(self, packages: List[str]) -> Tuple[bool, str]:
+    async def remove_packages(
+        self, session: AsyncSession, packages: List[str]
+    ) -> Tuple[bool, str]:
         """Remove packages using apt-get."""
         validated_packages = self._validate_package_names(packages)
 
@@ -137,7 +141,7 @@ class PackageManagerService:
                 self._cache_updated = False
 
                 for package_name in validated_packages:
-                    self._remove_installed_package(package_name)
+                    await self._remove_installed_package(session, package_name)
 
                 return True, f"Successfully removed: {', '.join(validated_packages)}"
             else:
@@ -259,26 +263,23 @@ class PackageManagerService:
 
         return None
 
-    def _save_installed_package(
+    async def _save_installed_package(
         self,
+        session: AsyncSession,
         package_name: str,
         version: str,
         install_command: str,
         dependencies: Optional[List[str]] = None,
     ) -> None:
         """Save installed package to database for persistence."""
-        if not self.db_session:
-            logger.warning(
-                "No database session available, cannot track installed package"
-            )
-            return
-
         try:
             existing = (
-                self.db_session.query(UserInstalledPackage)
-                .filter(UserInstalledPackage.package_name == package_name)
-                .first()
-            )
+                await session.execute(
+                    select(UserInstalledPackage).filter(
+                        UserInstalledPackage.package_name == package_name
+                    )
+                )
+            ).scalar_one_or_none()
 
             if existing:
                 existing.version = version
@@ -286,6 +287,10 @@ class PackageManagerService:
                 existing.install_command = install_command
                 existing.dependencies_installed = (
                     json.dumps(dependencies) if dependencies else None
+                )
+                await session.commit()
+                logger.info(
+                    f"Updated installation of package {package_name} v{version} in database"
                 )
             else:
                 package_record = UserInstalledPackage()
@@ -296,9 +301,9 @@ class PackageManagerService:
                 package_record.dependencies_installed = (
                     json.dumps(dependencies) if dependencies else None
                 )
-                self.db_session.add(package_record)
+                session.add(package_record)
 
-            self.db_session.commit()
+            await session.commit()
             logger.info(
                 f"Tracked installation of package {package_name} v{version} in database"
             )
@@ -307,53 +312,61 @@ class PackageManagerService:
             logger.error(
                 f"Failed to save installed package {package_name} to database: {e}"
             )
-            if self.db_session:
-                self.db_session.rollback()
+            if session:
+                await session.rollback()
 
-    def _remove_installed_package(self, package_name: str) -> None:
+    async def _remove_installed_package(
+        self, session: AsyncSession, package_name: str
+    ) -> None:
         """Remove installed package record from database."""
-        if not self.db_session:
-            logger.warning(
-                "No database session available, cannot remove tracked package"
-            )
-            return
-
         try:
             package_record = (
-                self.db_session.query(UserInstalledPackage)
-                .filter(UserInstalledPackage.package_name == package_name)
-                .first()
-            )
+                await session.execute(
+                    select(UserInstalledPackage).filter(
+                        UserInstalledPackage.package_name == package_name
+                    )
+                )
+            ).scalar_one_or_none()
 
             if package_record:
-                self.db_session.delete(package_record)
-                self.db_session.commit()
+                await session.delete(package_record)
+                await session.commit()
                 logger.info(f"Removed package {package_name} from database tracking")
 
         except Exception as e:
             logger.error(f"Failed to remove package {package_name} from database: {e}")
-            if self.db_session:
-                self.db_session.rollback()
+            if session:
+                await session.rollback()
 
-    def get_user_installed_packages(self) -> List[UserInstalledPackage]:
+    async def get_user_installed_packages(
+        self, session: AsyncSession
+    ) -> List[UserInstalledPackage]:
         """Get list of user-installed packages from database."""
-        if not self.db_session:
-            return []
-
         try:
-            return (
-                self.db_session.query(UserInstalledPackage)
-                .order_by(UserInstalledPackage.installed_at.desc())
+            result = (
+                (
+                    await session.execute(
+                        select(UserInstalledPackage).order_by(
+                            UserInstalledPackage.installed_at.desc()
+                        )
+                    )
+                )
+                .scalars()
                 .all()
             )
+
+            return list(result)
+
         except Exception as e:
             logger.error(f"Failed to get user-installed packages from database: {e}")
             return []
 
-    async def ensure_user_packages_installed(self) -> Tuple[bool, str]:
+    async def ensure_user_packages_installed(
+        self, session: AsyncSession
+    ) -> Tuple[bool, str]:
         """Ensure all user-installed packages from database are actually installed.
         This is called on startup to restore packages after container restart."""
-        user_packages = self.get_user_installed_packages()
+        user_packages = await self.get_user_installed_packages(session)
 
         if not user_packages:
             return True, "No packages to restore"
@@ -372,7 +385,7 @@ class PackageManagerService:
             f"Reinstalling {len(missing_packages)} missing packages: {', '.join(missing_packages)}"
         )
 
-        success, message = await self.install_packages(missing_packages)
+        success, message = await self.install_packages(session, missing_packages)
 
         if success:
             logger.info(f"Successfully restored {len(missing_packages)} packages")

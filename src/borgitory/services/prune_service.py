@@ -6,7 +6,8 @@ Handles all prune configuration-related business operations independent of HTTP 
 import logging
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Union, cast
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import PruneConfig, Repository
 from borgitory.models.schemas import PruneConfigCreate, PruneConfigUpdate
@@ -51,22 +52,32 @@ class PruneConfigDeleteResult:
 class PruneService:
     """Service for prune configuration business logic operations."""
 
-    def __init__(self, db: Session) -> None:
-        self.db = db
+    def __init__(self) -> None:
+        """
+        Initialize PruneService.
+        """
 
-    def get_prune_configs(self, skip: int = 0, limit: int = 100) -> List[PruneConfig]:
+    async def get_prune_configs(
+        self, db: AsyncSession, skip: int = 0, limit: int = 100
+    ) -> List[PruneConfig]:
         """Get all prune configurations with pagination."""
-        return self.db.query(PruneConfig).offset(skip).limit(limit).all()
+        result = await db.execute(select(PruneConfig).offset(skip).limit(limit))
+        return list(result.scalars().all())
 
-    def get_prune_config_by_id(self, config_id: int) -> Optional[PruneConfig]:
+    async def get_prune_config_by_id(
+        self, db: AsyncSession, config_id: int
+    ) -> Optional[PruneConfig]:
         """Get a prune configuration by ID."""
-        config = self.db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
+        result = await db.execute(
+            select(PruneConfig).where(PruneConfig.id == config_id)
+        )
+        config = result.scalar_one_or_none()
         if not config:
             raise Exception(f"Prune configuration with id {config_id} not found")
         return config
 
-    def create_prune_config(
-        self, prune_config: PruneConfigCreate
+    async def create_prune_config(
+        self, db: AsyncSession, prune_config: PruneConfigCreate
     ) -> PruneConfigOperationResult:
         """
         Create a new prune configuration.
@@ -75,11 +86,10 @@ class PruneService:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
-            existing = (
-                self.db.query(PruneConfig)
-                .filter(PruneConfig.name == prune_config.name)
-                .first()
+            result = await db.execute(
+                select(PruneConfig).where(PruneConfig.name == prune_config.name)
             )
+            existing = result.scalar_one_or_none()
             if existing:
                 return PruneConfigOperationResult(
                     success=False,
@@ -99,21 +109,21 @@ class PruneService:
             db_config.save_space = prune_config.save_space
             db_config.enabled = True
 
-            self.db.add(db_config)
-            self.db.commit()
-            self.db.refresh(db_config)
+            db.add(db_config)
+            await db.commit()
+            await db.refresh(db_config)
 
             return PruneConfigOperationResult(success=True, config=db_config)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return PruneConfigOperationResult(
                 success=False,
                 error_message=f"Failed to create prune configuration: {str(e)}",
             )
 
-    def update_prune_config(
-        self, config_id: int, prune_config_update: PruneConfigUpdate
+    async def update_prune_config(
+        self, db: AsyncSession, config_id: int, prune_config_update: PruneConfigUpdate
     ) -> PruneConfigOperationResult:
         """
         Update an existing prune configuration.
@@ -122,9 +132,10 @@ class PruneService:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
-            config = (
-                self.db.query(PruneConfig).filter(PruneConfig.id == config_id).first()
+            result = await db.execute(
+                select(PruneConfig).where(PruneConfig.id == config_id)
             )
+            config = result.scalar_one_or_none()
             if not config:
                 return PruneConfigOperationResult(
                     success=False, error_message="Prune configuration not found"
@@ -132,14 +143,13 @@ class PruneService:
 
             update_dict = prune_config_update.model_dump(exclude_unset=True)
             if "name" in update_dict and update_dict["name"] != config.name:
-                existing = (
-                    self.db.query(PruneConfig)
-                    .filter(
+                result = await db.execute(
+                    select(PruneConfig).where(
                         PruneConfig.name == update_dict["name"],
                         PruneConfig.id != config_id,
                     )
-                    .first()
                 )
+                existing = result.scalar_one_or_none()
                 if existing:
                     return PruneConfigOperationResult(
                         success=False,
@@ -150,19 +160,21 @@ class PruneService:
                 if hasattr(config, field):
                     setattr(config, field, value)
 
-            self.db.commit()
-            self.db.refresh(config)
+            await db.commit()
+            await db.refresh(config)
 
             return PruneConfigOperationResult(success=True, config=config)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return PruneConfigOperationResult(
                 success=False,
                 error_message=f"Failed to update prune configuration: {str(e)}",
             )
 
-    def enable_prune_config(self, prune_config_id: int) -> PruneConfigOperationResult:
+    async def enable_prune_config(
+        self, db: AsyncSession, prune_config_id: int
+    ) -> PruneConfigOperationResult:
         """
         Enable a prune configuration.
 
@@ -170,30 +182,31 @@ class PruneService:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
-            config = (
-                self.db.query(PruneConfig)
-                .filter(PruneConfig.id == prune_config_id)
-                .first()
+            result = await db.execute(
+                select(PruneConfig).where(PruneConfig.id == prune_config_id)
             )
+            config = result.scalar_one_or_none()
             if not config:
                 return PruneConfigOperationResult(
                     success=False, error_message="Prune configuration not found"
                 )
 
             config.enabled = True
-            self.db.commit()
-            self.db.refresh(config)
+            await db.commit()
+            await db.refresh(config)
 
             return PruneConfigOperationResult(success=True, config=config)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return PruneConfigOperationResult(
                 success=False,
                 error_message=f"Failed to enable prune configuration: {str(e)}",
             )
 
-    def disable_prune_config(self, prune_config_id: int) -> PruneConfigOperationResult:
+    async def disable_prune_config(
+        self, db: AsyncSession, prune_config_id: int
+    ) -> PruneConfigOperationResult:
         """
         Disable a prune configuration.
 
@@ -201,30 +214,31 @@ class PruneService:
             tuple: (success, config_or_none, error_message_or_none)
         """
         try:
-            config = (
-                self.db.query(PruneConfig)
-                .filter(PruneConfig.id == prune_config_id)
-                .first()
+            result = await db.execute(
+                select(PruneConfig).where(PruneConfig.id == prune_config_id)
             )
+            config = result.scalar_one_or_none()
             if not config:
                 return PruneConfigOperationResult(
                     success=False, error_message="Prune configuration not found"
                 )
 
             config.enabled = False
-            self.db.commit()
-            self.db.refresh(config)
+            await db.commit()
+            await db.refresh(config)
 
             return PruneConfigOperationResult(success=True, config=config)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return PruneConfigOperationResult(
                 success=False,
                 error_message=f"Failed to disable prune configuration: {str(e)}",
             )
 
-    def delete_prune_config(self, prune_config_id: int) -> PruneConfigDeleteResult:
+    async def delete_prune_config(
+        self, db: AsyncSession, prune_config_id: int
+    ) -> PruneConfigDeleteResult:
         """
         Delete a prune configuration.
 
@@ -232,31 +246,31 @@ class PruneService:
             tuple: (success, config_name_or_none, error_message_or_none)
         """
         try:
-            config = (
-                self.db.query(PruneConfig)
-                .filter(PruneConfig.id == prune_config_id)
-                .first()
+            result = await db.execute(
+                select(PruneConfig).where(PruneConfig.id == prune_config_id)
             )
+            config = result.scalar_one_or_none()
             if not config:
                 return PruneConfigDeleteResult(
                     success=False, error_message="Prune configuration not found"
                 )
 
             config_name = config.name
-            self.db.delete(config)
-            self.db.commit()
+            await db.delete(config)
+            await db.commit()
 
             return PruneConfigDeleteResult(success=True, config_name=config_name)
 
         except Exception as e:
-            self.db.rollback()
+            await db.rollback()
             return PruneConfigDeleteResult(
                 success=False,
                 error_message=f"Failed to delete prune configuration: {str(e)}",
             )
 
-    def get_configs_with_descriptions(
+    async def get_configs_with_descriptions(
         self,
+        db: AsyncSession,
     ) -> List[Dict[str, Union[str, int, bool, None]]]:
         """
         Get all prune configurations with computed description fields.
@@ -265,7 +279,7 @@ class PruneService:
             List of dictionaries with config data and computed fields
         """
         try:
-            prune_configs_raw = self.get_prune_configs()
+            prune_configs_raw = await self.get_prune_configs(db)
 
             processed_configs = []
             for config in prune_configs_raw:
@@ -284,10 +298,11 @@ class PruneService:
             logger.error(f"Error getting configs with descriptions: {str(e)}")
             return []
 
-    def get_form_data(self) -> Dict[str, List[Repository]]:
+    async def get_form_data(self, db: AsyncSession) -> Dict[str, List[Repository]]:
         """Get data needed for prune form."""
         try:
-            repositories = self.db.query(Repository).all()
+            result = await db.execute(select(Repository))
+            repositories = list(result.scalars().all())
 
             return {
                 "repositories": repositories,

@@ -35,7 +35,6 @@ class TestLinuxCommandExecutor:
         """Test get_platform_name returns correct value."""
         assert executor.get_platform_name() == "linux"
 
-    @pytest.mark.asyncio
     async def test_execute_command_success(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -68,7 +67,6 @@ class TestLinuxCommandExecutor:
                 cwd=None,
             )
 
-    @pytest.mark.asyncio
     async def test_execute_command_failure(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -86,7 +84,6 @@ class TestLinuxCommandExecutor:
             assert result.stderr == "error message"
             assert result.error == "error message"
 
-    @pytest.mark.asyncio
     async def test_execute_command_with_env(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -115,7 +112,6 @@ class TestLinuxCommandExecutor:
                 cwd=None,
             )
 
-    @pytest.mark.asyncio
     async def test_execute_command_with_cwd(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -143,7 +139,6 @@ class TestLinuxCommandExecutor:
                 cwd=cwd,
             )
 
-    @pytest.mark.asyncio
     async def test_execute_command_with_input(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -170,7 +165,6 @@ class TestLinuxCommandExecutor:
                 cwd=None,
             )
 
-    @pytest.mark.asyncio
     async def test_execute_command_timeout(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -190,7 +184,6 @@ class TestLinuxCommandExecutor:
                 mock_process.kill.assert_called_once()
                 mock_process.wait.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_command_custom_timeout(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -209,7 +202,6 @@ class TestLinuxCommandExecutor:
                 mock_wait_for.assert_called_once()
                 assert mock_wait_for.call_args[1]["timeout"] == 5.0
 
-    @pytest.mark.asyncio
     async def test_execute_command_default_timeout(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -228,7 +220,6 @@ class TestLinuxCommandExecutor:
                 mock_wait_for.assert_called_once()
                 assert mock_wait_for.call_args[1]["timeout"] == executor.default_timeout
 
-    @pytest.mark.asyncio
     async def test_execute_command_exception(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -243,7 +234,6 @@ class TestLinuxCommandExecutor:
             assert result.return_code == -1
             assert "Linux command execution failed: Permission denied" in result.error
 
-    @pytest.mark.asyncio
     async def test_execute_command_with_all_params(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -283,7 +273,6 @@ class TestLinuxCommandExecutor:
 
             mock_process.communicate.assert_called_once_with(b"input data")
 
-    @pytest.mark.asyncio
     async def test_execute_command_none_returncode(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -297,7 +286,6 @@ class TestLinuxCommandExecutor:
 
             assert result.return_code == 0  # Should default to 0 when None
 
-    @pytest.mark.asyncio
     async def test_execute_command_stderr_without_failure(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -315,7 +303,6 @@ class TestLinuxCommandExecutor:
             assert result.stderr == "warning message"
             assert result.error is None  # No error since command succeeded
 
-    @pytest.mark.asyncio
     async def test_create_subprocess(self, executor: LinuxCommandExecutor) -> None:
         """Test subprocess creation for streaming."""
         mock_process = Mock()
@@ -345,7 +332,6 @@ class TestLinuxCommandExecutor:
                 cwd="/home/user",
             )
 
-    @pytest.mark.asyncio
     async def test_create_subprocess_default_pipes(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -368,7 +354,6 @@ class TestLinuxCommandExecutor:
                 cwd=None,
             )
 
-    @pytest.mark.asyncio
     async def test_create_subprocess_exception(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -379,7 +364,6 @@ class TestLinuxCommandExecutor:
             with pytest.raises(OSError, match="Command not found"):
                 await executor.create_subprocess(["nonexistent"])
 
-    @pytest.mark.asyncio
     async def test_execute_command_utf8_handling(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -397,7 +381,6 @@ class TestLinuxCommandExecutor:
             assert result.success is True
             assert result.stdout == utf8_content
 
-    @pytest.mark.asyncio
     async def test_execute_command_invalid_utf8_handling(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -415,7 +398,6 @@ class TestLinuxCommandExecutor:
             # Should handle invalid UTF-8 gracefully with replacement characters
             assert isinstance(result.stdout, str)
 
-    @pytest.mark.asyncio
     async def test_execute_command_empty_command(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -433,7 +415,6 @@ class TestLinuxCommandExecutor:
             # Should still call create_subprocess_exec even with empty command
             mock_create.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_execute_command_complex_command(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -466,7 +447,6 @@ class TestLinuxCommandExecutor:
             call_args = mock_create.call_args[0]
             assert call_args == tuple(complex_command)
 
-    @pytest.mark.asyncio
     async def test_execute_command_logging_success(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -488,7 +468,6 @@ class TestLinuxCommandExecutor:
                 ]
                 assert any("completed successfully" in msg for msg in debug_calls)
 
-    @pytest.mark.asyncio
     async def test_execute_command_logging_failure(
         self, executor: LinuxCommandExecutor
     ) -> None:
@@ -509,7 +488,6 @@ class TestLinuxCommandExecutor:
                 assert "failed" in warning_msg
                 assert "code 1" in warning_msg
 
-    @pytest.mark.asyncio
     async def test_create_subprocess_logging(
         self, executor: LinuxCommandExecutor
     ) -> None:
