@@ -15,7 +15,7 @@ from borgitory.services.repositories.repository_service import RepositoryService
 from borgitory.models.repository_dtos import (
     ImportRepositoryRequest,
 )
-from borgitory.models.database import Repository
+from borgitory.models.database import Repository, Job, Schedule
 
 
 class TestRepositoryService:
@@ -289,6 +289,801 @@ class TestRepositoryService:
         assert "original_size" in result
         assert "config" in result
         assert result["config"]["repository.id"] == "abc123"
+
+    # Create Repository Tests
+
+    async def test_create_repository_success_basic(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository creation with basic configuration."""
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="new-repo",
+            path="/mnt/backup/new-repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+        )
+
+        mock_init_result = Mock()
+        mock_init_result.success = True
+        mock_init_result.message = "Repository initialized successfully"
+        mock_borg_service.initialize_repository.return_value = mock_init_result
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is True
+        assert result.repository_id is not None
+        assert result.repository_name == "new-repo"
+        assert result.message is not None
+        assert "created successfully" in result.message
+
+        mock_borg_service.initialize_repository.assert_called_once()
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "new-repo")
+        )
+        saved_repo = execute_result.scalar_one_or_none()
+        assert saved_repo is not None
+        assert saved_repo.path == "/mnt/backup/new-repo"
+        assert saved_repo.get_passphrase() == "secret123"
+        assert saved_repo.encryption_type == EncryptionType.REPOKEY
+
+    async def test_create_repository_success_with_cache_dir(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository creation with cache directory."""
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="cached-repo",
+            path="/mnt/backup/cached-repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+            cache_dir="/custom/cache",
+        )
+
+        mock_init_result = Mock()
+        mock_init_result.success = True
+        mock_init_result.message = "Repository initialized successfully"
+        mock_borg_service.initialize_repository.return_value = mock_init_result
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is True
+        assert result.repository_id is not None
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "cached-repo")
+        )
+        saved_repo = execute_result.scalar_one_or_none()
+        assert saved_repo is not None
+        assert saved_repo.cache_dir == "/custom/cache"
+
+    async def test_create_repository_success_with_keyfile_encryption(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        mock_command_executor: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository creation with keyfile encryption saves keyfile."""
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+        from borgitory.protocols.command_executor_protocol import CommandResult
+
+        request = CreateRepositoryRequest(
+            name="keyfile-repo",
+            path="/mnt/backup/keyfile-repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.KEYFILE,
+        )
+
+        mock_init_result = Mock()
+        mock_init_result.success = True
+        mock_init_result.message = "Repository initialized successfully"
+        mock_borg_service.initialize_repository.return_value = mock_init_result
+
+        mock_key_data = "BORG_KEY test-key-data-here"
+        mock_command_executor.execute_command.return_value = CommandResult(
+            command=["borg", "key", "export"],
+            return_code=0,
+            stdout=mock_key_data,
+            stderr="",
+            success=True,
+            execution_time=1.0,
+        )
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is True
+        assert result.repository_id is not None
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "keyfile-repo")
+        )
+        saved_repo = execute_result.scalar_one_or_none()
+        assert saved_repo is not None
+        assert saved_repo.encryption_type == EncryptionType.KEYFILE
+        assert saved_repo.get_keyfile_content() == mock_key_data
+
+    async def test_create_repository_name_already_exists(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test creation fails when repository name already exists."""
+        existing_repo = Repository()
+        existing_repo.name = "existing-repo"
+        existing_repo.path = "/different/path"
+        existing_repo.set_passphrase("different-passphrase")
+        test_db.add(existing_repo)
+        await test_db.commit()
+
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="existing-repo",
+            path="/mnt/backup/new-repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+        )
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is False
+        assert result.is_validation_error is True
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert result.validation_errors[0].field == "name"
+        assert "already exists" in result.validation_errors[0].message
+
+    async def test_create_repository_path_already_exists(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test creation fails when repository path already exists."""
+        existing_repo = Repository()
+        existing_repo.name = "different-repo"
+        existing_repo.path = "/mnt/backup/existing-path"
+        existing_repo.set_passphrase("different-passphrase")
+        test_db.add(existing_repo)
+        await test_db.commit()
+
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="new-repo",
+            path="/mnt/backup/existing-path",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+        )
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is False
+        assert result.is_validation_error is True
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert result.validation_errors[0].field == "path"
+        assert "already exists" in result.validation_errors[0].message
+        assert "different-repo" in result.validation_errors[0].message
+
+    async def test_create_repository_borg_initialization_fails(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test creation fails when borg initialization fails."""
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="failed-repo",
+            path="/mnt/backup/failed-repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+        )
+
+        mock_init_result = Mock()
+        mock_init_result.success = False
+        mock_init_result.message = "Permission denied"
+        mock_borg_service.initialize_repository.return_value = mock_init_result
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Permission denied" in result.error_message or "Permission denied" in (
+            result.borg_error or ""
+        )
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "failed-repo")
+        )
+        saved_repo = execute_result.scalar_one_or_none()
+        assert saved_repo is None
+
+    async def test_create_repository_borg_readonly_error(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test creation handles read-only filesystem error."""
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="readonly-repo",
+            path="/mnt/readonly/repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+        )
+
+        mock_init_result = Mock()
+        mock_init_result.success = False
+        mock_init_result.message = "Read-only file system"
+        mock_borg_service.initialize_repository.return_value = mock_init_result
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "read-only" in result.error_message.lower()
+
+    async def test_create_repository_exception_handling(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test creation handles exceptions and performs rollback."""
+        from borgitory.models.repository_dtos import CreateRepositoryRequest
+
+        request = CreateRepositoryRequest(
+            name="exception-repo",
+            path="/mnt/backup/exception-repo",
+            passphrase="secret123",
+            encryption_type=EncryptionType.REPOKEY,
+        )
+
+        mock_borg_service.initialize_repository.side_effect = Exception(
+            "Unexpected error"
+        )
+
+        result = await repository_service.create_repository(request, test_db)
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Failed to create repository" in result.error_message
+        assert "Unexpected error" in result.error_message
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.name == "exception-repo")
+        )
+        saved_repo = execute_result.scalar_one_or_none()
+        assert saved_repo is None
+
+    # Update Repository Tests
+
+    async def test_update_repository_success_name(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository name update."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        repository = Repository()
+        repository.name = "old-name"
+        repository.path = "/test/repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        update_data = RepositoryUpdate.model_validate({"name": "new-name"})
+
+        result = await repository_service.update_repository(
+            repository.id, update_data, test_db
+        )
+
+        assert result.success is True
+        assert result.repository_name == "new-name"
+
+        await test_db.refresh(repository)
+        assert repository.name == "new-name"
+
+    async def test_update_repository_success_cache_dir(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository cache directory update."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("secret123")
+        repository.cache_dir = "/old/cache"
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        update_data = RepositoryUpdate.model_validate({"cache_dir": "/new/cache"})
+
+        result = await repository_service.update_repository(
+            repository.id, update_data, test_db
+        )
+
+        assert result.success is True
+
+        await test_db.refresh(repository)
+        assert repository.cache_dir == "/new/cache"
+
+    async def test_update_repository_success_passphrase(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository passphrase update."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("old-passphrase")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        update_data = RepositoryUpdate.model_validate({"passphrase": "new-passphrase"})
+
+        result = await repository_service.update_repository(
+            repository.id, update_data, test_db
+        )
+
+        assert result.success is True
+
+        await test_db.refresh(repository)
+        assert repository.get_passphrase() == "new-passphrase"
+
+    async def test_update_repository_success_multiple_fields(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful update of multiple fields at once."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        repository = Repository()
+        repository.name = "old-name"
+        repository.path = "/test/repo"
+        repository.set_passphrase("old-passphrase")
+        repository.cache_dir = "/old/cache"
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        update_data = RepositoryUpdate.model_validate(
+            {
+                "name": "new-name",
+                "cache_dir": "/new/cache",
+                "passphrase": "new-passphrase",
+            }
+        )
+
+        result = await repository_service.update_repository(
+            repository.id, update_data, test_db
+        )
+
+        assert result.success is True
+        assert result.repository_name == "new-name"
+
+        await test_db.refresh(repository)
+        assert repository.name == "new-name"
+        assert repository.cache_dir == "/new/cache"
+        assert repository.get_passphrase() == "new-passphrase"
+
+    async def test_update_repository_not_found(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test update fails when repository is not found."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        update_data = RepositoryUpdate.model_validate({"name": "new-name"})
+
+        result = await repository_service.update_repository(999, update_data, test_db)
+
+        assert result.success is False
+        assert result.error_message == "Repository not found"
+
+    async def test_update_repository_name_already_exists(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test update fails when new name already exists."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        existing_repo = Repository()
+        existing_repo.name = "existing-name"
+        existing_repo.path = "/test/existing"
+        existing_repo.set_passphrase("secret123")
+        test_db.add(existing_repo)
+
+        target_repo = Repository()
+        target_repo.name = "target-repo"
+        target_repo.path = "/test/target"
+        target_repo.set_passphrase("secret456")
+        test_db.add(target_repo)
+
+        await test_db.commit()
+        await test_db.refresh(target_repo)
+
+        update_data = RepositoryUpdate.model_validate({"name": "existing-name"})
+
+        result = await repository_service.update_repository(
+            target_repo.id, update_data, test_db
+        )
+
+        assert result.success is False
+        assert result.is_validation_error is True
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert result.validation_errors[0].field == "name"
+        assert "already exists" in result.validation_errors[0].message
+
+    async def test_update_repository_same_name_allowed(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test update allows keeping the same name."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        update_data = RepositoryUpdate.model_validate(
+            {"name": "test-repo", "cache_dir": "/new/cache"}
+        )
+
+        result = await repository_service.update_repository(
+            repository.id, update_data, test_db
+        )
+
+        assert result.success is True
+        await test_db.refresh(repository)
+        assert repository.name == "test-repo"
+        assert repository.cache_dir == "/new/cache"
+
+    async def test_update_repository_exception_handling(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test update handles exceptions and performs rollback."""
+        from borgitory.models.schemas import RepositoryUpdate
+
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        original_name = repository.name
+
+        update_data = RepositoryUpdate.model_validate({"name": "new-name"})
+
+        with patch.object(test_db, "commit", side_effect=Exception("Database error")):
+            result = await repository_service.update_repository(
+                repository.id, update_data, test_db
+            )
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Failed to update repository" in result.error_message
+        assert "Database error" in result.error_message
+
+        await test_db.rollback()
+        await test_db.refresh(repository)
+        assert repository.name == original_name
+
+    # Delete Repository Tests
+
+    async def test_delete_repository_success(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository deletion."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "delete-me"
+        repository.path = "/test/delete-me"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        request = DeleteRepositoryRequest(repository_id=repository.id)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is True
+        assert result.repository_name == "delete-me"
+        assert result.message is not None
+        assert "deleted successfully" in result.message
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.id == repository.id)
+        )
+        deleted_repo = execute_result.scalar_one_or_none()
+        assert deleted_repo is None
+
+    async def test_delete_repository_with_schedules(
+        self,
+        repository_service: RepositoryService,
+        mock_scheduler_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successful repository deletion removes associated schedules."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "scheduled-repo"
+        repository.path = "/test/scheduled-repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        schedule1 = Schedule()
+        schedule1.repository_id = repository.id
+        schedule1.name = "backup-schedule"
+        schedule1.cron_expression = "0 0 * * *"
+        test_db.add(schedule1)
+
+        schedule2 = Schedule()
+        schedule2.repository_id = repository.id
+        schedule2.name = "prune-schedule"
+        schedule2.cron_expression = "0 1 * * *"
+        test_db.add(schedule2)
+
+        await test_db.commit()
+
+        request = DeleteRepositoryRequest(repository_id=repository.id)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is True
+        assert result.deleted_schedules == 2
+
+        assert mock_scheduler_service.remove_schedule.call_count == 2
+
+    async def test_delete_repository_not_found(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deletion fails when repository is not found."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        request = DeleteRepositoryRequest(repository_id=999)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is False
+        assert result.error_message == "Repository not found"
+        assert result.repository_name == "Unknown"
+
+    async def test_delete_repository_with_active_jobs(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deletion fails when repository has active jobs."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "active-repo"
+        repository.path = "/test/active-repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        job = Job()
+        job.repository_id = repository.id
+        job.type = "backup"
+        job.status = "running"
+        test_db.add(job)
+        await test_db.commit()
+
+        request = DeleteRepositoryRequest(repository_id=repository.id)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is False
+        assert result.repository_name == "active-repo"
+        assert result.conflict_jobs == ["backup"]
+        assert result.error_message is not None
+        assert "active job" in result.error_message
+        assert "backup" in result.error_message
+
+        execute_result = await test_db.execute(
+            select(Repository).where(Repository.id == repository.id)
+        )
+        still_exists = execute_result.scalar_one_or_none()
+        assert still_exists is not None
+
+    async def test_delete_repository_with_multiple_active_jobs(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deletion fails when repository has multiple active jobs."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "busy-repo"
+        repository.path = "/test/busy-repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        job1 = Job()
+        job1.repository_id = repository.id
+        job1.type = "backup"
+        job1.status = "running"
+        test_db.add(job1)
+
+        job2 = Job()
+        job2.repository_id = repository.id
+        job2.type = "prune"
+        job2.status = "pending"
+        test_db.add(job2)
+
+        await test_db.commit()
+
+        request = DeleteRepositoryRequest(repository_id=repository.id)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is False
+        assert result.conflict_jobs is not None
+        assert len(result.conflict_jobs) == 2
+        assert "backup" in result.conflict_jobs
+        assert "prune" in result.conflict_jobs
+
+    async def test_delete_repository_with_completed_jobs_allowed(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deletion succeeds when repository has only completed jobs."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "completed-repo"
+        repository.path = "/test/completed-repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        job1 = Job()
+        job1.repository_id = repository.id
+        job1.type = "backup"
+        job1.status = "completed"
+        test_db.add(job1)
+
+        job2 = Job()
+        job2.repository_id = repository.id
+        job2.type = "prune"
+        job2.status = "failed"
+        test_db.add(job2)
+
+        await test_db.commit()
+
+        request = DeleteRepositoryRequest(repository_id=repository.id)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is True
+        assert result.repository_name == "completed-repo"
+
+    async def test_delete_repository_exception_handling(
+        self,
+        repository_service: RepositoryService,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deletion handles exceptions and performs rollback."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "error-repo"
+        repository.path = "/test/error-repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        repo_id = repository.id
+
+        request = DeleteRepositoryRequest(repository_id=repo_id)
+
+        with patch.object(test_db, "commit", side_effect=Exception("Database error")):
+            result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "Failed to delete repository" in result.error_message
+        assert "Database error" in result.error_message
+
+    async def test_delete_repository_schedule_removal_partial_failure(
+        self,
+        repository_service: RepositoryService,
+        mock_scheduler_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deletion continues even if some schedule removals fail."""
+        from borgitory.models.repository_dtos import DeleteRepositoryRequest
+
+        repository = Repository()
+        repository.name = "partial-fail-repo"
+        repository.path = "/test/partial-fail-repo"
+        repository.set_passphrase("secret123")
+        test_db.add(repository)
+        await test_db.commit()
+        await test_db.refresh(repository)
+
+        schedule1 = Schedule()
+        schedule1.repository_id = repository.id
+        schedule1.name = "backup-schedule"
+        schedule1.cron_expression = "0 0 * * *"
+        test_db.add(schedule1)
+
+        schedule2 = Schedule()
+        schedule2.repository_id = repository.id
+        schedule2.name = "prune-schedule"
+        schedule2.cron_expression = "0 1 * * *"
+        test_db.add(schedule2)
+
+        await test_db.commit()
+        await test_db.refresh(schedule1)
+        await test_db.refresh(schedule2)
+
+        mock_scheduler_service.remove_schedule.side_effect = [
+            None,
+            Exception("Failed to remove schedule"),
+        ]
+
+        request = DeleteRepositoryRequest(repository_id=repository.id)
+
+        result = await repository_service.delete_repository(request, test_db)
+
+        assert result.success is True
+        assert result.deleted_schedules == 1
 
     # Import Repository Tests
 
