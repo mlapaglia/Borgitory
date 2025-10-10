@@ -49,10 +49,19 @@ def mock_archive_service() -> Mock:
 @pytest.fixture
 def mock_path_service() -> Mock:
     """Create mock path service."""
+
+    def secure_join_impl(base: str, *parts: str) -> str:
+        """Mock implementation of secure_join that mimics path joining."""
+        if not parts:
+            return base
+        # Join all parts together with /
+        result = base
+        for part in parts:
+            result = f"{result}/{part}"
+        return result
+
     mock = Mock()
-    mock.secure_join = Mock(
-        side_effect=lambda base, *parts: f"{base}/{'/'.join(parts)}"
-    )
+    mock.secure_join = Mock(side_effect=secure_join_impl)
     return mock
 
 
@@ -205,10 +214,15 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if "HOME" in cmd[-1]:
-                result.stdout = "/home/testuser"
-            elif "TMPDIR" in cmd[-1]:
-                result.stdout = "/tmp"
+            # Check the actual command pattern: ["echo", "$VAR_NAME"]
+            if len(cmd) >= 2:
+                arg = cmd[-1]  # Get the last argument which should be "$VAR_NAME"
+                if "$HOME" in arg:
+                    result.stdout = "/home/testuser"
+                elif "$TMPDIR" in arg or "TMPDIR" in arg:
+                    result.stdout = "/tmp"
+                else:
+                    result.stdout = ""
             else:
                 result.stdout = ""
             return result
@@ -233,10 +247,14 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if "BORG_BASE_DIR" in cmd[-1]:
-                result.stdout = "/custom/borg/base"
-            elif "TMPDIR" in cmd[-1]:
-                result.stdout = "/tmp"
+            if len(cmd) >= 2:
+                arg = cmd[-1]
+                if "$BORG_BASE_DIR" in arg:
+                    result.stdout = "/custom/borg/base"
+                elif "$TMPDIR" in arg or "TMPDIR" in arg:
+                    result.stdout = "/tmp"
+                else:
+                    result.stdout = ""
             else:
                 result.stdout = ""
             return result
@@ -259,14 +277,18 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if "HOME" in cmd[-1]:
-                result.stdout = "/home/testuser"
-            elif "XDG_CACHE_HOME" in cmd[-1]:
-                result.stdout = "/custom/cache"
-            elif "XDG_CONFIG_HOME" in cmd[-1]:
-                result.stdout = "/custom/config"
-            elif "TMPDIR" in cmd[-1]:
-                result.stdout = "/tmp"
+            if len(cmd) >= 2:
+                arg = cmd[-1]
+                if "$HOME" in arg:
+                    result.stdout = "/home/testuser"
+                elif "$XDG_CACHE_HOME" in arg:
+                    result.stdout = "/custom/cache"
+                elif "$XDG_CONFIG_HOME" in arg:
+                    result.stdout = "/custom/config"
+                elif "$TMPDIR" in arg or "TMPDIR" in arg:
+                    result.stdout = "/tmp"
+                else:
+                    result.stdout = ""
             else:
                 result.stdout = ""
             return result
@@ -289,14 +311,18 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if "BORG_BASE_DIR" in cmd[-1]:
-                result.stdout = "/custom/borg/base"
-            elif "XDG_CACHE_HOME" in cmd[-1]:
-                result.stdout = "/custom/cache"
-            elif "XDG_CONFIG_HOME" in cmd[-1]:
-                result.stdout = "/custom/config"
-            elif "TMPDIR" in cmd[-1]:
-                result.stdout = "/tmp"
+            if len(cmd) >= 2:
+                arg = cmd[-1]
+                if "$BORG_BASE_DIR" in arg:
+                    result.stdout = "/custom/borg/base"
+                elif "$XDG_CACHE_HOME" in arg:
+                    result.stdout = "/custom/cache"
+                elif "$XDG_CONFIG_HOME" in arg:
+                    result.stdout = "/custom/config"
+                elif "$TMPDIR" in arg or "TMPDIR" in arg:
+                    result.stdout = "/tmp"
+                else:
+                    result.stdout = ""
             else:
                 result.stdout = ""
             return result
