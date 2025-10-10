@@ -378,31 +378,49 @@ class PathService(PathServiceInterface):
         - BORG_KEYS_DIR defaults to $BORG_CONFIG_DIR/keys
         """
 
-        async def get_env_var(var_name: str) -> str:
-            """Get environment variable from execution environment."""
-            result = await self.command_executor.execute_command(
-                ["echo", f"${var_name}"]
+        result = await self.command_executor.execute_command(
+            [
+                "sh",
+                "-c",
+                "printf 'BORG_BASE_DIR=%s\\n' \"$BORG_BASE_DIR\"; "
+                "printf 'HOME=%s\\n' \"$HOME\"; "
+                "printf 'XDG_CACHE_HOME=%s\\n' \"$XDG_CACHE_HOME\"; "
+                "printf 'XDG_CONFIG_HOME=%s\\n' \"$XDG_CONFIG_HOME\"; "
+                "printf 'TMPDIR=%s\\n' \"${TMPDIR:-/tmp}\"; "
+                "printf 'HOME_FROM_CD=%s\\n' \"$(cd ~ 2>/dev/null && pwd || echo)\"",
+            ]
+        )
+
+        if not result.success:
+            logger.warning(f"Failed to get environment variables: {result.error}")
+            return BorgDefaultDirectories(
+                base_dir="",
+                cache_dir="",
+                config_dir="",
+                security_dir="",
+                keys_dir="",
+                temp_dir="/tmp",
             )
 
-            return result.stdout.strip() if result.success and result.stdout else ""
+        env_vars = {}
+        for line in result.stdout.strip().split("\n"):
+            if "=" in line:
+                key, value = line.split("=", 1)
+                env_vars[key] = value
 
-        borg_base_dir_explicit = await get_env_var("BORG_BASE_DIR")
+        borg_base_dir_explicit = env_vars.get("BORG_BASE_DIR", "")
+        home = env_vars.get("HOME", "")
+        xdg_cache_home = env_vars.get("XDG_CACHE_HOME", "")
+        xdg_config_home = env_vars.get("XDG_CONFIG_HOME", "")
+        temp_dir = env_vars.get("TMPDIR", "/tmp") or "/tmp"
+        home_from_cd = env_vars.get("HOME_FROM_CD", "")
 
         if borg_base_dir_explicit:
             base_dir = borg_base_dir_explicit
         else:
-            home = await get_env_var("HOME")
-            if not home:
-                user = await get_env_var("USER")
-                if user:
-                    result = await self.command_executor.execute_command(
-                        ["cd", "~", "&&", "pwd"]
-                    )
-                    home = result.stdout.strip() if result.success else ""
+            if not home and home_from_cd:
+                home = home_from_cd
             base_dir = home
-
-        xdg_cache_home = await get_env_var("XDG_CACHE_HOME")
-        xdg_config_home = await get_env_var("XDG_CONFIG_HOME")
 
         if not borg_base_dir_explicit and xdg_cache_home:
             cache_dir = self.secure_join(xdg_cache_home, "borg")
@@ -416,11 +434,6 @@ class PathService(PathServiceInterface):
 
         security_dir = self.secure_join(config_dir, "security")
         keys_dir = self.secure_join(config_dir, "keys")
-
-        temp_result = await self.command_executor.execute_command(
-            ["echo", "${TMPDIR:-/tmp}"]
-        )
-        temp_dir = temp_result.stdout.strip() if temp_result.success else "/tmp"
 
         return BorgDefaultDirectories(
             base_dir=base_dir,

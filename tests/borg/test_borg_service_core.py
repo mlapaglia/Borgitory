@@ -206,15 +206,15 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            # Check the actual command pattern: ["echo", "$VAR_NAME"]
-            if len(cmd) >= 2:
-                arg = cmd[-1]  # Get the last argument which should be "$VAR_NAME"
-                if "$HOME" in arg:
-                    result.stdout = "/home/testuser"
-                elif "$TMPDIR" in arg or "TMPDIR" in arg:
-                    result.stdout = "/tmp"
-                else:
-                    result.stdout = ""
+            if cmd[0] == "sh" and cmd[1] == "-c":
+                result.stdout = (
+                    "BORG_BASE_DIR=\n"
+                    "HOME=/home/testuser\n"
+                    "XDG_CACHE_HOME=\n"
+                    "XDG_CONFIG_HOME=\n"
+                    "TMPDIR=/tmp\n"
+                    "HOME_FROM_CD=/home/testuser"
+                )
             else:
                 result.stdout = ""
             return result
@@ -239,14 +239,15 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if len(cmd) >= 2:
-                arg = cmd[-1]
-                if "$BORG_BASE_DIR" in arg:
-                    result.stdout = "/custom/borg/base"
-                elif "$TMPDIR" in arg or "TMPDIR" in arg:
-                    result.stdout = "/tmp"
-                else:
-                    result.stdout = ""
+            if cmd[0] == "sh" and cmd[1] == "-c":
+                result.stdout = (
+                    "BORG_BASE_DIR=/custom/borg/base\n"
+                    "HOME=\n"
+                    "XDG_CACHE_HOME=\n"
+                    "XDG_CONFIG_HOME=\n"
+                    "TMPDIR=/tmp\n"
+                    "HOME_FROM_CD="
+                )
             else:
                 result.stdout = ""
             return result
@@ -269,18 +270,15 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if len(cmd) >= 2:
-                arg = cmd[-1]
-                if "$HOME" in arg:
-                    result.stdout = "/home/testuser"
-                elif "$XDG_CACHE_HOME" in arg:
-                    result.stdout = "/custom/cache"
-                elif "$XDG_CONFIG_HOME" in arg:
-                    result.stdout = "/custom/config"
-                elif "$TMPDIR" in arg or "TMPDIR" in arg:
-                    result.stdout = "/tmp"
-                else:
-                    result.stdout = ""
+            if cmd[0] == "sh" and cmd[1] == "-c":
+                result.stdout = (
+                    "BORG_BASE_DIR=\n"
+                    "HOME=/home/testuser\n"
+                    "XDG_CACHE_HOME=/custom/cache\n"
+                    "XDG_CONFIG_HOME=/custom/config\n"
+                    "TMPDIR=/tmp\n"
+                    "HOME_FROM_CD=/home/testuser"
+                )
             else:
                 result.stdout = ""
             return result
@@ -303,18 +301,15 @@ class TestBorgDefaultDirectories:
         async def mock_execute(cmd: List[str]) -> Mock:
             result = Mock()
             result.success = True
-            if len(cmd) >= 2:
-                arg = cmd[-1]
-                if "$BORG_BASE_DIR" in arg:
-                    result.stdout = "/custom/borg/base"
-                elif "$XDG_CACHE_HOME" in arg:
-                    result.stdout = "/custom/cache"
-                elif "$XDG_CONFIG_HOME" in arg:
-                    result.stdout = "/custom/config"
-                elif "$TMPDIR" in arg or "TMPDIR" in arg:
-                    result.stdout = "/tmp"
-                else:
-                    result.stdout = ""
+            if cmd[0] == "sh" and cmd[1] == "-c":
+                result.stdout = (
+                    "BORG_BASE_DIR=/custom/borg/base\n"
+                    "HOME=\n"
+                    "XDG_CACHE_HOME=/custom/cache\n"
+                    "XDG_CONFIG_HOME=/custom/config\n"
+                    "TMPDIR=/tmp\n"
+                    "HOME_FROM_CD="
+                )
             else:
                 result.stdout = ""
             return result
