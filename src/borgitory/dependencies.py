@@ -63,7 +63,7 @@ from borgitory.services.debug_service import DebugService
 from borgitory.protocols.environment_protocol import DefaultEnvironment
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.encryption_service import EncryptionService
-from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
 )
@@ -119,7 +119,7 @@ def datetime_browser_filter(
 
 
 if TYPE_CHECKING:
-    from borgitory.services.cloud_sync_service import CloudSyncConfigService
+    from borgitory.services.cloud_sync_config_service import CloudSyncConfigService
     from borgitory.protocols.command_protocols import (
         CommandRunnerProtocol,
         ProcessExecutorProtocol,
@@ -678,9 +678,11 @@ def get_encryption_service() -> EncryptionService:
 
 def get_storage_factory(
     rclone: RcloneService = Depends(get_rclone_service),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> StorageFactory:
-    """Provide a StorageFactory instance with injected RcloneService."""
-    return StorageFactory(rclone)
+    """Provide a StorageFactory instance with injected dependencies."""
+    return StorageFactory(rclone, command_executor, file_service)
 
 
 def get_job_manager_env_config() -> "JobManagerEnvironmentConfig":
@@ -916,7 +918,6 @@ def get_debug_service(
 
 
 def get_cloud_provider_service_factory(
-    rclone_service: RcloneService = Depends(get_rclone_service),
     storage_factory: StorageFactory = Depends(get_storage_factory),
     encryption_service: EncryptionService = Depends(get_encryption_service),
 ) -> CloudProviderServiceFactory:
@@ -932,14 +933,13 @@ def get_cloud_provider_service_factory(
         CloudProviderServiceFactory: Configured factory instance
     """
     return CloudProviderServiceFactory(
-        rclone_service=rclone_service,
         storage_factory=storage_factory,
         encryption_service=encryption_service,
         metadata_func=get_metadata,
     )
 
 
-def get_cloud_sync_service(
+def get_cloud_sync_config_service(
     factory: CloudProviderServiceFactory = Depends(get_cloud_provider_service_factory),
 ) -> "CloudSyncConfigServiceProtocol":
     """
@@ -949,7 +949,7 @@ def get_cloud_sync_service(
     Uses factory for consistent DI pattern across all services.
     """
 
-    return factory.create_cloud_sync_service("default")
+    return factory.create_cloud_sync_config_service("default")
 
 
 # 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
@@ -1069,7 +1069,7 @@ UpcomingBackupsServiceDep = Annotated[
     UpcomingBackupsService, Depends(get_upcoming_backups_service)
 ]
 CloudSyncServiceDep = Annotated[
-    "CloudSyncConfigService", Depends(get_cloud_sync_service)
+    "CloudSyncConfigService", Depends(get_cloud_sync_config_service)
 ]
 HookExecutionServiceDep = Annotated[
     HookExecutionService, Depends(get_hook_execution_service)

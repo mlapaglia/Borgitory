@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
     from borgitory.services.rclone_service import RcloneService
-    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
 

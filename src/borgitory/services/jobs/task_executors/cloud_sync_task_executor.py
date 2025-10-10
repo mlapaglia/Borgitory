@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Dict
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 from borgitory.services.encryption_service import EncryptionService
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.rclone_service import RcloneService

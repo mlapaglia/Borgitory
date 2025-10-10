@@ -8,7 +8,7 @@ from unittest.mock import patch, Mock
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from borgitory.services.cloud_sync_service import CloudSyncConfigService
+from borgitory.services.cloud_sync_config_service import CloudSyncConfigService
 from tests.conftest import create_s3_cloud_sync_config
 
 

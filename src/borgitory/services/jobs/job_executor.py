@@ -19,7 +19,10 @@ from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import (
+    CloudSyncService,
+    StorageFactory,
+)
 from borgitory.services.encryption_service import EncryptionService
 from borgitory.custom_types import ConfigDict
 from borgitory.utils.security import create_borg_command
@@ -303,6 +306,7 @@ class JobExecutor:
         repository_path: str,
         cloud_sync_config_id: int,
         session_maker: "async_sessionmaker[AsyncSession]",
+        cloud_sync_service: CloudSyncService,
         rclone_service: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
@@ -438,6 +442,7 @@ class JobExecutor:
                         )
 
                     # Use the generic rclone dispatcher
+                    await cloud_sync_service.execute_sync(config, repository_path)
                     progress_generator = rclone_service.sync_repository_to_provider(
                         provider=config.provider,
                         repository=repo_obj,

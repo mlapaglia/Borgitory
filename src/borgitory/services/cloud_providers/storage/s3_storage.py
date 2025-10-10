@@ -5,11 +5,15 @@ This module provides S3-specific storage operations with clean separation
 from business logic and easy testability.
 """
 
+import asyncio
 import re
-from typing import Callable, Dict, Optional
+from typing import AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 from pydantic import Field, field_validator
 
-from borgitory.services.rclone_service import RcloneService
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.protocols.file_protocols import FileServiceProtocol
+from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
+from borgitory.utils.datetime_utils import now_utc
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
@@ -102,16 +106,21 @@ class S3Storage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: S3StorageConfig, rclone_service: RcloneService) -> None:
+    def __init__(
+        self,
+        config: S3StorageConfig,
+        command_executor: CommandExecutorProtocol,
+        file_service: FileServiceProtocol,
+    ) -> None:
         """
         Initialize S3 storage.
 
         Args:
             config: Validated S3 configuration
-            rclone_service: Injected rclone service for I/O operations
         """
         self._config = config
-        self._rclone_service = rclone_service
+        self._command_executor = command_executor
+        self._file_service = file_service
 
     async def upload_repository(
         self,
@@ -129,21 +138,9 @@ class S3Storage(CloudStorage):
             )
 
         try:
-            # Create a simple repository object with the path
-            from borgitory.models.database import Repository
-
-            repository_obj = Repository()
-            repository_obj.path = repository_path
-
-            async for progress in self._rclone_service.sync_repository_to_s3(
-                repository=repository_obj,
-                access_key_id=self._config.access_key,
-                secret_access_key=self._config.secret_key,
-                bucket_name=self._config.bucket_name,
+            async for progress in self.sync_repository_to_s3(
+                repository_path=repository_path,
                 path_prefix=remote_path,
-                region=self._config.region,
-                endpoint_url=self._config.endpoint_url,
-                storage_class=self._config.storage_class,
             ):
                 if progress_callback and progress.get("type") == "progress":
                     progress_callback(
@@ -173,7 +170,7 @@ class S3Storage(CloudStorage):
     async def test_connection(self) -> bool:
         """Test S3 connection"""
         try:
-            result = await self._rclone_service.test_s3_connection(
+            result = await self.test_s3_connection(
                 access_key_id=self._config.access_key,
                 secret_access_key=self._config.secret_key,
                 bucket_name=self._config.bucket_name,
@@ -239,6 +236,301 @@ class S3Storage(CloudStorage):
             ],
             optional_params={"path_prefix": "", "region": "us-east-1"},
         )
+
+    def _build_s3_flags(
+        self,
+        access_key_id: str,
+        secret_access_key: str,
+        region: str = "us-east-1",
+        endpoint_url: Optional[str] = None,
+        storage_class: str = "STANDARD",
+    ) -> List[str]:
+        """Build S3 configuration flags for rclone command"""
+        flags = [
+            "--s3-access-key-id",
+            access_key_id,
+            "--s3-secret-access-key",
+            secret_access_key,
+            "--s3-provider",
+            "AWS",
+            "--s3-region",
+            region,
+            "--s3-storage-class",
+            storage_class,
+        ]
+
+        # Add endpoint URL if specified (for S3-compatible services)
+        if endpoint_url:
+            flags.extend(["--s3-endpoint", endpoint_url])
+
+        return flags
+
+    async def sync_repository_to_s3(
+        self,
+        repository_path: str,
+        path_prefix: str = "",
+    ) -> AsyncGenerator[ProgressData, None]:
+        """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
+
+        # Build S3 path
+        s3_path = f":s3:{self._config.bucket_name}"
+        if path_prefix:
+            s3_path = f"{s3_path}/{path_prefix}"
+
+        # Build rclone command with S3 backend flags
+        command = [
+            "rclone",
+            "sync",
+            repository_path,
+            s3_path,
+            "--progress",
+            "--stats",
+            "1s",
+            "--verbose",
+        ]
+
+        # Add S3 configuration flags
+        s3_flags = self._build_s3_flags(
+            self._config.access_key,
+            self._config.secret_key,
+            self._config.region,
+            self._config.endpoint_url,
+            self._config.storage_class,
+        )
+        command.extend(s3_flags)
+
+        try:
+            process = await self._command_executor.create_subprocess(
+                command=command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            yield cast(
+                ProgressData,
+                {"type": "started", "command": " ".join(command), "pid": process.pid},
+            )
+
+            async def read_stream(
+                stream: Optional[asyncio.StreamReader], stream_type: str
+            ) -> AsyncGenerator[ProgressData, None]:
+                if stream is None:
+                    return
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+
+                    decoded_line = line.decode("utf-8").strip()
+                    progress_data = self.parse_rclone_progress(decoded_line)
+
+                    if progress_data:
+                        yield cast(ProgressData, {"type": "progress", **progress_data})
+                    else:
+                        yield cast(
+                            ProgressData,
+                            {
+                                "type": "log",
+                                "stream": stream_type,
+                                "message": decoded_line,
+                            },
+                        )
+
+            async for item in self._merge_async_generators(
+                read_stream(process.stdout, "stdout"),
+                read_stream(process.stderr, "stderr"),
+            ):
+                yield item
+
+            return_code = await process.wait()
+
+            yield cast(
+                ProgressData,
+                {
+                    "type": "completed",
+                    "return_code": return_code,
+                    "status": "success" if return_code == 0 else "failed",
+                },
+            )
+
+        except Exception as e:
+            yield cast(ProgressData, {"type": "error", "message": str(e)})
+
+    async def test_s3_connection(
+        self,
+        access_key_id: str,
+        secret_access_key: str,
+        bucket_name: str,
+        region: str = "us-east-1",
+        endpoint_url: Optional[str] = None,
+        storage_class: str = "STANDARD",
+    ) -> ConnectionTestResult:
+        """Test S3 connection by checking bucket access"""
+        try:
+            s3_path = f":s3:{bucket_name}"
+
+            # Build rclone command with S3 backend flags
+            command = [
+                "rclone",
+                "lsd",
+                s3_path,
+                "--max-depth",
+                "1",
+                "--verbose",
+            ]
+
+            # Add S3 configuration flags
+            s3_flags = self._build_s3_flags(
+                access_key_id, secret_access_key, region, endpoint_url, storage_class
+            )
+            command.extend(s3_flags)
+
+            result = await self._command_executor.execute_command(
+                command=command,
+                timeout=30.0,  # Reasonable timeout for connection test
+            )
+
+            if result.success:
+                test_result = await self._test_s3_write_permissions()
+
+                if test_result.get("status") == "success":
+                    return {
+                        "status": "success",
+                        "message": "Connection successful - bucket accessible and writable",
+                        "output": result.stdout,
+                        "details": {"read_test": "passed", "write_test": "passed"},
+                    }
+                else:
+                    return {
+                        "status": "warning",
+                        "message": f"Bucket is readable but may have write permission issues: {test_result.get('message', 'Unknown error')}",
+                        "output": result.stdout,
+                        "details": {"read_test": "passed", "write_test": "failed"},
+                    }
+            else:
+                error_message = result.stderr.lower()
+                if "no such bucket" in error_message or "nosuchbucket" in error_message:
+                    return {
+                        "status": "failed",
+                        "message": f"Bucket '{bucket_name}' does not exist or is not accessible",
+                    }
+                elif (
+                    "invalid access key" in error_message
+                    or "access denied" in error_message
+                ):
+                    return {
+                        "status": "failed",
+                        "message": "Access denied - check your AWS credentials",
+                    }
+                else:
+                    return {
+                        "status": "failed",
+                        "message": f"Connection failed: {result.stderr}",
+                    }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Test failed with exception: {str(e)}",
+            }
+
+    async def _test_s3_write_permissions(self) -> ConnectionTestResult:
+        """Test write permissions by creating and deleting a small test file"""
+        try:
+            test_content = f"borgitory-test-{now_utc().isoformat()}"
+            test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
+
+            async with self._file_service.create_temp_file(
+                suffix=".txt", content=test_content.encode("utf-8")
+            ) as temp_file_path:
+                s3_path = f":s3:{self._config.bucket_name}/{test_filename}"
+
+                upload_command = ["rclone", "copy", temp_file_path, s3_path]
+
+                s3_flags = self._build_s3_flags(
+                    self._config.access_key, self._config.secret_key
+                )
+                upload_command.extend(s3_flags)
+
+                upload_result = await self._command_executor.execute_command(
+                    command=upload_command, timeout=30.0
+                )
+
+                if upload_result.success:
+                    delete_command = ["rclone", "delete", s3_path]
+                    delete_command.extend(s3_flags)
+
+                    await self._command_executor.execute_command(
+                        command=delete_command, timeout=30.0
+                    )
+
+                    return {
+                        "status": "success",
+                        "message": "Write permissions verified",
+                    }
+                else:
+                    return {
+                        "status": "failed",
+                        "message": f"Cannot write to bucket: {upload_result.stderr}",
+                    }
+
+        except Exception as e:
+            return {"status": "failed", "message": f"Write test failed: {str(e)}"}
+
+    def parse_rclone_progress(
+        self, line: str
+    ) -> Optional[Dict[str, Union[str, int, float]]]:
+        """Parse Rclone progress output"""
+        # Look for progress statistics
+        if "Transferred:" in line:
+            try:
+                # Example: "Transferred:   	  123.45 MiByte / 456.78 MiByte, 27%, 12.34 MiByte/s, ETA 1m23s"
+                parts = line.split()
+                if len(parts) >= 6:
+                    transferred = parts[1]
+                    total = parts[4].rstrip(",")
+                    percentage = parts[5].rstrip("%,")
+                    speed = parts[6] if len(parts) > 6 else "0"
+
+                    return {
+                        "transferred": transferred,
+                        "total": total,
+                        "percentage": float(percentage)
+                        if percentage.replace(".", "").isdigit()
+                        else 0,
+                        "speed": speed,
+                    }
+            except (IndexError, ValueError):
+                pass
+
+        # Look for ETA information
+        if "ETA" in line:
+            try:
+                eta_part = line.split("ETA")[-1].strip()
+                return {"eta": eta_part}
+            except (ValueError, KeyError):
+                pass
+
+        return None
+
+    async def _merge_async_generators(
+        self, *async_generators: AsyncGenerator[ProgressData, None]
+    ) -> AsyncGenerator[ProgressData, None]:
+        """Merge multiple async generators into one"""
+        tasks = []
+        for gen in async_generators:
+
+            async def wrapper(
+                g: AsyncGenerator[ProgressData, None],
+            ) -> AsyncGenerator[ProgressData, None]:
+                async for item in g:
+                    yield item
+
+            tasks.append(wrapper(gen))
+
+        for task in tasks:
+            async for item in task:
+                yield item
 
 
 @register_provider(

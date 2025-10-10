@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.dependencies import ApplicationScopedNotificationService
     from borgitory.services.notifications.providers.discord_provider import HttpClient
-    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
     from borgitory.services.hooks.hook_execution_service import HookExecutionService

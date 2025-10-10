@@ -4,6 +4,7 @@ import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
 from borgitory.utils.datetime_utils import now_utc
 from typing import Any, List, Dict, Callable, cast, Optional, TYPE_CHECKING
 
@@ -16,11 +17,10 @@ from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
 )
-from borgitory.services.rclone_service import RcloneService
 from borgitory.services.cloud_providers.registry import (
     get_storage_class,
 )
-from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 from borgitory.services.encryption_service import EncryptionService
 from borgitory.custom_types import ConfigDict
 
@@ -69,17 +69,15 @@ def _get_sensitive_fields_for_provider(provider: str) -> list[str]:
         return []
 
 
-class CloudSyncConfigService:
+class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
     """Service class for cloud sync configuration management (CRUD operations)."""
 
     def __init__(
         self,
-        rclone_service: RcloneService,
         storage_factory: StorageFactory,
         encryption_service: EncryptionService,
         get_metadata_func: Callable[[str], Optional["ProviderMetadata"]],
     ):
-        self._rclone_service = rclone_service
         self._storage_factory = storage_factory
         self._encryption_service = encryption_service
         self._get_metadata = get_metadata_func
@@ -243,7 +241,6 @@ class CloudSyncConfigService:
     async def test_cloud_sync_config(
         self,
         config_id: int,
-        rclone: RcloneService,
         encryption_service: EncryptionService,
         storage_factory: StorageFactory,
         db: AsyncSession,
@@ -264,7 +261,9 @@ class CloudSyncConfigService:
             provider_config, sensitive_fields
         )
 
-        storage_factory.create_storage(str(config.provider), decrypted_config)
+        storage_provider = storage_factory.create_storage(
+            str(config.provider), decrypted_config
+        )
 
         # Get provider metadata and rclone mapping using injected dependency
         metadata = self._get_metadata(str(config.provider))
@@ -282,7 +281,7 @@ class CloudSyncConfigService:
         logger.info(f"Using test method: {test_method_name}")
 
         # Check if rclone service has the test method
-        if not hasattr(rclone, test_method_name):
+        if not hasattr(storage_provider, test_method_name):
             logger.error(f"Rclone service missing test method: {test_method_name}")
             raise HTTPException(
                 status_code=500,
@@ -320,7 +319,7 @@ class CloudSyncConfigService:
         )  # Don't log values for security
 
         # Get the test method and filter parameters to match method signature
-        test_method = getattr(rclone, test_method_name)
+        test_method = getattr(storage_provider, test_method_name)
 
         # Filter parameters to only include those supported by the test method
         method_signature = inspect.signature(test_method)

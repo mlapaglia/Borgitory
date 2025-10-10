@@ -10,7 +10,7 @@ from borgitory.custom_types import ConfigDict
 if TYPE_CHECKING:
     from borgitory.models.database import CloudSyncConfig
     from borgitory.models.schemas import CloudSyncConfigCreate, CloudSyncConfigUpdate
-    from borgitory.services.cloud_providers import StorageFactory
+    from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
 
 

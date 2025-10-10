@@ -83,6 +83,8 @@ class StorageFactory:
     def __init__(
         self,
         rclone_service: Optional[RcloneService] = None,
+        command_executor: Optional[object] = None,
+        file_service: Optional[object] = None,
         registry: Optional["ProviderRegistry"] = None,
     ) -> None:
         """
@@ -90,12 +92,13 @@ class StorageFactory:
 
         Args:
             rclone_service: Rclone service for I/O operations (optional for DI)
+            command_executor: Command executor for running external commands (optional for DI)
+            file_service: File service for file operations (optional for DI)
             registry: Provider registry instance (optional for DI)
         """
         if registry is not None:
             self._registry = registry
         else:
-            # Fallback to global registry for backward compatibility
             from .registry import get_registry
 
             self._registry = get_registry()
@@ -103,7 +106,8 @@ class StorageFactory:
         self._validator = ConfigValidator(registry=self._registry)
         self._dependencies = {
             "rclone_service": rclone_service,
-            # Add more injectable dependencies here as needed
+            "command_executor": command_executor,
+            "file_service": file_service,
         }
 
     def create_storage(self, provider: str, config: ConfigDict) -> CloudStorage:

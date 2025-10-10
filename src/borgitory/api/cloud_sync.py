@@ -18,7 +18,6 @@ from borgitory.models.schemas import (
 )
 from borgitory.dependencies import (
     CloudSyncServiceDep,
-    RcloneServiceDep,
     EncryptionServiceDep,
     StorageFactoryDep,
     ProviderRegistryDep,
@@ -438,7 +437,6 @@ async def delete_cloud_sync_config(
 async def test_cloud_sync_config(
     request: Request,
     config_id: int,
-    rclone: RcloneServiceDep,
     encryption_service: EncryptionServiceDep,
     storage_factory: StorageFactoryDep,
     cloud_sync_service: CloudSyncServiceDep,
@@ -449,7 +447,7 @@ async def test_cloud_sync_config(
 
     try:
         result = await cloud_sync_service.test_cloud_sync_config(
-            config_id, rclone, encryption_service, storage_factory, db
+            config_id, encryption_service, storage_factory, db
         )
         config = await cloud_sync_service.get_cloud_sync_config_by_id(config_id, db)
 

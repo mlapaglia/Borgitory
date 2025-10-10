@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.cloud_providers.storage.s3_storage import S3StorageConfig
-from borgitory.services.cloud_sync_service import (
+from borgitory.services.cloud_sync_config_service import (
     CloudSyncConfigService,
     _get_sensitive_fields_for_provider,
 )
@@ -205,7 +205,9 @@ class TestServiceLayerIntegration:
     async def test_config_validator_uses_registry(self) -> None:
         """Test that ConfigValidator uses registry for validation"""
         # Import storage modules to trigger registration (if not already done)
-        from borgitory.services.cloud_providers.service import ConfigValidator
+        from borgitory.services.cloud_providers.cloud_sync_service import (
+            ConfigValidator,
+        )
 
         validator = ConfigValidator()
 
@@ -237,7 +239,7 @@ class TestServiceLayerIntegration:
     def test_storage_factory_uses_registry(self) -> None:
         """Test that StorageFactory uses registry for creation"""
         # Import storage modules to trigger registration (if not already done)
-        from borgitory.services.cloud_providers.service import StorageFactory
+        from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 
         mock_rclone = Mock()
         factory = StorageFactory(mock_rclone)
@@ -265,7 +267,7 @@ class TestServiceLayerIntegration:
     def test_storage_factory_get_supported_providers(self) -> None:
         """Test that StorageFactory returns supported providers from registry"""
         # Import storage modules to trigger registration (if not already done)
-        from borgitory.services.cloud_providers.service import StorageFactory
+        from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 
         mock_rclone = Mock()
         factory = StorageFactory(mock_rclone)
@@ -299,7 +301,10 @@ class TestCloudSyncConfigServiceIntegration:
         # Get the registry for the service
         from borgitory.services.cloud_providers.registry import get_metadata
         from borgitory.services.rclone_service import RcloneService
-        from borgitory.services.cloud_providers import StorageFactory, EncryptionService
+        from borgitory.services.cloud_providers.cloud_sync_service import (
+            StorageFactory,
+            EncryptionService,
+        )
 
         mock_rclone = Mock(spec=RcloneService)
         mock_storage_factory = Mock(spec=StorageFactory)

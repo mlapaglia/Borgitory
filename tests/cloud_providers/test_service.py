@@ -11,7 +11,7 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import (
+from borgitory.services.cloud_providers.cloud_sync_service import (
     ConfigValidator,
     StorageFactory,
     CloudSyncService,

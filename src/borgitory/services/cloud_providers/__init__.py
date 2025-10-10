@@ -21,7 +21,7 @@ from .storage import (
     SFTPStorageConfig,
 )
 from .orchestration import CloudSyncer, SyncEventHandler, LoggingSyncEventHandler
-from .service import (
+from .cloud_sync_service import (
     CloudSyncService,
     StorageFactory,
     ConfigValidator,
