@@ -1128,6 +1128,7 @@ def get_archive_service(
 
 def get_file_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    platform_service: PlatformServiceProtocol = Depends(get_platform_service),
 ) -> "FileServiceProtocol":
     """
     Provide a FileService instance for file operations.
@@ -1137,7 +1138,7 @@ def get_file_service(
     """
     from borgitory.services.files.file_service_factory import create_file_service
 
-    return create_file_service(command_executor)
+    return create_file_service(command_executor, platform_service)
 
 
 def get_borg_service(
