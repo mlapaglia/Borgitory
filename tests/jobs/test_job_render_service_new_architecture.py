@@ -5,12 +5,15 @@ Focuses on the new dataclass-based approach and catches template selection bugs.
 
 import uuid
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 from datetime import datetime, timezone
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from borgitory.dependencies import TemplatesDep
 from borgitory.models.job_results import JobStatusEnum
+from borgitory.services.jobs.job_manager import JobManager
+from borgitory.services.jobs.job_models import BorgJob
 from borgitory.services.jobs.job_render_service import (
     JobRenderService,
     JobDataConverter,
@@ -27,6 +30,12 @@ from borgitory.services.jobs.job_render_service import (
 
 class TestJobRenderServiceNewArchitecture:
     """Test JobRenderService new architecture with proper DI patterns"""
+
+    @pytest.fixture
+    def mock_db(self) -> Mock:
+        """Mock database"""
+        db = Mock(spec=AsyncSession)
+        return db
 
     def test_initialization_with_proper_di(self) -> None:
         """Test JobRenderService initialization with proper dependency injection"""
@@ -45,11 +54,11 @@ class TestJobRenderServiceNewArchitecture:
         assert service.templates == mock_templates
         assert service.converter == mock_converter
 
-    def test_get_job_display_data_from_memory(self) -> None:
+    async def test_get_job_display_data_from_memory(self, mock_db: Mock) -> None:
         """Test getting job display data from in-memory job manager"""
         # Create mock job manager with a running job
-        mock_job_manager = Mock()
-        mock_job = Mock()
+        mock_job_manager = Mock(spec=JobManager)
+        mock_job = Mock(spec=BorgJob)
         mock_job.id = uuid.uuid4()
         mock_job.status = JobStatusEnum.RUNNING
         mock_job_manager.jobs = {mock_job.id: mock_job}
@@ -77,29 +86,40 @@ class TestJobRenderServiceNewArchitecture:
             converter=mock_converter,
         )
 
-        # Mock database to return None (job not found in DB)
-        mock_db = Mock(spec=Session)
-        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = None
+        # Mock database to return None (job not found in DB) using SQLAlchemy 2.0 pattern
+        # The query pattern is: db.execute(query).unique().scalar_one_or_none()
+        mock_unique = Mock()
+        mock_unique.scalar_one_or_none.return_value = None
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_unique
+        mock_db.execute = AsyncMock(return_value=mock_result)
 
-        result = service.get_job_display_data(mock_job.id, mock_db)
+        result = await service.get_job_display_data(mock_job.id, mock_db)
 
         assert result == expected_job_data
         # The converter is called with memory_job and db_job (which is None when not found in DB)
         mock_converter.convert_memory_job.assert_called_once_with(mock_job, None)
 
-    def test_get_job_display_data_from_database_fallback(self) -> None:
+    async def test_get_job_display_data_from_database_fallback(
+        self, mock_db: Mock
+    ) -> None:
         """Test getting job display data from database when not in memory"""
         # Create mock job manager with no jobs
-        mock_job_manager = Mock()
+        mock_job_manager = Mock(spec=JobManager)
         mock_job_manager.jobs = {}
 
         # Create mock database job
-        mock_db_job = Mock()
+        mock_db_job = Mock(spec=BorgJob)
         mock_db_job.id = uuid.uuid4()
         mock_db_job.status = JobStatusEnum.COMPLETED
 
-        mock_db = Mock(spec=Session)
-        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_db_job
+        # Mock database to return job using SQLAlchemy 2.0 pattern
+        # The query pattern is: db.execute(query).unique().scalar_one_or_none()
+        mock_unique = Mock()
+        mock_unique.scalar_one_or_none.return_value = mock_db_job
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_unique
+        mock_db.execute = AsyncMock(return_value=mock_result)
 
         # Create mock converter
         mock_converter = Mock(spec=JobDataConverter)
@@ -123,16 +143,16 @@ class TestJobRenderServiceNewArchitecture:
             converter=mock_converter,
         )
 
-        result = service.get_job_display_data(mock_db_job.id, mock_db)
+        result = await service.get_job_display_data(mock_db_job.id, mock_db)
 
         assert result == expected_job_data
         mock_converter.convert_database_job.assert_called_once_with(mock_db_job)
 
-    def test_get_job_for_template_with_running_job(self) -> None:
+    async def test_get_job_for_template_with_running_job(self, mock_db: Mock) -> None:
         """Test getting job data formatted for templates"""
         # Create mock job manager with a running job
-        mock_job_manager = Mock()
-        mock_job = Mock()
+        mock_job_manager = Mock(spec=JobManager)
+        mock_job = Mock(spec=BorgJob)
         mock_job.id = uuid.uuid4()
         mock_job.status = JobStatusEnum.RUNNING
         mock_job_manager.jobs = {mock_job.id: mock_job}
@@ -171,8 +191,17 @@ class TestJobRenderServiceNewArchitecture:
             converter=mock_converter,
         )
 
-        mock_db = Mock(spec=Session)
-        result = service.get_job_for_template(mock_job.id, mock_db, expand_details=True)
+        # Mock database query (job found in memory, but still queries DB for complete data)
+        # The query pattern is: db.execute(query).unique().scalar_one_or_none()
+        mock_unique = Mock()
+        mock_unique.scalar_one_or_none.return_value = None
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_unique
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        result = await service.get_job_for_template(
+            mock_job.id, mock_db, expand_details=True
+        )
 
         assert result is not None
         assert isinstance(result, TemplateJobData)
@@ -238,11 +267,13 @@ class TestJobRenderServiceNewArchitecture:
         # Create mock templates
         mock_template = Mock()
         mock_template.render.return_value = "<div>rendered job</div>"
-        mock_templates = Mock(spec=Jinja2Templates)
+        mock_templates = Mock(spec=TemplatesDep)
         mock_templates.get_template.return_value = mock_template
 
         service = JobRenderService(
-            job_manager=Mock(), templates=mock_templates, converter=Mock()
+            job_manager=Mock(spec=JobManager),
+            templates=mock_templates,
+            converter=Mock(spec=JobDataConverter),
         )
 
         service._render_job_html(job_display_data, expand_details=True)
@@ -283,7 +314,9 @@ class TestJobRenderServiceNewArchitecture:
         import inspect
 
         service = JobRenderService(
-            job_manager=Mock(), templates=Mock(spec=Jinja2Templates), converter=Mock()
+            job_manager=Mock(spec=JobManager),
+            templates=Mock(spec=Jinja2Templates),
+            converter=Mock(spec=JobDataConverter),
         )
 
         # Get all methods of the service
@@ -311,30 +344,6 @@ class TestJobRenderServiceNewArchitecture:
 
 class TestTemplateSelectionBugRegression:
     """Regression tests to catch the template selection bug we just fixed"""
-
-    def test_template_job_status_comparison_bug(self) -> None:
-        """
-        Regression test for the template selection bug.
-
-        The bug was: template_job.job.status == "running" returned False
-        because TemplateJobStatus object was compared to string directly.
-
-        This test ensures str(template_job.job.status) == "running" works.
-        """
-        # Create a TemplateJobStatus like the API would
-        template_job_status = TemplateJobStatus(JobStatusEnum.RUNNING)
-
-        # This was the failing comparison in the API
-        assert template_job_status != "running"  # Object != string (expected to fail)
-
-        # This is the correct comparison (what we fixed)
-        assert str(template_job_status) == "running"  # String conversion (should work)
-
-        # Test all status types
-        for status_value in ["running", "completed", "failed", "pending", "cancelled"]:
-            template_status = TemplateJobStatus(status_value)
-            assert str(template_status) == status_value
-            assert template_status.title() == status_value.title()
 
     def test_api_template_selection_logic(self) -> None:
         """

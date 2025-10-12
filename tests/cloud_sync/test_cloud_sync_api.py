@@ -3,19 +3,18 @@ Tests for cloud sync API endpoints - HTMX response format testing only
 Business logic tests moved to test_cloud_sync_service.py
 """
 
-import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
 from unittest.mock import patch, Mock
 
-from borgitory.services.cloud_sync_service import CloudSyncConfigService
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from borgitory.services.cloud_sync_config_service import CloudSyncConfigService
 from tests.conftest import create_s3_cloud_sync_config
 
 
 class TestCloudSyncAPIHTMX:
     """Test class for cloud sync API HTMX responses."""
 
-    @pytest.mark.asyncio
     async def test_get_add_form_html_response(self, async_client: AsyncClient) -> None:
         """Test getting add form returns HTML."""
         response = await async_client.get("/api/cloud-sync/add-form")
@@ -25,7 +24,6 @@ class TestCloudSyncAPIHTMX:
         content = response.text
         assert len(content) > 0
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_s3(self, async_client: AsyncClient) -> None:
         """Test getting provider fields for S3 returns HTML."""
         response = await async_client.get("/api/cloud-sync/provider-fields?provider=s3")
@@ -36,7 +34,6 @@ class TestCloudSyncAPIHTMX:
         content = response.text
         assert len(content) > 0
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_sftp(self, async_client: AsyncClient) -> None:
         """Test getting provider fields for SFTP returns HTML."""
         response = await async_client.get(
@@ -46,7 +43,6 @@ class TestCloudSyncAPIHTMX:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_provider_fields_default(self, async_client: AsyncClient) -> None:
         """Test getting provider fields with default provider returns HTML."""
         response = await async_client.get("/api/cloud-sync/provider-fields")
@@ -54,7 +50,6 @@ class TestCloudSyncAPIHTMX:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_create_config_html_response(self, async_client: AsyncClient) -> None:
         """Test config creation returns HTML response with form data."""
         # Send as form data (how HTMX actually sends it)
@@ -90,7 +85,6 @@ class TestCloudSyncAPIHTMX:
             assert "HX-Trigger" in response.headers
             assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
 
-    @pytest.mark.asyncio
     async def test_create_config_validation_error_html(
         self, async_client: AsyncClient
     ) -> None:
@@ -108,7 +102,6 @@ class TestCloudSyncAPIHTMX:
         # Schema validation should return 422
         assert response.status_code == 422
 
-    @pytest.mark.asyncio
     async def test_create_config_service_error_html(
         self, async_client: AsyncClient
     ) -> None:
@@ -144,7 +137,6 @@ class TestCloudSyncAPIHTMX:
             assert response.status_code == 400
             assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_configs_html_empty(self, async_client: AsyncClient) -> None:
         """Test getting configs as HTML when empty."""
         with patch.object(
@@ -157,7 +149,6 @@ class TestCloudSyncAPIHTMX:
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_configs_html_format(self, async_client: AsyncClient) -> None:
         """Test getting configs as HTML format (response type test only)."""
         response = await async_client.get("/api/cloud-sync/html")
@@ -167,9 +158,8 @@ class TestCloudSyncAPIHTMX:
         # Just verify it returns HTML content - business logic tested in service tests
         assert len(response.text) > 0
 
-    @pytest.mark.asyncio
     async def test_update_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config update returns HTML response."""
         # Create test config in database
@@ -179,7 +169,7 @@ class TestCloudSyncAPIHTMX:
             enabled=True,
         )
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
         update_data = {"bucket_name": "new-bucket", "path_prefix": "updated/"}
 
@@ -192,9 +182,8 @@ class TestCloudSyncAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
 
-    @pytest.mark.asyncio
     async def test_delete_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config deletion returns HTML response."""
         # Create test config
@@ -202,7 +191,7 @@ class TestCloudSyncAPIHTMX:
             name="delete-html-test", bucket_name="delete-bucket"
         )
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.delete(f"/api/cloud-sync/{config.id}")
 
@@ -211,9 +200,8 @@ class TestCloudSyncAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
 
-    @pytest.mark.asyncio
     async def test_enable_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config enable returns HTML response."""
         config = create_s3_cloud_sync_config(
@@ -222,7 +210,7 @@ class TestCloudSyncAPIHTMX:
             enabled=False,
         )
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.post(f"/api/cloud-sync/{config.id}/enable")
 
@@ -231,9 +219,8 @@ class TestCloudSyncAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
 
-    @pytest.mark.asyncio
     async def test_disable_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config disable returns HTML response."""
         config = create_s3_cloud_sync_config(
@@ -242,7 +229,7 @@ class TestCloudSyncAPIHTMX:
             enabled=True,
         )
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.post(f"/api/cloud-sync/{config.id}/disable")
 
@@ -251,9 +238,8 @@ class TestCloudSyncAPIHTMX:
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "cloudSyncUpdate"
 
-    @pytest.mark.asyncio
     async def test_test_config_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test config test returns HTML response."""
         config = create_s3_cloud_sync_config(
@@ -264,11 +250,11 @@ class TestCloudSyncAPIHTMX:
             enabled=True,
         )
         test_db.add(config)
-        test_db.commit()
+        await test_db.commit()
 
         # Mock the rclone service and cloud sync service
         with patch(
-            "borgitory.services.cloud_sync_service.CloudSyncConfigService.test_cloud_sync_config"
+            "borgitory.services.cloud_sync_config_service.CloudSyncConfigService.test_cloud_sync_config"
         ) as mock_test:
             mock_test.return_value = {
                 "status": "success",
@@ -280,9 +266,8 @@ class TestCloudSyncAPIHTMX:
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
-    @pytest.mark.asyncio
     async def test_get_edit_form_html_response(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting edit form returns HTML."""
         config = create_s3_cloud_sync_config(
@@ -293,8 +278,8 @@ class TestCloudSyncAPIHTMX:
             enabled=True,
         )
         test_db.add(config)
-        test_db.commit()
-        test_db.refresh(config)  # Ensure ID is populated
+        await test_db.commit()
+        await test_db.refresh(config)  # Ensure ID is populated
 
         response = await async_client.get(f"/api/cloud-sync/{config.id}/edit")
 
@@ -303,7 +288,6 @@ class TestCloudSyncAPIHTMX:
         content = response.text
         assert "edit-form-test" in content
 
-    @pytest.mark.asyncio
     async def test_html_error_responses(self, async_client: AsyncClient) -> None:
         """Test that error responses return HTML format."""
         # Test with non-existent config
@@ -312,9 +296,8 @@ class TestCloudSyncAPIHTMX:
         assert response.status_code == 404
         # Should be JSON for non-HTMX endpoints that don't have HTML variants
 
-    @pytest.mark.asyncio
     async def test_htmx_headers_preserved(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that HTMX-specific headers are properly set."""
         # Send as form data

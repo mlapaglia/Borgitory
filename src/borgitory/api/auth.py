@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
-from sqlalchemy.orm import Session
+from sqlalchemy import select, func, delete
+from sqlalchemy.ext.asyncio import AsyncSession
 import secrets
 from datetime import timedelta
 from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, Optional
 
-from borgitory.models.database import User, UserSession, get_db
+from borgitory.models.database import User, UserSession
+from borgitory.dependencies import get_db
 from borgitory.dependencies import TemplatesDep
 from starlette.templating import _TemplateResponse
 
@@ -13,10 +15,11 @@ router = APIRouter()
 
 
 @router.get("/check-users")
-def check_users_exist(
-    request: Request, templates: TemplatesDep, db: Session = Depends(get_db)
+async def check_users_exist(
+    request: Request, templates: TemplatesDep, db: AsyncSession = Depends(get_db)
 ) -> _TemplateResponse:
-    user_count = db.query(User).count()
+    result = await db.execute(select(func.count(User.id)))
+    user_count = result.scalar() or 0
     has_users = user_count > 0
     next_url = request.query_params.get("next", "/repositories")
 
@@ -31,15 +34,16 @@ def check_users_exist(
 
 
 @router.post("/register")
-def register_user(
+async def register_user(
     request: Request,
     templates: TemplatesDep,
     username: str = Form(...),
     password: str = Form(...),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     try:
-        user_count = db.query(User).count()
+        result = await db.execute(select(func.count(User.id)))
+        user_count = result.scalar() or 0
         if user_count > 0:
             return templates.TemplateResponse(
                 request,
@@ -48,7 +52,8 @@ def register_user(
                 status_code=403,
             )
 
-        existing_user = db.query(User).filter(User.username == username).first()
+        result = await db.execute(select(User).where(User.username == username))
+        existing_user = result.scalar_one_or_none()
         if existing_user:
             return templates.TemplateResponse(
                 request,
@@ -78,8 +83,8 @@ def register_user(
         user.set_password(password)
 
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
 
         success_response = templates.TemplateResponse(
             request,
@@ -102,17 +107,18 @@ def register_user(
 
 
 @router.post("/login")
-def login_user(
+async def login_user(
     request: Request,
     templates: TemplatesDep,
     username: str = Form(...),
     password: str = Form(...),
     remember_me: bool = Form(False),
     next: str = Form("/repositories"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     try:
-        user = db.query(User).filter(User.username == username).first()
+        result = await db.execute(select(User).where(User.username == username))
+        user = result.scalar_one_or_none()
         if not user or not user.verify_password(password):
             return templates.TemplateResponse(
                 request,
@@ -130,9 +136,11 @@ def login_user(
             expires_at = now_utc() + timedelta(minutes=30)
             max_age = 30 * 60
 
-        db.query(UserSession).filter(
-            UserSession.user_id == user.id, UserSession.expires_at < now_utc()
-        ).delete()
+        await db.execute(
+            delete(UserSession).where(
+                UserSession.user_id == user.id, UserSession.expires_at < now_utc()
+            )
+        )
 
         user_agent = request.headers.get("user-agent") if request else None
         client_ip = (
@@ -154,7 +162,7 @@ def login_user(
         db.add(db_session)
 
         user.last_login = current_time
-        db.commit()
+        await db.commit()
 
         success_response = templates.TemplateResponse(
             request,
@@ -185,31 +193,34 @@ def login_user(
 
 
 @router.post("/logout")
-def logout(
-    request: Request, response: Response, db: Session = Depends(get_db)
+async def logout(
+    request: Request, response: Response, db: AsyncSession = Depends(get_db)
 ) -> Dict[str, str]:
     auth_token = request.cookies.get("auth_token")
     if auth_token:
-        db.query(UserSession).filter(UserSession.session_token == auth_token).delete()
-        db.commit()
+        await db.execute(
+            delete(UserSession).where(UserSession.session_token == auth_token)
+        )
+        await db.commit()
 
     response.delete_cookie("auth_token")
     return {"status": "logged out"}
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+async def get_current_user(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> User:
     auth_token = request.cookies.get("auth_token")
     if not auth_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    session = (
-        db.query(UserSession)
-        .filter(
+    result = await db.execute(
+        select(UserSession).where(
             UserSession.session_token == auth_token,
             UserSession.expires_at > now_utc(),
         )
-        .first()
     )
+    session = result.scalar_one_or_none()
 
     if not session:
         raise HTTPException(status_code=401, detail="Session expired")
@@ -217,21 +228,22 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not session.remember_me:
         session.expires_at = now_utc() + timedelta(minutes=30)
         session.last_activity = now_utc()
-        db.commit()
+        await db.commit()
 
-    user = db.query(User).filter(User.id == session.user_id).first()
+    user_result = await db.execute(select(User).where(User.id == session.user_id))
+    user = user_result.scalar_one_or_none()
     if not user:
-        db.delete(session)
-        db.commit()
+        await db.delete(session)
+        await db.commit()
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
 
 
-def get_current_user_optional(
-    request: Request, db: Session = Depends(get_db)
+async def get_current_user_optional(
+    request: Request, db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     try:
-        return get_current_user(request, db)
+        return await get_current_user(request, db)
     except HTTPException:
         return None

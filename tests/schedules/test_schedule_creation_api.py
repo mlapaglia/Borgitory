@@ -1,12 +1,13 @@
 """Tests for schedule creation API with cron validation."""
 
 import pytest
-from typing import Any, Dict, Generator
+from typing import Any, Dict, AsyncGenerator
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from borgitory.main import app
 from borgitory.models.database import Repository, User
@@ -38,9 +39,9 @@ class TestScheduleCreationAPI:
         return TestClient(app)
 
     @pytest.fixture(scope="function")
-    def setup_dependencies(
-        self, test_db: Session
-    ) -> Generator[Dict[str, Any], None, None]:
+    async def setup_dependencies(
+        self, test_db: AsyncSession
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Setup dependency overrides for each test."""
         # Create mock scheduler service
         mock_scheduler_service = AsyncMock()
@@ -50,8 +51,8 @@ class TestScheduleCreationAPI:
         mock_scheduler_service.get_scheduled_jobs.return_value = []
 
         # Create real services with test database
-        schedule_service = ScheduleService(test_db, mock_scheduler_service)
-        configuration_service = ConfigurationService(test_db)
+        schedule_service = ScheduleService(mock_scheduler_service)
+        configuration_service = ConfigurationService()
 
         # Override dependencies
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
@@ -73,7 +74,7 @@ class TestScheduleCreationAPI:
         repository.path = "/tmp/test-repo"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.commit()
+        await test_db.commit()
 
         yield {
             "schedule_service": schedule_service,

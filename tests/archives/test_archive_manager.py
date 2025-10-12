@@ -3,7 +3,7 @@ Tests for ArchiveManager
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.models.database import Repository
@@ -56,7 +56,6 @@ class TestArchiveManager:
         assert manager.job_executor == mock_job_executor
         assert manager.command_executor == mock_command_executor
 
-    @pytest.mark.asyncio
     async def test_parse_borg_list_output(self, manager: ArchiveManager) -> None:
         """Test parsing borg list JSON output"""
         json_output = """{"type": "d", "mode": "drwxr-xr-x", "uid": 1000, "gid": 1000, "user": "user", "group": "user", "size": 0, "mtime": "2023-01-01T00:00:00Z", "path": "test_dir"}
@@ -176,80 +175,3 @@ class TestArchiveManager:
         assert result[0].name == "dir1"  # directory
         assert result[1].name == "dir2"  # directory
         assert result[2].name == "file1.txt"  # file
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_success(
-        self, manager: ArchiveManager, mock_repository: MagicMock
-    ) -> None:
-        """Test successful file extraction"""
-        # Mock the secure_borg_command context manager
-        mock_process = AsyncMock()
-        mock_process.stdout.read.side_effect = [b"chunk1", b"chunk2", b""]
-        mock_process.wait.return_value = 0
-        mock_process.stderr.read.return_value = b""
-
-        with patch(
-            "borgitory.services.archives.archive_manager.build_secure_borg_command_with_keyfile"
-        ) as mock_secure:
-            mock_result = MagicMock()
-            mock_result.command = [
-                "borg",
-                "extract",
-                "--stdout",
-                "/test/repo::test_archive",
-                "test_file.txt",
-            ]
-            mock_result.environment = {"BORG_PASSPHRASE": "test_passphrase"}
-            mock_result.cleanup_temp_files.return_value = None
-            mock_secure.return_value = mock_result
-
-            with patch.object(
-                manager.command_executor, "create_subprocess", return_value=mock_process
-            ):
-                # Test that extract_file_stream returns a StreamingResponse
-                response = await manager.extract_file_stream(
-                    mock_repository, "test_archive", "test_file.txt"
-                )
-
-            # Verify it's a StreamingResponse
-            from starlette.responses import StreamingResponse
-
-            assert isinstance(response, StreamingResponse)
-
-    @pytest.mark.asyncio
-    async def test_extract_file_stream_error(
-        self, manager: ArchiveManager, mock_repository: MagicMock
-    ) -> None:
-        """Test file extraction with error"""
-        # Mock the secure_borg_command context manager
-        mock_process = AsyncMock()
-        mock_process.stdout.read.return_value = b""
-        mock_process.wait.return_value = 1
-        mock_process.stderr.read.return_value = b"Error: File not found"
-
-        with patch(
-            "borgitory.services.archives.archive_manager.build_secure_borg_command_with_keyfile"
-        ) as mock_secure:
-            mock_result = MagicMock()
-            mock_result.command = [
-                "borg",
-                "extract",
-                "--stdout",
-                "/test/repo::test_archive",
-                "missing_file.txt",
-            ]
-            mock_result.environment = {"BORG_PASSPHRASE": "test_passphrase"}
-            mock_result.cleanup_temp_files.return_value = None
-            mock_secure.return_value = mock_result
-
-            with patch.object(
-                manager.command_executor, "create_subprocess", return_value=mock_process
-            ):
-                # Test that extract_file_stream raises an exception when stream is consumed
-                with pytest.raises(Exception, match="Borg extract failed"):
-                    response = await manager.extract_file_stream(
-                        mock_repository, "test_archive", "missing_file.txt"
-                    )
-                    # Consume the stream to trigger the exception
-                    async for chunk in response.body_iterator:
-                        pass

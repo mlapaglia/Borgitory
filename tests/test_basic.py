@@ -2,14 +2,12 @@
 Basic test to verify testing setup works
 """
 
-import pytest
 from httpx import AsyncClient
 
 
 class TestBasic:
     """Basic test class."""
 
-    @pytest.mark.asyncio
     async def test_basic_functionality(self, async_client: AsyncClient) -> None:
         """Test that the test client can make requests."""
         # Test a simple endpoint - this might fail due to auth but should at least connect

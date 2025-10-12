@@ -4,16 +4,16 @@ import sys
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import _TemplateResponse
-from borgitory.models.database import User
+from borgitory.models.database import User, async_session_maker
 from borgitory.utils.template_paths import get_static_directory, get_template_directory
 from borgitory.utils.security import get_or_generate_secret_key
-from borgitory.models.database import init_db, get_db
+from borgitory.models.database import init_db
 from borgitory.api import (
     repositories,
     jobs,
@@ -31,9 +31,10 @@ from borgitory.api import (
     packages,
 )
 from borgitory.dependencies import (
+    get_db,
     get_recovery_service,
-    get_scheduler_service_singleton,
     get_package_restoration_service_for_startup,
+    get_scheduler_service_singleton,
 )
 
 logging.basicConfig(
@@ -49,7 +50,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         logger.info("Starting Borgitory application...")
-
+        app.state.async_session_maker = async_session_maker
         from borgitory.config_module import DATA_DIR
 
         secret_key = get_or_generate_secret_key(DATA_DIR)
@@ -59,8 +60,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await init_db()
 
         try:
-            restoration_service = get_package_restoration_service_for_startup()
-            await restoration_service.restore_user_packages()
+            async with async_session_maker() as session:
+                restoration_service = get_package_restoration_service_for_startup()
+                await restoration_service.restore_user_packages(session)
         except Exception as e:
             logger.error(f"Package restoration failed during startup: {e}")
 
@@ -215,8 +217,10 @@ def _render_page_with_tab(
 
 
 @app.get("/")
-async def root(request: Request, db: Session = Depends(get_db)) -> RedirectResponse:
-    current_user = auth.get_current_user_optional(request, db)
+async def root(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> RedirectResponse:
+    current_user = await auth.get_current_user_optional(request, db)
 
     if not current_user:
         return RedirectResponse(url="/login?next=/repositories", status_code=302)
@@ -227,9 +231,9 @@ async def root(request: Request, db: Session = Depends(get_db)) -> RedirectRespo
 
 @app.get("/login", response_model=None)
 async def login_page(
-    request: Request, db: Session = Depends(get_db)
+    request: Request, db: AsyncSession = Depends(get_db)
 ) -> RedirectResponse | _TemplateResponse:
-    current_user = auth.get_current_user_optional(request, db)
+    current_user = await auth.get_current_user_optional(request, db)
     next_url = request.query_params.get("next", "/repositories")
     # Strip backslashes, and validate redirect target is internal
     cleaned_next_url = next_url.replace("\\", "")
@@ -249,16 +253,12 @@ async def login_page(
 # Dynamic route for all tab pages
 @app.get("/{tab_name}", response_model=None)
 async def tab_page(
-    tab_name: str, request: Request, db: Session = Depends(get_db)
+    tab_name: str, request: Request, db: AsyncSession = Depends(get_db)
 ) -> RedirectResponse | _TemplateResponse:
-    from fastapi.responses import RedirectResponse
-    from fastapi import HTTPException
-    from borgitory.api.auth import get_current_user_optional
-
     if tab_name not in VALID_TABS:
         raise HTTPException(status_code=404, detail="Page not found")
 
-    current_user = get_current_user_optional(request, db)
+    current_user = await auth.get_current_user_optional(request, db)
     if not current_user:
         return RedirectResponse(url=f"/login?next=/{tab_name}", status_code=302)
 

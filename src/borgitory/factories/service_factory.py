@@ -19,14 +19,13 @@ from typing import (
 from abc import ABC
 import logging
 
+
 from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
     from borgitory.services.encryption_service import EncryptionService
-    from borgitory.services.cloud_providers import StorageFactory
-    from borgitory.services.rclone_service import RcloneService
+    from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 
 logger = logging.getLogger(__name__)
 
@@ -145,14 +144,12 @@ class CloudProviderServiceFactory(ServiceFactory[CloudSyncConfigServiceProtocol]
 
     def __init__(
         self,
-        rclone_service: "RcloneService",
         storage_factory: "StorageFactory",
         encryption_service: "EncryptionService",
         metadata_func: Callable[..., Any],
     ) -> None:
         super().__init__()
         # Inject dependencies instead of using service locator
-        self._rclone_service = rclone_service
         self._storage_factory = storage_factory
         self._encryption_service = encryption_service
         self._metadata_func = metadata_func
@@ -161,26 +158,25 @@ class CloudProviderServiceFactory(ServiceFactory[CloudSyncConfigServiceProtocol]
     def _register_default_implementations(self) -> None:
         """Register default cloud sync service implementations."""
 
-        def create_cloud_sync_service(db: "Session") -> CloudSyncConfigServiceProtocol:
+        def create_cloud_sync_config_service() -> CloudSyncConfigServiceProtocol:
             """Factory function to create CloudSyncConfigService."""
             # Import here to avoid circular dependencies
-            from borgitory.services.cloud_sync_service import CloudSyncConfigService
+            from borgitory.services.cloud_sync_config_service import (
+                CloudSyncConfigService,
+            )
 
-            # Use injected dependencies - no more service locator!
             return CloudSyncConfigService(
-                db=db,
-                rclone_service=self._rclone_service,
                 storage_factory=self._storage_factory,
                 encryption_service=self._encryption_service,
                 get_metadata_func=self._metadata_func,
             )
 
         self.register_implementation(
-            "default", create_cloud_sync_service, set_as_default=True
+            "default", create_cloud_sync_config_service, set_as_default=True
         )
 
-    def create_cloud_sync_service(
-        self, db: "Session", service_type: str = "default"
+    def create_cloud_sync_config_service(
+        self, service_type: str = "default"
     ) -> CloudSyncConfigServiceProtocol:
-        """Create a cloud sync service."""
-        return self.create_service(service_type, db=db)
+        """Create a cloud sync config service."""
+        return self.create_service(service_type)

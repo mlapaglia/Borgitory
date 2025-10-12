@@ -16,8 +16,7 @@ from borgitory.models.database import Repository
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.utils.security import (
-    build_secure_borg_command_with_keyfile,
-    secure_borg_command,
+    create_borg_command,
     validate_archive_name,
 )
 
@@ -192,7 +191,6 @@ class ArchiveManager:
         self, repository: Repository, archive_name: str, file_path: str
     ) -> StreamingResponse:
         """Extract a single file from an archive and stream it to the client"""
-        result = None
         try:
             # Validate inputs
             if not archive_name or not archive_name.strip():
@@ -210,21 +208,19 @@ class ArchiveManager:
             borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
             # Use manual keyfile management for streaming operations
-            result = build_secure_borg_command_with_keyfile(
-                base_command="borg extract",
-                repository_path="",
+            borg_command = create_borg_command(
+                repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                keyfile_content=repository.get_keyfile_content(),
+                base_command="borg extract",
                 additional_args=borg_args,
             )
-            command, env = result.command, result.environment
 
             logger.info(f"Extracting file {file_path} from archive {archive_name}")
 
             # Start the borg process using command executor for cross-platform compatibility
             process = await self.command_executor.create_subprocess(
-                command=command,
-                env=env,
+                command=borg_command.command,
+                env=borg_command.environment,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -278,9 +274,6 @@ class ArchiveManager:
                             process.kill()
                             await process.wait()
                     raise
-                finally:
-                    # Clean up keyfile after streaming completes
-                    result.cleanup_temp_files()
 
             filename = os.path.basename(file_path)
 
@@ -291,9 +284,6 @@ class ArchiveManager:
             )
 
         except Exception as e:
-            # Clean up keyfile if error occurs before streaming starts
-            if result:
-                result.cleanup_temp_files()
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
             raise Exception(f"Failed to extract file: {str(e)}")
 
@@ -312,39 +302,33 @@ class ArchiveManager:
             f"{repository.path}::{archive_name}",
         ]
 
-        keyfile_content = repository.get_keyfile_content()
-        passphrase = repository.get_passphrase() or ""
-
-        async with secure_borg_command(
+        borg_command = create_borg_command(
             base_command=base_command,
-            repository_path="",  # Already included in additional_args
-            passphrase=passphrase,
-            keyfile_content=keyfile_content,
+            repository_path="",
+            passphrase=repository.get_passphrase(),
             additional_args=additional_args,
-        ) as (final_command, env, temp_keyfile_path):
-            try:
-                # Use command_executor directly instead of job_executor to avoid WSL FIFO issues
-                cmd_result = await self.command_executor.execute_command(
-                    command=final_command,
-                    env=env,
-                    timeout=60.0,  # 1 minute timeout for listing
-                )
+        )
 
-                if not cmd_result.success:
-                    error_text = (
-                        cmd_result.stderr or cmd_result.error or "Unknown error"
-                    )
-                    raise Exception(f"Borg list failed: {error_text}")
+        try:
+            cmd_result = await self.command_executor.execute_command(
+                command=borg_command.command,
+                env=borg_command.environment,
+                timeout=60.0,
+            )
 
-                # Parse the JSON lines output
-                items = self._parse_borg_list_output(cmd_result.stdout)
+            if not cmd_result.success:
+                error_text = cmd_result.stderr or cmd_result.error or "Unknown error"
+                raise Exception(f"Borg list failed: {error_text}")
 
-                logger.info(f"Retrieved {len(items)} items from archive {archive_name}")
-                return items
+            # Parse the JSON lines output
+            items = self._parse_borg_list_output(cmd_result.stdout)
 
-            except Exception as e:
-                logger.error(f"Error getting archive items: {e}")
-                raise
+            logger.info(f"Retrieved {len(items)} items from archive {archive_name}")
+            return items
+
+        except Exception as e:
+            logger.error(f"Error getting archive items: {e}")
+            raise
 
     def _parse_borg_list_output(self, output_text: str) -> List[ArchiveEntry]:
         """

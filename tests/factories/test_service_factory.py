@@ -174,14 +174,11 @@ class TestCloudProviderServiceFactory:
 
     def test_factory_has_default_implementations(self) -> None:
         """Test that factory comes with default implementations."""
-        # Create factory with injected dependencies - clean and simple!
-        mock_rclone = Mock()
         mock_storage = Mock()
         mock_encryption = Mock()
         mock_metadata = Mock()
 
         factory = CloudProviderServiceFactory(
-            rclone_service=mock_rclone,
             storage_factory=mock_storage,
             encryption_service=mock_encryption,
             metadata_func=mock_metadata,
@@ -193,21 +190,17 @@ class TestCloudProviderServiceFactory:
 
     def test_create_cloud_sync_service(self) -> None:
         """Test creating a cloud sync service."""
-        # Create factory with injected dependencies - no more complex patching!
-        mock_db = Mock()
-        mock_rclone = Mock()
         mock_storage = Mock()
         mock_encryption = Mock()
         mock_metadata = Mock()
 
         factory = CloudProviderServiceFactory(
-            rclone_service=mock_rclone,
             storage_factory=mock_storage,
             encryption_service=mock_encryption,
             metadata_func=mock_metadata,
         )
 
-        service = factory.create_cloud_sync_service(mock_db, "default")
+        service = factory.create_cloud_sync_config_service("default")
 
         assert service is not None
         # Should satisfy the CloudSyncConfigServiceProtocol
@@ -218,26 +211,19 @@ class TestCloudProviderServiceFactory:
 
     def test_create_cloud_sync_service_with_db_session(self) -> None:
         """Test creating cloud sync service with proper database session injection."""
-        # This tests the DI pattern - db session is injected, dependencies are pre-injected
-        mock_db = Mock()
-        mock_rclone = Mock()
         mock_storage = Mock()
         mock_encryption = Mock()
         mock_metadata = Mock()
 
         factory = CloudProviderServiceFactory(
-            rclone_service=mock_rclone,
             storage_factory=mock_storage,
             encryption_service=mock_encryption,
             metadata_func=mock_metadata,
         )
 
-        service = factory.create_cloud_sync_service(
-            mock_db
-        )  # Using default implementation
+        service = factory.create_cloud_sync_config_service()
 
         assert service is not None
-        # Dependencies are already injected - no need to verify function calls!
 
 
 class TestFactoryIntegration:
@@ -258,20 +244,16 @@ class TestFactoryIntegration:
 
     def test_cloud_sync_factory_creates_protocol_compliant_services(self) -> None:
         """Test that cloud sync factory creates protocol-compliant services."""
-        # Create factory with injected dependencies - no more complex patching!
-        mock_db = Mock()
-        mock_rclone = Mock()
         mock_storage = Mock()
         mock_encryption = Mock()
         mock_metadata = Mock()
 
         factory = CloudProviderServiceFactory(
-            rclone_service=mock_rclone,
             storage_factory=mock_storage,
             encryption_service=mock_encryption,
             metadata_func=mock_metadata,
         )
-        service = factory.create_cloud_sync_service(mock_db)
+        service = factory.create_cloud_sync_config_service()
 
         # Test that service satisfies the CloudSyncConfigServiceProtocol
         assert hasattr(service, "create_cloud_sync_config")

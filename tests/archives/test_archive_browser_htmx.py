@@ -2,9 +2,8 @@
 Tests for archive browser HTMX functionality
 """
 
-import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import Mock, AsyncMock
 
 from borgitory.main import app
@@ -16,9 +15,8 @@ from borgitory.services.borg_service import BorgService
 class TestArchiveBrowserHTMX:
     """Test class for archive browser HTMX functionality."""
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_success(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test listing archives via HTMX returns HTML template."""
         repo = Repository()
@@ -26,7 +24,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/htmx-test"
         repo.set_passphrase("htmx-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -76,9 +74,8 @@ class TestArchiveBrowserHTMX:
             if get_repository_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_service]
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_empty(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test listing archives when repository has no archives."""
         repo = Repository()
@@ -86,7 +83,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/empty"
         repo.set_passphrase("empty-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -125,9 +122,8 @@ class TestArchiveBrowserHTMX:
             if get_repository_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_service]
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_error(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test listing archives when service throws error."""
         repo = Repository()
@@ -135,7 +131,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/error"
         repo.set_passphrase("error-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         from borgitory.dependencies import get_repository_service
         from borgitory.services.repositories.repository_service import RepositoryService
@@ -173,7 +169,6 @@ class TestArchiveBrowserHTMX:
             if get_repository_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_service]
 
-    @pytest.mark.asyncio
     async def test_list_archives_htmx_not_found(
         self, async_client: AsyncClient
     ) -> None:
@@ -214,9 +209,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_success(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting archive contents via HTMX returns HTML template."""
         repo = Repository()
@@ -224,7 +218,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/contents"
         repo.set_passphrase("contents-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         mock_contents = [
             {
@@ -283,9 +277,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_with_path(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting archive contents with specific path."""
         repo = Repository()
@@ -293,7 +286,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/contents-path"
         repo.set_passphrase("contents-path-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         mock_contents = [
             {
@@ -333,9 +326,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_empty_directory(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test getting contents of empty directory."""
         repo = Repository()
@@ -343,7 +335,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/empty-dir"
         repo.set_passphrase("empty-dir-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Create mock service
         mock_borg_service = Mock(spec=BorgService)
@@ -367,9 +359,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_error(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test archive contents when service throws error."""
         repo = Repository()
@@ -377,7 +368,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/contents-error"
         repo.set_passphrase("contents-error-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Create mock service
         mock_borg_service = Mock(spec=BorgService)
@@ -404,7 +395,6 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_contents_htmx_not_found(
         self, async_client: AsyncClient
     ) -> None:
@@ -416,9 +406,8 @@ class TestArchiveBrowserHTMX:
 
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
     async def test_file_size_formatting(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test various file size formatting in templates."""
         repo = Repository()
@@ -426,7 +415,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/size"
         repo.set_passphrase("size-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         mock_contents = [
             {
@@ -486,9 +475,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_archive_repository_selector(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test the repository selector for archives."""
         # Create test repositories
@@ -502,7 +490,7 @@ class TestArchiveBrowserHTMX:
         repo2.set_passphrase("pass2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         response = await async_client.get(
             "/api/repositories/archives/selector", headers={"hx-request": "true"}
@@ -524,9 +512,8 @@ class TestArchiveBrowserHTMX:
         assert 'id="refresh-archives-btn"' in response.text
         assert "hx-include" in response.text
 
-    @pytest.mark.asyncio
     async def test_archive_repository_selector_with_preselection(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test the repository selector with preselected repository."""
         # Create test repositories
@@ -540,7 +527,7 @@ class TestArchiveBrowserHTMX:
         repo2.set_passphrase("pass2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         # Test with preselected repository
         response = await async_client.get(
@@ -570,9 +557,8 @@ class TestArchiveBrowserHTMX:
         assert "repo-1" in content
         assert "repo-2" in content
 
-    @pytest.mark.asyncio
     async def test_archive_repository_selector_htmx_triggers(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that HTMX triggers are properly configured for preselection."""
         # Create test repository
@@ -581,7 +567,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/test-repo"
         repo.set_passphrase("testpass")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Test without preselection - should only have 'change' trigger
         response = await async_client.get(
@@ -600,9 +586,8 @@ class TestArchiveBrowserHTMX:
         content = response.text
         assert 'hx-trigger="change, load"' in content
 
-    @pytest.mark.asyncio
     async def test_archives_list_endpoint_form_data(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test archives/list endpoint handles form data from selector."""
         repo = Repository()
@@ -610,7 +595,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/form"
         repo.set_passphrase("form-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Import the dataclass
         from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
@@ -648,9 +633,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_htmx_navigation_attributes(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that HTMX navigation attributes are present in archive browser."""
         repo = Repository()
@@ -658,7 +642,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/nav"
         repo.set_passphrase("nav-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         mock_contents = [
             {
@@ -702,9 +686,8 @@ class TestArchiveBrowserHTMX:
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
 
-    @pytest.mark.asyncio
     async def test_breadcrumb_navigation_paths(
-        self, async_client: AsyncClient, test_db: Session
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that breadcrumb navigation generates correct paths for nested directories."""
         repo = Repository()
@@ -712,7 +695,7 @@ class TestArchiveBrowserHTMX:
         repo.path = "/tmp/breadcrumb"
         repo.set_passphrase("breadcrumb-passphrase")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         mock_contents = [
             {

@@ -7,6 +7,7 @@ import json
 
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
+from borgitory.models.enums import EncryptionType
 
 
 def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
@@ -137,6 +138,12 @@ class RepositoryBase(BaseModel):
         pattern=r"^[A-Za-z0-9-_\s]+$",
         description="Repository name (alphanumeric, hyphens, underscores, spaces only)",
     )
+    passphrase: str = Field(
+        min_length=8, description="Passphrase must be at least 8 characters"
+    )
+    encryption_type: EncryptionType = Field(
+        description="Encryption type",
+    )
     path: str = Field(
         min_length=1,
         pattern=ABSOLUTE_PATH_PATTERN,
@@ -160,9 +167,7 @@ class RepositoryBase(BaseModel):
 
 
 class RepositoryCreate(RepositoryBase):
-    passphrase: str = Field(
-        min_length=8, description="Passphrase must be at least 8 characters"
-    )
+    pass
 
 
 class RepositoryUpdate(BaseModel):
@@ -170,10 +175,20 @@ class RepositoryUpdate(BaseModel):
         None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-_\s]+$"
     )
     path: Optional[str] = Field(None, min_length=1, pattern=ABSOLUTE_PATH_PATTERN)
-    passphrase: Optional[str] = Field(None, min_length=8)
+    passphrase: Optional[str] = Field(None)
     cache_dir: Optional[str] = Field(
         None, description="Custom cache directory path (optional, absolute path)"
     )
+
+    @field_validator("passphrase")
+    @classmethod
+    def validate_passphrase(cls, v: Optional[str]) -> Optional[str]:
+        """Validate passphrase - can be None, empty string (keep current), or at least 8 characters."""
+        if v is None or v == "":
+            return v
+        if len(v) < 8:
+            raise ValueError("Passphrase must be at least 8 characters long")
+        return v
 
     @field_validator("cache_dir")
     @classmethod
@@ -190,6 +205,24 @@ class RepositoryUpdate(BaseModel):
 class Repository(RepositoryBase):
     id: int = Field(gt=0)
     created_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+        "str_strip_whitespace": True,
+        "validate_assignment": True,
+        "extra": "forbid",
+    }
+
+
+class RepositoryResponse(BaseModel):
+    """Repository response model without sensitive fields like passphrase"""
+
+    id: int = Field(gt=0)
+    name: str
+    path: str
+    encryption_type: EncryptionType
+    created_at: datetime
+    cache_dir: Optional[str] = None
 
     model_config = {
         "from_attributes": True,

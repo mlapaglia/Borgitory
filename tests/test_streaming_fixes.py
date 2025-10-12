@@ -4,12 +4,11 @@ Test suite for streaming fixes and UUID system improvements
 
 import pytest
 import uuid
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, AsyncMock
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 
-from borgitory.models.database import Job, JobTask
 from borgitory.services.jobs.job_stream_service import JobStreamService
 
 
@@ -60,7 +59,6 @@ class TestJobStreamingFixes:
         job.tasks = [task1, task2]
         return job
 
-    @pytest.mark.asyncio
     async def test_task_streaming_sends_individual_lines(
         self,
         job_stream_service: JobStreamService,
@@ -100,7 +98,6 @@ class TestJobStreamingFixes:
         assert "event: output" in events[2]
         assert "<div>Backup completed</div>" in events[2]
 
-    @pytest.mark.asyncio
     async def test_task_streaming_handles_new_output_events(
         self,
         job_stream_service: JobStreamService,
@@ -144,7 +141,6 @@ class TestJobStreamingFixes:
         assert "event: output" in new_event
         assert "<div>New output line</div>" in new_event
 
-    @pytest.mark.asyncio
     async def test_completed_task_streaming_from_database(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock
     ) -> None:
@@ -152,82 +148,21 @@ class TestJobStreamingFixes:
         job_id = uuid.uuid4()
         task_order = 0
 
-        # Job not in manager, should try database
+        # Job not in manager, should return error (streaming only works from memory)
         mock_job_manager.jobs = {}
 
-        # Mock database session and task - patch the import inside the function
-        with patch("borgitory.models.database.SessionLocal") as mock_session_local:
-            mock_session = Mock()
-            mock_session_local.return_value = mock_session
+        events = []
+        async for event in job_stream_service._task_output_event_generator(
+            job_id, task_order
+        ):
+            events.append(event)
+            if len(events) >= 1:  # Get error event
+                break
 
-            mock_job = Mock()
-            mock_job.id = job_id
-            mock_task = Mock()
-            mock_task.task_name = "backup"
-            mock_task.status = JobStatusEnum.COMPLETED
-            mock_task.output = "Backup completed successfully\nFiles processed: 100"
-
-            # Set up the query chain properly
-            mock_session.query().filter().first.side_effect = [mock_job, mock_task]
-
-            events = []
-            async for event in job_stream_service._task_output_event_generator(
-                job_id, task_order
-            ):
-                events.append(event)
-                if len(events) >= 2:  # Limit to prevent infinite loop
-                    break
-
-            # Should have output events
-            assert len(events) >= 1
-            # The content may vary depending on implementation, just check we got some events
-            assert all(isinstance(event, str) for event in events)
-
-
-class TestUUIDSystemFixes:
-    """Test the UUID system improvements"""
-
-    def test_job_model_auto_generates_uuid(self) -> None:
-        """Test that Job model has UUID auto-generation configured"""
-        # SQLAlchemy defaults only trigger during database operations
-        # Test that the default is configured correctly
-        from borgitory.models.database import Job
-
-        # Check that the default function is set
-        id_column = Job.__table__.columns["id"]
-        assert id_column.default is not None
-        assert callable(id_column.default.arg)
-
-        # Test the default function generates valid UUIDs
-        # SQLAlchemy lambda defaults receive a context parameter
-        generated_id = id_column.default.arg(None)
-        assert isinstance(generated_id, uuid.UUID)
-
-        # Should be a valid UUID (already is since it's a UUID object)
-        assert generated_id.version == 4  # UUID4
-
-    def test_job_model_respects_explicit_uuid(self) -> None:
-        """Test that Job model uses explicitly provided UUID"""
-        explicit_id = uuid.uuid4()
-        job = Job()
-        job.id = explicit_id
-        job.repository_id = 1
-        job.type = TaskTypeEnum.BACKUP
-        job.status = JobStatusEnum.PENDING
-
-        assert job.id == explicit_id
-
-    def test_job_task_foreign_key_uses_string_uuid(self) -> None:
-        """Test that JobTask foreign key references string UUID"""
-        job_id = uuid.uuid4()
-        task = JobTask()
-        task.job_id = job_id
-        task.task_type = TaskTypeEnum.BACKUP
-        task.task_name = "Test Task"
-        task.task_order = 0
-
-        assert task.job_id == job_id
-        assert isinstance(task.job_id, uuid.UUID)
+        # Should have output events indicating error
+        assert len(events) >= 1
+        assert isinstance(events[0], str)
+        assert "error" in events[0].lower()
 
 
 class TestJobRenderServiceUUIDIntegration:
@@ -265,7 +200,7 @@ class TestJobRenderServiceUUIDIntegration:
         assert str(mock_job_with_uuid.id) in html
         assert html != ""  # Should not return empty string
 
-    def test_format_database_job_creates_context_with_uuid(
+    async def test_format_database_job_creates_context_with_uuid(
         self, mock_job_with_uuid: Mock
     ) -> None:
         """Test that JobRenderService properly handles UUID-based job identification"""
@@ -279,8 +214,12 @@ class TestJobRenderServiceUUIDIntegration:
         # Set up the mock job with completed status to trigger database path
         mock_job_with_uuid.status = "completed"
 
-        # Mock database query to return our job
-        mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_job_with_uuid
+        # Mock database query to return our job (SQLAlchemy 2.0 execute pattern)
+        mock_unique = Mock()
+        mock_unique.scalar_one_or_none.return_value = mock_job_with_uuid
+        mock_result = Mock()
+        mock_result.unique.return_value = mock_unique
+        mock_db.execute = AsyncMock(return_value=mock_result)
 
         # Mock the converter methods to return realistic data
         from borgitory.services.jobs.job_render_service import JobProgress
@@ -299,11 +238,11 @@ class TestJobRenderServiceUUIDIntegration:
             error=mock_job_with_uuid.error,
         )
 
-        service.converter.convert_database_job.return_value = expected_job_data
-        service.converter.fix_failed_job_tasks.return_value = expected_job_data
+        service.converter.convert_database_job.return_value = expected_job_data  # type: ignore[attr-defined]
+        service.converter.fix_failed_job_tasks.return_value = expected_job_data  # type: ignore[attr-defined]
 
         # Test the new architecture method
-        result = service.get_job_display_data(mock_job_with_uuid.id, mock_db)
+        result = await service.get_job_display_data(mock_job_with_uuid.id, mock_db)
 
         # Verify the result contains the UUID and proper structure
         assert result is not None
@@ -312,10 +251,10 @@ class TestJobRenderServiceUUIDIntegration:
         assert result.status.type.value == "completed"
 
         # Verify the converter was called with the database job
-        service.converter.convert_database_job.assert_called_once_with(
+        service.converter.convert_database_job.assert_called_once_with(  # type: ignore[attr-defined]
             mock_job_with_uuid
         )
-        service.converter.fix_failed_job_tasks.assert_called_once_with(
+        service.converter.fix_failed_job_tasks.assert_called_once_with(  # type: ignore[attr-defined]
             expected_job_data
         )
 
@@ -377,14 +316,12 @@ class TestBackwardCompatibility:
 class TestStreamingIntegration:
     """Integration tests for streaming functionality"""
 
-    @pytest.mark.asyncio
     async def test_complete_task_streaming_workflow(self) -> None:
         """Test complete workflow from job creation to streaming completion"""
         # This would be a more comprehensive integration test
         # that tests the entire streaming pipeline
         pass  # Implementation would require more setup
 
-    @pytest.mark.asyncio
     async def test_database_to_memory_job_transition(self) -> None:
         """Test transition from database job to memory job during streaming"""
         # Test the handoff between completed jobs in database

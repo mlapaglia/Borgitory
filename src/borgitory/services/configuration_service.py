@@ -5,7 +5,8 @@ Handles all configuration-related business operations for dropdowns and form dat
 
 import logging
 from typing import List, Dict, TypedDict, cast
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from borgitory.models.database import (
     Repository,
@@ -40,36 +41,47 @@ class CronFormContext(TypedDict):
 class ConfigurationService:
     """Service for configuration and form data operations."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self) -> None:
         """
-        Initialize ConfigurationService with injected database session.
-
-        Args:
-            db: Database session for configuration queries
+        Initialize ConfigurationService.
         """
-        self.db = db
 
-    def get_schedule_form_data(self) -> ScheduleFormData:
+    async def get_schedule_form_data(self, db: AsyncSession) -> ScheduleFormData:
         """
         Get all configuration data needed for schedule forms.
 
         Returns:
             Dict containing lists of repositories and enabled configurations
         """
+        repositories_result = await db.execute(select(Repository))
+        repositories = list(repositories_result.scalars().all())
+
+        prune_configs_result = await db.execute(
+            select(PruneConfig).where(PruneConfig.enabled)
+        )
+        prune_configs = list(prune_configs_result.scalars().all())
+
+        cloud_sync_configs_result = await db.execute(
+            select(CloudSyncConfig).where(CloudSyncConfig.enabled)
+        )
+        cloud_sync_configs = list(cloud_sync_configs_result.scalars().all())
+
+        notification_configs_result = await db.execute(
+            select(NotificationConfig).where(NotificationConfig.enabled)
+        )
+        notification_configs = list(notification_configs_result.scalars().all())
+
+        check_configs_result = await db.execute(
+            select(RepositoryCheckConfig).where(RepositoryCheckConfig.enabled)
+        )
+        check_configs = list(check_configs_result.scalars().all())
+
         return {
-            "repositories": self.db.query(Repository).all(),
-            "prune_configs": self.db.query(PruneConfig)
-            .filter(PruneConfig.enabled)
-            .all(),
-            "cloud_sync_configs": self.db.query(CloudSyncConfig)
-            .filter(CloudSyncConfig.enabled)
-            .all(),
-            "notification_configs": self.db.query(NotificationConfig)
-            .filter(NotificationConfig.enabled)
-            .all(),
-            "check_configs": self.db.query(RepositoryCheckConfig)
-            .filter(RepositoryCheckConfig.enabled)
-            .all(),
+            "repositories": repositories,
+            "prune_configs": prune_configs,
+            "cloud_sync_configs": cloud_sync_configs,
+            "notification_configs": notification_configs,
+            "check_configs": check_configs,
         }
 
     def get_cron_preset_descriptions(self) -> Dict[str, str]:

@@ -4,15 +4,16 @@ Tests for repository statistics HTML endpoint functionality
 
 import pytest
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
-from borgitory.models.database import Repository, get_db
+from borgitory.models.database import Repository
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
 )
-from borgitory.dependencies import get_repository_stats_service
+from borgitory.dependencies import get_db, get_repository_stats_service
 
 
 class TestRepositoryStatsHTML:
@@ -29,22 +30,20 @@ class TestRepositoryStatsHTML:
         return repo
 
     @pytest.fixture
-    def mock_db(self) -> Mock:
+    def mock_db(self) -> MagicMock:
         """Create a mock database session"""
-        db = Mock()
-        return db
+        return AsyncMock(spec=AsyncSession)
 
-    @pytest.mark.asyncio
     async def test_stats_html_basic_flow(
-        self, mock_repository: Mock, mock_db: Mock
+        self, mock_repository: Mock, mock_db: AsyncSession
     ) -> None:
         """Test that stats HTML endpoint returns complete HTML with charts"""
 
         # Override database dependency
-        def override_get_db() -> Mock:
-            mock_db.query.return_value.filter.return_value.first.return_value = (
-                mock_repository
-            )
+        def override_get_db() -> AsyncSession:
+            mock_result = Mock()
+            mock_result.scalar_one_or_none.return_value = mock_repository
+            mock_db.execute = AsyncMock(return_value=mock_result)
             return mock_db
 
         app.dependency_overrides[get_db] = override_get_db
@@ -130,17 +129,16 @@ class TestRepositoryStatsHTML:
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
-    @pytest.mark.asyncio
     async def test_stats_html_error_handling(
-        self, mock_repository: Mock, mock_db: Mock
+        self, mock_repository: Mock, mock_db: AsyncSession
     ) -> None:
         """Test that errors are properly returned as HTML"""
 
         # Override database dependency
-        def override_get_db() -> Mock:
-            mock_db.query.return_value.filter.return_value.first.return_value = (
-                mock_repository
-            )
+        def override_get_db() -> AsyncSession:
+            mock_result = Mock()
+            mock_result.scalar_one_or_none.return_value = mock_repository
+            mock_db.execute = AsyncMock(return_value=mock_result)
             return mock_db
 
         app.dependency_overrides[get_db] = override_get_db
@@ -185,13 +183,14 @@ class TestRepositoryStatsHTML:
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
-    @pytest.mark.asyncio
-    async def test_stats_html_repository_not_found(self, mock_db: Mock) -> None:
+    async def test_stats_html_repository_not_found(self, mock_db: AsyncSession) -> None:
         """Test handling of non-existent repository"""
 
         # Override database dependency
-        def override_get_db() -> Mock:
-            mock_db.query.return_value.filter.return_value.first.return_value = None
+        def override_get_db() -> AsyncSession:
+            mock_result = Mock()
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db.execute = AsyncMock(return_value=mock_result)
             return mock_db
 
         app.dependency_overrides[get_db] = override_get_db
@@ -264,17 +263,6 @@ class TestRepositoryStatsHTML:
         assert "Loading repository statistics" in html_content, (
             "Should have loading message"
         )
-
-    @pytest.mark.integration
-    @pytest.mark.asyncio
-    async def test_full_stats_html_integration(self) -> None:
-        """
-        Integration test that verifies the complete stats HTML generation flow
-        This test requires a test repository to be available
-        """
-        # This would test with actual borg commands if test repo exists
-        # Skip for now since it requires external dependencies
-        pytest.skip("Integration test requires test borg repository")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,8 @@ CRUD operations, following the project's service layer patterns.
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi import HTTPException
 
 from borgitory.models.database import NotificationConfig
@@ -35,17 +36,15 @@ class NotificationConfigService:
 
     def __init__(
         self,
-        db: Session,
         notification_service: Optional[NotificationService] = None,
     ):
         """
         Initialize notification config service.
 
         Args:
-            db: Database session
+            session_maker: Database session maker
             notification_service: Notification service for provider operations
         """
-        self.db = db
         if notification_service is None:
             # Create a basic notification service with default factory
             from .service import NotificationProviderFactory
@@ -57,19 +56,21 @@ class NotificationConfigService:
         else:
             self._notification_service = notification_service
 
-    def get_all_configs(
-        self, skip: int = 0, limit: int = 100
+    async def get_all_configs(
+        self, db: AsyncSession, skip: int = 0, limit: int = 100
     ) -> List[NotificationConfig]:
         """Get all notification configurations."""
-        return self.db.query(NotificationConfig).offset(skip).limit(limit).all()
+        result = await db.execute(select(NotificationConfig).offset(skip).limit(limit))
+        return list(result.scalars().all())
 
-    def get_config_by_id(self, config_id: int) -> Optional[NotificationConfig]:
+    async def get_config_by_id(
+        self, db: AsyncSession, config_id: int
+    ) -> Optional[NotificationConfig]:
         """Get notification configuration by ID."""
-        return (
-            self.db.query(NotificationConfig)
-            .filter(NotificationConfig.id == config_id)
-            .first()
+        result = await db.execute(
+            select(NotificationConfig).where(NotificationConfig.id == config_id)
         )
+        return result.scalar_one_or_none()
 
     def get_supported_providers(self) -> List[SupportedProvider]:
         """Get supported notification providers from the registry."""
@@ -88,8 +89,12 @@ class NotificationConfigService:
         # Sort by provider name for consistent ordering
         return sorted(supported_providers, key=lambda x: x.value)
 
-    def create_config(
-        self, name: str, provider: str, provider_config: Dict[str, Any]
+    async def create_config(
+        self,
+        db: AsyncSession,
+        name: str,
+        provider: str,
+        provider_config: Dict[str, Any],
     ) -> NotificationConfig:
         """
         Create a new notification configuration.
@@ -106,11 +111,10 @@ class NotificationConfigService:
             HTTPException: If validation fails or name already exists
         """
         # Check if name already exists
-        existing = (
-            self.db.query(NotificationConfig)
-            .filter(NotificationConfig.name == name)
-            .first()
+        result = await db.execute(
+            select(NotificationConfig).where(NotificationConfig.name == name)
         )
+        existing = result.scalar_one_or_none()
         if existing:
             raise HTTPException(
                 status_code=400,
@@ -136,14 +140,15 @@ class NotificationConfigService:
         db_config.provider_config = provider_config_json
         db_config.enabled = True
 
-        self.db.add(db_config)
-        self.db.commit()
-        self.db.refresh(db_config)
+        db.add(db_config)
+        await db.commit()
+        await db.refresh(db_config)
 
         return db_config
 
-    def update_config(
+    async def update_config(
         self,
+        db: AsyncSession,
         config_id: int,
         name: Optional[str] = None,
         provider: Optional[str] = None,
@@ -166,7 +171,7 @@ class NotificationConfigService:
         Raises:
             HTTPException: If config not found or validation fails
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"
@@ -174,13 +179,12 @@ class NotificationConfigService:
 
         # Check name uniqueness if changing name
         if name and name != config.name:
-            existing = (
-                self.db.query(NotificationConfig)
-                .filter(
+            result = await db.execute(
+                select(NotificationConfig).where(
                     NotificationConfig.name == name, NotificationConfig.id != config_id
                 )
-                .first()
             )
+            existing = result.scalar_one_or_none()
             if existing:
                 raise HTTPException(
                     status_code=400,
@@ -209,11 +213,11 @@ class NotificationConfigService:
                     status_code=400, detail=f"Invalid configuration: {str(e)}"
                 )
 
-        self.db.commit()
-        self.db.refresh(config)
+        await db.commit()
+        await db.refresh(config)
         return config
 
-    def delete_config(self, config_id: int) -> Tuple[bool, str]:
+    async def delete_config(self, db: AsyncSession, config_id: int) -> Tuple[bool, str]:
         """
         Delete a notification configuration.
 
@@ -226,19 +230,19 @@ class NotificationConfigService:
         Raises:
             HTTPException: If config not found
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"
             )
 
         config_name = config.name
-        self.db.delete(config)
-        self.db.commit()
+        await db.delete(config)
+        await db.commit()
 
         return True, config_name
 
-    def enable_config(self, config_id: int) -> Tuple[bool, str]:
+    async def enable_config(self, db: AsyncSession, config_id: int) -> Tuple[bool, str]:
         """
         Enable a notification configuration.
 
@@ -251,18 +255,20 @@ class NotificationConfigService:
         Raises:
             HTTPException: If config not found
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"
             )
 
         config.enabled = True
-        self.db.commit()
+        await db.commit()
 
         return True, f"Notification '{config.name}' enabled successfully!"
 
-    def disable_config(self, config_id: int) -> Tuple[bool, str]:
+    async def disable_config(
+        self, db: AsyncSession, config_id: int
+    ) -> Tuple[bool, str]:
         """
         Disable a notification configuration.
 
@@ -275,18 +281,18 @@ class NotificationConfigService:
         Raises:
             HTTPException: If config not found
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"
             )
 
         config.enabled = False
-        self.db.commit()
+        await db.commit()
 
         return True, f"Notification '{config.name}' disabled successfully!"
 
-    async def test_config(self, config_id: int) -> Tuple[bool, str]:
+    async def test_config(self, db: AsyncSession, config_id: int) -> Tuple[bool, str]:
         """
         Test a notification configuration.
 
@@ -299,7 +305,7 @@ class NotificationConfigService:
         Raises:
             HTTPException: If config not found or disabled
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"
@@ -339,7 +345,10 @@ class NotificationConfigService:
             return False, f"Test failed: {str(e)}"
 
     async def test_config_with_service(
-        self, config_id: int, notification_service: NotificationService
+        self,
+        db: AsyncSession,
+        config_id: int,
+        notification_service: NotificationService,
     ) -> Tuple[bool, str]:
         """
         Test notification configuration with provided notification service.
@@ -354,7 +363,7 @@ class NotificationConfigService:
         Returns:
             Tuple of (success, message)
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"
@@ -393,8 +402,8 @@ class NotificationConfigService:
             logger.error(f"Error testing notification config {config_id}: {e}")
             return False, f"Test failed: {str(e)}"
 
-    def get_config_with_decrypted_data(
-        self, config_id: int
+    async def get_config_with_decrypted_data(
+        self, db: AsyncSession, config_id: int
     ) -> Tuple[NotificationConfig, Dict[str, Any]]:
         """
         Get configuration with decrypted provider data for editing.
@@ -408,7 +417,7 @@ class NotificationConfigService:
         Raises:
             HTTPException: If config not found
         """
-        config = self.get_config_by_id(config_id)
+        config = await self.get_config_by_id(db, config_id)
         if not config:
             raise HTTPException(
                 status_code=404, detail="Notification configuration not found"

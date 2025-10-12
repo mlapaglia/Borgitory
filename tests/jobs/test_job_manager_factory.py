@@ -9,13 +9,8 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 )
 from borgitory.services.jobs.job_models import (
     JobManagerConfig,
-    JobManagerDependencies,
 )
-from borgitory.services.jobs.job_manager_factory import (
-    JobManagerFactory,
-    get_default_job_manager_dependencies,
-    get_test_job_manager_dependencies,
-)
+from borgitory.services.jobs.job_manager_factory import JobManagerFactory
 
 
 class TestJobManagerFactory:
@@ -33,7 +28,7 @@ class TestJobManagerFactory:
         assert deps.database_manager is not None
 
         # Test that it uses default session factory
-        assert deps.db_session_factory is not None
+        assert deps.async_session_maker is not None
 
     def test_create_dependencies_with_config(self) -> None:
         """Test creating dependencies with custom config"""
@@ -79,70 +74,25 @@ class TestJobManagerFactory:
         deps = JobManagerFactory.create_for_testing(
             mock_event_broadcaster=mock_event_broadcaster,
             mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
+            mock_async_session_maker=mock_db_session,
             mock_rclone_service=mock_rclone,
         )
 
         assert deps.event_broadcaster is mock_event_broadcaster
         assert deps.subprocess_executor is mock_subprocess
-        assert deps.db_session_factory is mock_db_session
+        assert deps.async_session_maker is mock_db_session
         assert deps.rclone_service is mock_rclone
 
-    def test_create_minimal(self) -> None:
-        """Test creating minimal dependencies"""
-        deps = JobManagerFactory.create_minimal()
+    def test_dependencies_initialization(self) -> None:
+        """Test JobManagerDependencies initialization"""
 
-        assert deps is not None
-        assert deps.queue_manager is not None
-        assert deps.output_manager is not None
-        # Should have reduced limits
-        assert deps.queue_manager.max_concurrent_backups == 1
-
-    def test_dependencies_post_init(self) -> None:
-        """Test JobManagerDependencies post_init method"""
-
-        # Test with factory-created dependencies
+        # Test with factory-created dependencies - session maker should be set
         deps = JobManagerFactory.create_dependencies()
-        deps.__post_init__()
+        assert deps.async_session_maker is not None
 
-        assert deps.db_session_factory is not None
-
-        # Test with custom session factory
+        # Test with custom session factory - should be preserved
         custom_factory = Mock()
         deps_custom = JobManagerFactory.create_dependencies()
-        deps_custom.db_session_factory = custom_factory
-        deps_custom.__post_init__()
+        deps_custom.async_session_maker = custom_factory
 
-        assert deps_custom.db_session_factory is custom_factory
-
-
-class TestJobManagerFactoryFunctions:
-    """Test module-level factory functions"""
-
-    def test_get_default_job_manager_dependencies(self) -> None:
-        """Test getting default dependencies"""
-        deps = get_default_job_manager_dependencies()
-
-        assert isinstance(deps, JobManagerDependencies)
-        assert deps.job_executor is not None
-        assert deps.output_manager is not None
-        assert deps.queue_manager is not None
-
-    def test_get_test_job_manager_dependencies(self) -> None:
-        """Test getting test dependencies"""
-        mock_event_broadcaster = Mock(spec=JobEventBroadcasterProtocol)
-        mock_subprocess = AsyncMock()
-        mock_db_session = Mock()
-        mock_rclone = Mock()
-
-        deps = get_test_job_manager_dependencies(
-            mock_event_broadcaster=mock_event_broadcaster,
-            mock_subprocess=mock_subprocess,
-            mock_db_session=mock_db_session,
-            mock_rclone_service=mock_rclone,
-        )
-
-        assert deps.event_broadcaster is mock_event_broadcaster
-        assert deps.subprocess_executor is mock_subprocess
-        assert deps.db_session_factory is mock_db_session
-        assert deps.rclone_service is mock_rclone
+        assert deps_custom.async_session_maker is custom_factory

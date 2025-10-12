@@ -2,6 +2,18 @@ from enum import StrEnum
 from typing import List
 
 
+class EncryptionType(StrEnum):
+    """Borg encryption type enumeration"""
+
+    NONE = "none"
+    REPOKEY = "repokey"
+    REPOKEY_BLAKE2 = "repokey-blake2"
+    KEYFILE = "keyfile"
+    KEYFILE_BLAKE2 = "keyfile-blake2"
+    AUTHENTICATED = "authenticated"
+    AUTHENTICATED_BLAKE2 = "authenticated-blake2"
+
+
 class JobType(StrEnum):
     """Job type enumeration with display-friendly names"""
 

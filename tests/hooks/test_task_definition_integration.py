@@ -3,9 +3,9 @@ Tests for hook integration with TaskDefinitionBuilder.
 """
 
 import json
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 import pytest
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.services.task_definition_builder import TaskDefinitionBuilder
@@ -14,10 +14,15 @@ from borgitory.services.task_definition_builder import TaskDefinitionBuilder
 class TestTaskDefinitionBuilderHookIntegration:
     """Test hook integration with TaskDefinitionBuilder."""
 
+    @pytest.fixture
+    def mock_db(self) -> MagicMock:
+        """Mock database session"""
+        session = MagicMock(spec=AsyncSession)
+        return session
+
     def test_build_hook_task(self) -> None:
         """Test building a single hook task definition."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         task = builder.build_hook_task(
             hook_name="Test Hook",
@@ -34,8 +39,7 @@ class TestTaskDefinitionBuilderHookIntegration:
 
     def test_build_hook_task_without_repository_name(self) -> None:
         """Test building hook task without repository name."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         task = builder.build_hook_task(
             hook_name="Simple Hook", hook_command="ls -la", hook_type="post"
@@ -45,8 +49,7 @@ class TestTaskDefinitionBuilderHookIntegration:
 
     def test_build_hooks_from_json_empty(self) -> None:
         """Test building hooks from empty JSON."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         tasks = builder.build_hooks_from_json(None, "pre")
         assert tasks == []
@@ -56,8 +59,7 @@ class TestTaskDefinitionBuilderHookIntegration:
 
     def test_build_hooks_from_json_valid(self) -> None:
         """Test building hooks from valid JSON."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         hooks_json = """[
             {
@@ -94,8 +96,7 @@ class TestTaskDefinitionBuilderHookIntegration:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """Test building hooks from invalid JSON logs error and returns empty list."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         invalid_json = '[{"name": "Test", "invalid": "json"}]'  # Missing command
 
@@ -105,15 +106,15 @@ class TestTaskDefinitionBuilderHookIntegration:
         assert tasks == []
         assert "Failed to parse pre-job hooks" in caplog.text
 
-    def test_build_task_list_with_hooks(self) -> None:
+    async def test_build_task_list_with_hooks(self, mock_db: AsyncSession) -> None:
         """Test building complete task list with pre and post hooks."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         pre_hooks = '[{"name": "Pre Hook", "command": "echo starting"}]'
         post_hooks = '[{"name": "Post Hook", "command": "echo finished"}]'
 
-        tasks = builder.build_task_list(
+        tasks = await builder.build_task_list(
+            db=mock_db,
             repository_name="test-repo",
             include_backup=True,
             backup_params={
@@ -143,10 +144,11 @@ class TestTaskDefinitionBuilderHookIntegration:
         backup_tasks = [task for task in tasks if task.type == TaskTypeEnum.BACKUP]
         assert len(backup_tasks) == 1
 
-    def test_build_task_list_with_hooks_and_other_tasks(self) -> None:
+    async def test_build_task_list_with_hooks_and_other_tasks(
+        self, mock_db: AsyncSession
+    ) -> None:
         """Test building task list with hooks and other task types."""
-        mock_db = Mock(spec=Session)
-        builder = TaskDefinitionBuilder(mock_db)
+        builder = TaskDefinitionBuilder()
 
         # Mock cleanup config
         mock_prune_config = Mock()
@@ -156,14 +158,16 @@ class TestTaskDefinitionBuilderHookIntegration:
         mock_prune_config.show_stats = True
         mock_prune_config.save_space = False
 
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_prune_config
-        )
+        # Mock SQLAlchemy 2.0 execute pattern
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_prune_config
+        mock_db.execute.return_value = mock_result  # type: ignore[attr-defined]
 
         pre_hooks = '[{"name": "Setup", "command": "echo setup"}]'
         post_hooks = '[{"name": "Cleanup", "command": "echo cleanup"}]'
 
-        tasks = builder.build_task_list(
+        tasks = await builder.build_task_list(
+            db=mock_db,
             repository_name="test-repo",
             include_backup=True,
             prune_config_id=1,

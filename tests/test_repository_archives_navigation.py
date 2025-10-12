@@ -7,8 +7,9 @@ and ensures it properly navigates to the archives tab with preselected repositor
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
-from typing import Any, Generator
+from typing import Any, AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.api.auth import get_current_user
@@ -16,14 +17,14 @@ from borgitory.models.database import User, Repository
 
 
 @pytest.fixture
-def mock_current_user(test_db: Session) -> Generator[User, None, None]:
+async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]:
     """Create a mock current user for testing."""
     test_user = User()
     test_user.username = "testuser"
     test_user.set_password("testpass")
     test_db.add(test_user)
-    test_db.commit()
-    test_db.refresh(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
 
     def override_get_current_user() -> User:
         return test_user
@@ -36,9 +37,8 @@ def mock_current_user(test_db: Session) -> Generator[User, None, None]:
 class TestRepositoryArchivesNavigation:
     """Test class for repository archives navigation functionality."""
 
-    @pytest.mark.asyncio
     async def test_repository_list_contains_view_archives_button(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that repository list contains properly configured View Archives buttons."""
         # Create test repositories
@@ -52,7 +52,7 @@ class TestRepositoryArchivesNavigation:
         repo2.set_passphrase("pass2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         # Get repository list HTML
         response = await async_client.get("/api/repositories/html")
@@ -72,9 +72,8 @@ class TestRepositoryArchivesNavigation:
         assert f'"preselect_repo": "{repo1.id}"' in content
         assert f'"preselect_repo": "{repo2.id}"' in content
 
-    @pytest.mark.asyncio
     async def test_view_archives_button_navigation_flow(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test the complete navigation flow when clicking View Archives."""
         # Create test repository
@@ -83,7 +82,7 @@ class TestRepositoryArchivesNavigation:
         repo.path = "/tmp/navigation-test"
         repo.set_passphrase("navpass")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Simulate clicking the View Archives button by calling the archives tab with preselect_repo
         response = await async_client.get(
@@ -99,9 +98,8 @@ class TestRepositoryArchivesNavigation:
         # Check that the preselect_repo parameter is passed to the selector
         assert f"preselect_repo={repo.id}" in content
 
-    @pytest.mark.asyncio
     async def test_archives_tab_selector_with_preselected_repository(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that the archives selector correctly handles preselected repository."""
         # Create test repositories
@@ -115,7 +113,7 @@ class TestRepositoryArchivesNavigation:
         repo2.set_passphrase("sel2")
 
         test_db.add_all([repo1, repo2])
-        test_db.commit()
+        await test_db.commit()
 
         # Test archives selector with preselected repository
         response = await async_client.get(
@@ -143,9 +141,8 @@ class TestRepositoryArchivesNavigation:
         # Check that HTMX triggers include load for auto-triggering
         assert 'hx-trigger="change, load"' in content
 
-    @pytest.mark.asyncio
     async def test_archives_selector_without_preselection(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that archives selector works normally without preselection."""
         # Create test repository
@@ -154,7 +151,7 @@ class TestRepositoryArchivesNavigation:
         repo.path = "/tmp/normal"
         repo.set_passphrase("normal")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Test archives selector without preselection
         response = await async_client.get(
@@ -174,7 +171,6 @@ class TestRepositoryArchivesNavigation:
         assert 'hx-trigger="change"' in content
         assert 'hx-trigger="change, load"' not in content
 
-    @pytest.mark.asyncio
     async def test_view_archives_button_with_nonexistent_repository(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -199,7 +195,6 @@ class TestRepositoryArchivesNavigation:
         assert "selected" not in content
         assert "Select a repository to view archives..." in content
 
-    @pytest.mark.asyncio
     async def test_empty_repository_list_archives_buttons(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -213,9 +208,8 @@ class TestRepositoryArchivesNavigation:
         assert "No repositories configured" in content
         assert "View Archives" not in content
 
-    @pytest.mark.asyncio
     async def test_archives_tab_oob_navigation_update(
-        self, async_client: AsyncClient, test_db: Session, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
     ) -> None:
         """Test that archives tab includes out-of-band navigation update."""
         # Create test repository
@@ -224,7 +218,7 @@ class TestRepositoryArchivesNavigation:
         repo.path = "/tmp/oob-test"
         repo.set_passphrase("oobpass")
         test_db.add(repo)
-        test_db.commit()
+        await test_db.commit()
 
         # Test archives tab response
         response = await async_client.get(

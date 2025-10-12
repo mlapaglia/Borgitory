@@ -4,17 +4,23 @@ import logging
 import uuid
 import os
 from datetime import datetime
-from borgitory.config_module import DATA_DIR, DATABASE_URL, get_secret_key
+
+from borgitory.config_module import (
+    ASYNC_DATABASE_URL,
+    DATA_DIR,
+    DATABASE_URL,
+    get_secret_key,
+)
 from borgitory.services.migrations.migration_factory import (
     create_migration_service_for_startup,
 )
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.models.enums import EncryptionType
 from typing import List, Any
 
 from cryptography.fernet import Fernet
 from passlib.context import CryptContext
 from sqlalchemy import (
-    create_engine,
     Integer,
     String,
     DateTime,
@@ -23,9 +29,9 @@ from sqlalchemy import (
     ForeignKey,
     Uuid,
 )
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
-from sqlalchemy.orm import sessionmaker, relationship, Session
-from typing import Generator
+from sqlalchemy.orm import relationship
 
 
 class StringUUID(uuid.UUID):
@@ -55,8 +61,12 @@ class StringUuidType(Uuid[str]):
 logger = logging.getLogger(__name__)
 
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_async_engine(
+    ASYNC_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+async_session_maker = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 Base = declarative_base()
 
@@ -87,9 +97,9 @@ class Repository(Base):
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
     encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
-    encryption_type: Mapped[str | None] = mapped_column(
-        String, nullable=True
-    )  # "repokey", "keyfile", "none", etc.
+    encryption_type: Mapped[EncryptionType] = mapped_column(
+        String, default=EncryptionType.NONE, nullable=False
+    )
     encrypted_keyfile_content: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Encrypted keyfile content
@@ -452,19 +462,3 @@ async def init_db() -> None:
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         raise
-
-
-def reset_db() -> None:
-    """Reset the entire database - USE WITH CAUTION"""
-    logger.info("Resetting database...")
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database reset complete")
-
-
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()

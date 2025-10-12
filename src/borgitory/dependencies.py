@@ -5,19 +5,25 @@ FastAPI dependency providers for the application.
 from typing import (
     Annotated,
     TYPE_CHECKING,
+    AsyncGenerator,
     Optional,
     Callable,
-    ContextManager,
     Any,
     List,
     Coroutine,
 )
 import asyncio
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from borgitory.factories.service_factory import CloudProviderServiceFactory
+from borgitory.models.database import async_session_maker
 from borgitory.models.job_results import JobStatusEnum, JobTypeEnum
+from borgitory.models.enums import EncryptionType
+from borgitory.protocols.path_protocols import PlatformServiceProtocol
 from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
-from borgitory.services.notifications.registry import get_metadata
-from borgitory.services.path.path_configuration_service import PathConfigurationService
+from borgitory.services.cloud_providers.registry import get_metadata
+from borgitory.services.path.platform_service import PlatformService
 
 if TYPE_CHECKING:
     from borgitory.services.notifications.registry import NotificationProviderRegistry
@@ -38,11 +44,8 @@ if TYPE_CHECKING:
     from borgitory.services.command_execution.wsl_command_executor import (
         WSLCommandExecutor,
     )
-    from sqlalchemy.orm import Session
 from functools import lru_cache
 from fastapi import Depends
-from sqlalchemy.orm import Session
-from borgitory.models.database import SessionLocal, get_db
 from borgitory.utils.template_paths import get_template_directory
 from borgitory.services.simple_command_runner import SimpleCommandRunner
 from borgitory.services.borg_service import BorgService
@@ -60,7 +63,7 @@ from borgitory.services.debug_service import DebugService
 from borgitory.protocols.environment_protocol import DefaultEnvironment
 from borgitory.services.rclone_service import RcloneService
 from borgitory.services.encryption_service import EncryptionService
-from borgitory.services.cloud_providers import StorageFactory
+from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 from borgitory.services.repositories.repository_stats_service import (
     RepositoryStatsService,
 )
@@ -116,7 +119,7 @@ def datetime_browser_filter(
 
 
 if TYPE_CHECKING:
-    from borgitory.services.cloud_sync_service import CloudSyncConfigService
+    from borgitory.services.cloud_sync_config_service import CloudSyncConfigService
     from borgitory.protocols.command_protocols import (
         CommandRunnerProtocol,
         ProcessExecutorProtocol,
@@ -125,7 +128,26 @@ if TYPE_CHECKING:
         JobManagerProtocol,
     )
     from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
-    from borgitory.factories.service_factory import CloudProviderServiceFactory
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+
+def get_platform_service() -> PlatformServiceProtocol:
+    """
+    Provide PlatformService for platform detection.
+
+    Returns:
+        PlatformServiceProtocol: Platform service instance
+    """
+    return PlatformService()
 
 
 def get_wsl_command_executor() -> "WSLCommandExecutor":
@@ -144,6 +166,7 @@ def get_wsl_command_executor() -> "WSLCommandExecutor":
 
 def get_command_executor(
     wsl_executor: "WSLCommandExecutor" = Depends(get_wsl_command_executor),
+    platform_service: PlatformServiceProtocol = Depends(get_platform_service),
 ) -> "CommandExecutorProtocol":
     """
     Provide a command executor for cross-platform command execution.
@@ -162,7 +185,7 @@ def get_command_executor(
         create_command_executor_with_injection,
     )
 
-    return create_command_executor_with_injection(wsl_executor)
+    return create_command_executor_with_injection(wsl_executor, platform_service)
 
 
 def get_subprocess_executor() -> Callable[
@@ -228,21 +251,15 @@ def get_job_queue_manager() -> JobQueueManager:
     )
 
 
-def get_job_database_manager(
-    db_session_factory: Optional[Callable[[], ContextManager["Session"]]] = None,
-) -> JobDatabaseManager:
+def get_job_database_manager() -> JobDatabaseManager:
     """
     Provide a JobDatabaseManager instance.
 
     Request-scoped for proper database session management.
     Uses default db_session_factory if none provided.
     """
-    if db_session_factory is None:
-        from borgitory.utils.db_session import get_db_session
 
-        db_session_factory = get_db_session
-
-    return JobDatabaseManager(db_session_factory=db_session_factory)
+    return JobDatabaseManager(async_session_maker)
 
 
 def get_command_runner_config() -> "CommandRunnerConfig":
@@ -274,21 +291,6 @@ def get_simple_command_runner(
     from borgitory.services.simple_command_runner import SimpleCommandRunner
 
     return SimpleCommandRunner(config=config, executor=executor)
-
-
-def get_recovery_service(
-    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
-) -> RecoveryService:
-    """
-    Provide a RecoveryService instance with proper FastAPI dependency injection.
-
-    Args:
-        command_executor: Injected command executor for cross-platform execution
-
-    Returns:
-        RecoveryService: New RecoveryService instance for each request
-    """
-    return RecoveryService(command_executor=command_executor)
 
 
 def get_http_client() -> "HttpClient":
@@ -381,7 +383,6 @@ def get_notification_service(
 
 
 def get_notification_config_service(
-    db: Session = Depends(get_db),
     notification_service: NotificationService = Depends(get_notification_service),
 ) -> NotificationConfigService:
     """
@@ -389,22 +390,39 @@ def get_notification_config_service(
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return NotificationConfigService(db=db, notification_service=notification_service)
+    return NotificationConfigService(notification_service=notification_service)
+
+
+def get_file_service(
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    platform_service: "PlatformServiceProtocol" = Depends(get_platform_service),
+) -> "FileServiceProtocol":
+    """
+    Provide a FileService instance for file operations.
+
+    Returns:
+        FileServiceProtocol: File service implementation
+    """
+    from borgitory.services.files.file_service_factory import create_file_service
+
+    return create_file_service(command_executor, platform_service)
 
 
 def get_rclone_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> RcloneService:
     """
     Provide a RcloneService instance with proper FastAPI dependency injection.
 
     Args:
         command_executor: Injected CommandExecutorProtocol instance
+        file_service: Injected FileServiceProtocol instance
 
     Returns:
         RcloneService: New RcloneService instance for each request
     """
-    return RcloneService(command_executor=command_executor)
+    return RcloneService(command_executor=command_executor, file_service=file_service)
 
 
 def get_repository_stats_service(
@@ -434,15 +452,6 @@ def get_file_system() -> "FileSystemInterface":
     return OsFileSystem()
 
 
-def get_path_configuration_service() -> "PathConfigurationService":
-    """Get path configuration service."""
-    from borgitory.services.path.path_configuration_service import (
-        PathConfigurationService,
-    )
-
-    return PathConfigurationService()
-
-
 def get_path_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
 ) -> "PathServiceInterface":
@@ -455,16 +464,9 @@ def get_path_service(
     Returns:
         PathServiceInterface: Unified path service implementation
     """
-    import logging
     from borgitory.services.path.path_service import PathService
 
-    logger = logging.getLogger(__name__)
-    config = get_path_configuration_service()
-
-    logger.debug(
-        f"Creating unified path service for {config.get_platform_name()} with {type(command_executor).__name__}"
-    )
-    return PathService(config, command_executor)
+    return PathService(command_executor)
 
 
 def get_hook_execution_service() -> HookExecutionService:
@@ -475,18 +477,19 @@ def get_hook_execution_service() -> HookExecutionService:
     """
     command_runner_config = get_command_runner_config()
     wsl_executor = get_wsl_command_executor()
-    command_executor = get_command_executor(wsl_executor)
+    platform_service = get_platform_service()
+    command_executor = get_command_executor(wsl_executor, platform_service)
     command_runner = get_simple_command_runner(command_runner_config, command_executor)
     return HookExecutionService(command_runner=command_runner)
 
 
-def get_task_definition_builder(db: Session = Depends(get_db)) -> TaskDefinitionBuilder:
+def get_task_definition_builder() -> TaskDefinitionBuilder:
     """
     Provide a TaskDefinitionBuilder instance with database session.
 
     Note: This is not cached because it needs a database session per request.
     """
-    return TaskDefinitionBuilder(db)
+    return TaskDefinitionBuilder()
 
 
 def get_job_event_broadcaster_dep() -> JobEventBroadcaster:
@@ -589,6 +592,7 @@ def get_templates() -> TimezoneAwareJinja2Templates:
     templates.env.globals["TaskTypeEnum"] = TaskTypeEnum
     templates.env.globals["JobStatusEnum"] = JobStatusEnum
     templates.env.globals["JobTypeEnum"] = JobTypeEnum
+    templates.env.globals["EncryptionType"] = EncryptionType
 
     return templates
 
@@ -620,37 +624,32 @@ def get_provider_registry(
     return registry_factory.create_production_registry()
 
 
-def get_configuration_service(db: Session = Depends(get_db)) -> ConfigurationService:
+def get_configuration_service() -> ConfigurationService:
     """
-    Provide ConfigurationService with injected database session.
-
-    Args:
-        db: Database session for configuration queries
+    Provide ConfigurationService.
 
     Returns:
         ConfigurationService: Configured service instance
     """
-    return ConfigurationService(db=db)
+    return ConfigurationService()
 
 
-def get_repository_check_config_service(
-    db: Session = Depends(get_db),
-) -> RepositoryCheckConfigService:
+def get_repository_check_config_service() -> RepositoryCheckConfigService:
     """
-    Provide a RepositoryCheckConfigService instance with database session injection.
+    Provide a RepositoryCheckConfigService instance.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return RepositoryCheckConfigService(db=db)
+    return RepositoryCheckConfigService()
 
 
-def get_prune_service(db: Session = Depends(get_db)) -> PruneService:
+def get_prune_service() -> PruneService:
     """
     Provide a PruneService instance with database session injection.
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return PruneService(db=db)
+    return PruneService()
 
 
 def get_cron_description_service() -> CronDescriptionService:
@@ -679,9 +678,11 @@ def get_encryption_service() -> EncryptionService:
 
 def get_storage_factory(
     rclone: RcloneService = Depends(get_rclone_service),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    file_service: "FileServiceProtocol" = Depends(get_file_service),
 ) -> StorageFactory:
-    """Provide a StorageFactory instance with injected RcloneService."""
-    return StorageFactory(rclone)
+    """Provide a StorageFactory instance with injected dependencies."""
+    return StorageFactory(rclone, command_executor, file_service)
 
 
 def get_job_manager_env_config() -> "JobManagerEnvironmentConfig":
@@ -744,19 +745,31 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     env_config = get_job_manager_env_config()
     config = get_job_manager_config(env_config)
     wsl_executor = get_wsl_command_executor()
-    command_executor = get_command_executor(wsl_executor)
+    platform_service = get_platform_service()
+    command_executor = get_command_executor(wsl_executor, platform_service)
     job_executor = get_job_executor(command_executor)
     output_manager = get_job_output_manager()
     queue_manager = get_job_queue_manager()
     database_manager = get_job_database_manager()
     event_broadcaster = get_job_event_broadcaster_dep()
-    rclone_service = get_rclone_service(command_executor)
-    notification_service = get_notification_service_singleton()  # Use singleton version
+    file_service = get_file_service(command_executor, get_platform_service())
+    rclone_service = get_rclone_service(command_executor, file_service)
+    notification_service = get_notification_service_singleton()
     encryption_service = get_encryption_service()
-    storage_factory = get_storage_factory(rclone_service)
+    storage_factory = get_storage_factory(
+        rclone_service, command_executor, file_service
+    )
     registry_factory = get_registry_factory()
     provider_registry = get_provider_registry(registry_factory)
     hook_execution_service = get_hook_execution_service()
+
+    # Create cloud sync service
+    from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
+
+    cloud_sync_service = CloudSyncService(
+        storage_factory=storage_factory,
+        encryption_service=encryption_service,
+    )
 
     # Create dependencies using resolved services
     custom_dependencies = JobManagerDependencies(
@@ -771,6 +784,9 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
         storage_factory=storage_factory,
         provider_registry=provider_registry,
         hook_execution_service=hook_execution_service,
+        cloud_sync_service=cloud_sync_service,
+        async_session_maker=async_session_maker,
+        http_client_factory=lambda: HttpClient(),  # type: ignore
     )
 
     # Use the factory to ensure all dependencies are properly initialized
@@ -822,7 +838,11 @@ def get_scheduler_service_singleton() -> SchedulerService:
     """
     # Resolve dependencies directly (not via FastAPI DI)
     job_manager = get_job_manager_singleton()
-    return SchedulerService(job_manager=job_manager, job_service_factory=None)
+    job_service = get_job_service()
+    return SchedulerService(
+        job_manager=job_manager,
+        job_service=job_service,
+    )
 
 
 def get_scheduler_service_dependency() -> SchedulerService:
@@ -849,7 +869,6 @@ def get_scheduler_service_dependency() -> SchedulerService:
 
 
 def get_schedule_service(
-    db: Session = Depends(get_db),
     scheduler_service: SchedulerService = Depends(get_scheduler_service_dependency),
 ) -> ScheduleService:
     """
@@ -857,11 +876,10 @@ def get_schedule_service(
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return ScheduleService(db=db, scheduler_service=scheduler_service)
+    return ScheduleService(scheduler_service=scheduler_service)
 
 
 def get_job_service(
-    db: Session = Depends(get_db),
     job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
 ) -> JobService:
     """
@@ -869,7 +887,7 @@ def get_job_service(
 
     Note: This creates a new instance per request since it depends on the database session.
     """
-    return JobService(db, job_manager)
+    return JobService(job_manager)
 
 
 def get_job_stream_service(
@@ -911,10 +929,9 @@ def get_debug_service(
 
 
 def get_cloud_provider_service_factory(
-    rclone_service: RcloneService = Depends(get_rclone_service),
     storage_factory: StorageFactory = Depends(get_storage_factory),
     encryption_service: EncryptionService = Depends(get_encryption_service),
-) -> "CloudProviderServiceFactory":
+) -> CloudProviderServiceFactory:
     """
     Provide CloudProviderServiceFactory with proper FastAPI dependency injection.
 
@@ -927,18 +944,14 @@ def get_cloud_provider_service_factory(
         CloudProviderServiceFactory: Configured factory instance
     """
     return CloudProviderServiceFactory(
-        rclone_service=rclone_service,
         storage_factory=storage_factory,
         encryption_service=encryption_service,
         metadata_func=get_metadata,
     )
 
 
-def get_cloud_sync_service(
-    db: Session = Depends(get_db),
-    factory: "CloudProviderServiceFactory" = Depends(
-        get_cloud_provider_service_factory
-    ),
+def get_cloud_sync_config_service(
+    factory: CloudProviderServiceFactory = Depends(get_cloud_provider_service_factory),
 ) -> "CloudSyncConfigServiceProtocol":
     """
     Provide a CloudSyncConfigService instance using factory pattern with proper DI.
@@ -946,8 +959,8 @@ def get_cloud_sync_service(
     Request-scoped since it depends on database session.
     Uses factory for consistent DI pattern across all services.
     """
-    # **DI CHECK**: Using factory pattern with request-scoped db injection
-    return factory.create_cloud_sync_service(db, "default")
+
+    return factory.create_cloud_sync_config_service("default")
 
 
 # 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
@@ -962,17 +975,14 @@ def get_cloud_sync_service(
 RequestScopedSimpleCommandRunner = Annotated[
     "CommandRunnerProtocol", Depends(get_simple_command_runner)
 ]
-# RequestScopedBorgService will be defined after get_borg_service
-RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
-RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
 
-# Notification Service - Dual Scoped (Most Complex Example)
+RequestScopedJobService = Annotated[JobService, Depends(get_job_service)]
+
 ApplicationScopedNotificationService = NotificationService  # Application-wide singleton
 RequestScopedNotificationService = Annotated[
     NotificationService, Depends(get_notification_service)
-]  # Per-request instance via FastAPI DI
+]
 
-# JobManager Service - Dual Scoped (Critical for State Consistency)
 ApplicationScopedJobManager = "JobManagerProtocol"  # Application-wide singleton
 RequestScopedJobManager = Annotated[
     "JobManagerProtocol", Depends(get_job_manager_dependency)
@@ -981,7 +991,6 @@ RequestScopedJobManager = Annotated[
 SimpleCommandRunnerDep = RequestScopedSimpleCommandRunner
 JobServiceDep = RequestScopedJobService
 JobManagerDep = RequestScopedJobManager
-RecoveryServiceDep = RequestScopedRecoveryService
 NotificationConfigServiceDep = Annotated[
     NotificationConfigService, Depends(get_notification_config_service)
 ]
@@ -1071,13 +1080,14 @@ UpcomingBackupsServiceDep = Annotated[
     UpcomingBackupsService, Depends(get_upcoming_backups_service)
 ]
 CloudSyncServiceDep = Annotated[
-    "CloudSyncConfigService", Depends(get_cloud_sync_service)
+    "CloudSyncConfigService", Depends(get_cloud_sync_config_service)
 ]
 HookExecutionServiceDep = Annotated[
     HookExecutionService, Depends(get_hook_execution_service)
 ]
 ProviderRegistryDep = Annotated[ProviderRegistry, Depends(get_provider_registry)]
 PathServiceDep = Annotated["PathServiceInterface", Depends(get_path_service)]
+PlatformServiceDep = Annotated[PlatformServiceProtocol, Depends(get_platform_service)]
 
 
 @lru_cache()
@@ -1098,7 +1108,8 @@ def get_archive_manager_singleton() -> ArchiveManagerProtocol:
     """
     # Resolve dependencies directly (not via FastAPI DI)
     wsl_executor = get_wsl_command_executor()
-    command_executor = get_command_executor(wsl_executor)
+    platform_service = get_platform_service()
+    command_executor = get_command_executor(wsl_executor, platform_service)
     job_executor = get_job_executor(command_executor)
 
     return ArchiveManager(
@@ -1131,6 +1142,50 @@ def get_archive_manager_dependency() -> ArchiveManagerProtocol:
     return get_archive_manager_singleton()
 
 
+def get_archive_service(
+    archive_manager: ArchiveManagerProtocol = Depends(get_archive_manager_dependency),
+) -> "ArchiveServiceProtocol":
+    """
+    Provide ArchiveManager service for archive operations.
+
+    Returns:
+        ArchiveServiceProtocol: Archive service implementation
+    """
+    return archive_manager
+
+
+def get_borg_service(
+    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
+    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
+    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
+    archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
+    command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    path_service: "PathServiceInterface" = Depends(get_path_service),
+) -> BorgService:
+    """
+    Provide BorgService with all mandatory dependencies injected.
+
+    Args:
+        job_executor: Injected job executor for running Borg processes
+        command_runner: Injected command runner for system commands
+        job_manager: Injected job manager for job lifecycle
+        archive_service: Injected archive service for archive operations
+        command_executor: Injected command executor for cross-platform execution
+        path_service: Injected path service for secure path operations
+
+    Returns:
+        BorgService: Fully configured service with all dependencies
+    """
+    return BorgService(
+        job_executor=job_executor,
+        command_runner=command_runner,
+        job_manager=job_manager,
+        archive_service=archive_service,
+        command_executor=command_executor,
+        path_service=path_service,
+    )
+
+
 def get_archive_manager(
     job_executor: JobExecutor = Depends(get_job_executor),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
@@ -1151,57 +1206,26 @@ def get_archive_manager(
     )
 
 
-def get_archive_service(
-    archive_manager: ArchiveManagerProtocol = Depends(get_archive_manager_dependency),
-) -> "ArchiveServiceProtocol":
-    """
-    Provide ArchiveManager service for archive operations.
-
-    Returns:
-        ArchiveServiceProtocol: Archive service implementation
-    """
-    return archive_manager
-
-
-def get_borg_service(
-    job_executor: "ProcessExecutorProtocol" = Depends(get_job_executor),
-    command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
-    job_manager: "JobManagerProtocol" = Depends(get_job_manager_dependency),
-    archive_service: "ArchiveServiceProtocol" = Depends(get_archive_service),
+def get_recovery_service(
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
-) -> BorgService:
+) -> RecoveryService:
     """
-    Provide BorgService with all mandatory dependencies injected.
+    Provide a RecoveryService instance with proper FastAPI dependency injection.
 
     Args:
-        job_executor: Injected job executor for running Borg processes
-        command_runner: Injected command runner for system commands
-        job_manager: Injected job manager for job lifecycle
-        archive_service: Injected archive service for archive operations
         command_executor: Injected command executor for cross-platform execution
+        borg_service: Injected borg service for repository operations
 
     Returns:
-        BorgService: Fully configured service with all dependencies
+        RecoveryService: New RecoveryService instance for each request
     """
-    return BorgService(
-        job_executor=job_executor,
-        command_runner=command_runner,
-        job_manager=job_manager,
-        archive_service=archive_service,
-        command_executor=command_executor,
+    return RecoveryService(
+        command_executor=command_executor, session_maker=async_session_maker
     )
 
 
-def get_file_service() -> "FileServiceProtocol":
-    """
-    Provide a FileService instance for file operations.
-
-    Returns:
-        FileServiceProtocol: File service implementation
-    """
-    from borgitory.services.file_service import FileService
-
-    return FileService()
+RequestScopedRecoveryService = Annotated[RecoveryService, Depends(get_recovery_service)]
+RecoveryServiceDep = RequestScopedRecoveryService
 
 
 def get_repository_service(
@@ -1234,11 +1258,10 @@ RepositoryServiceDep = Annotated[RepositoryService, Depends(get_repository_servi
 
 
 def get_package_manager_service(
-    db: Session = Depends(get_db),
     command_runner: "CommandRunnerProtocol" = Depends(get_simple_command_runner),
 ) -> PackageManagerService:
     """Get PackageManagerService instance with database session."""
-    return PackageManagerService(command_runner=command_runner, db_session=db)
+    return PackageManagerService(command_runner=command_runner)
 
 
 PackageManagerServiceDep = Annotated[
@@ -1267,16 +1290,14 @@ def get_package_restoration_service_for_startup() -> PackageRestorationService:
     """
 
     # The service will manage its own database session during restoration
-    db = SessionLocal()
     from borgitory.config.command_runner_config import CommandRunnerConfig
     from borgitory.services.command_execution.command_executor_factory import (
         create_command_executor,
     )
 
+    platform_service = get_platform_service()
     config = CommandRunnerConfig()
-    executor = create_command_executor()
+    executor = create_command_executor(platform_service=platform_service)
     command_runner = SimpleCommandRunner(config=config, executor=executor)
-    package_manager = PackageManagerService(
-        command_runner=command_runner, db_session=db
-    )
+    package_manager = PackageManagerService(command_runner=command_runner)
     return PackageRestorationService(package_manager=package_manager)

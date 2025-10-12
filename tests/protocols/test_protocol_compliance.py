@@ -175,6 +175,7 @@ class TestProtocolCompliance:
         mock_job_manager = Mock()
         mock_archive_service = Mock()
         mock_command_executor = Mock(spec=CommandExecutorProtocol)
+        mock_path_service = Mock()
 
         service = BorgService(
             job_executor=mock_job_executor,
@@ -182,6 +183,7 @@ class TestProtocolCompliance:
             job_manager=mock_job_manager,
             archive_service=mock_archive_service,
             command_executor=mock_command_executor,
+            path_service=mock_path_service,
         )
         assert service is not None
 

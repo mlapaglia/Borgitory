@@ -10,7 +10,7 @@ import os
 import subprocess
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
-from borgitory.services.path.path_configuration_service import PathConfigurationService
+from borgitory.protocols.path_protocols import PlatformServiceProtocol
 from .linux_command_executor import LinuxCommandExecutor
 from .wsl_command_executor import WSLCommandExecutor
 
@@ -34,7 +34,9 @@ def wsl_available() -> bool:
         return False
 
 
-def create_command_executor() -> CommandExecutorProtocol:
+def create_command_executor(
+    platform_service: PlatformServiceProtocol,
+) -> CommandExecutorProtocol:
     """
     Create a command executor for the current environment.
 
@@ -45,25 +47,25 @@ def create_command_executor() -> CommandExecutorProtocol:
     Returns:
         CommandExecutorProtocol: A command executor implementation
     """
-    config = PathConfigurationService()
 
-    if config.is_windows():
+    if platform_service.is_windows():
         if not wsl_available():
             raise RuntimeError("Detected Windows environment, but WSL is not available")
 
         logger.debug("Creating WSL command executor")
         return WSLCommandExecutor()
-    elif config.is_linux() or config.is_docker():
+    elif platform_service.is_linux() or platform_service.is_docker():
         logger.debug("Creating Linux command executor")
         return LinuxCommandExecutor()
     else:
         raise RuntimeError(
-            f"Unsupported environment detected: {config.get_platform_name()}"
+            f"Unsupported environment detected: {platform_service.get_platform_name()}"
         )
 
 
 def create_command_executor_with_injection(
     wsl_executor: "WSLCommandExecutor",
+    platform_service: PlatformServiceProtocol,
 ) -> CommandExecutorProtocol:
     """
     Create a command executor with dependency injection.
@@ -77,12 +79,11 @@ def create_command_executor_with_injection(
     Returns:
         CommandExecutorProtocol: A command executor implementation
     """
-    config = PathConfigurationService()
 
-    if config.is_windows() and wsl_available():
+    if platform_service.is_windows() and wsl_available():
         logger.debug("Using injected WSL command executor for Windows environment")
         return wsl_executor
     else:
-        platform = config.get_platform_name()
+        platform = platform_service.get_platform_name()
         logger.debug(f"Creating Unix command executor for {platform} environment")
         return LinuxCommandExecutor()

@@ -5,11 +5,18 @@ This module provides SMB/CIFS-specific storage operations with clean separation
 from business logic and easy testability.
 """
 
+import asyncio
+import os
 import re
-from typing import Callable, Dict, Optional
+import subprocess
+import tempfile
+import time
+from typing import Callable, Dict, Optional, List, AsyncGenerator, Union, cast
 from pydantic import Field, field_validator, model_validator
 
-from borgitory.services.rclone_service import RcloneService
+from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.protocols.file_protocols import FileServiceProtocol
+from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
@@ -126,16 +133,23 @@ class SMBStorage(CloudStorage):
     CloudStorage interface for easy testing and integration.
     """
 
-    def __init__(self, config: SMBStorageConfig, rclone_service: RcloneService) -> None:
+    def __init__(
+        self,
+        config: SMBStorageConfig,
+        command_executor: CommandExecutorProtocol,
+        file_service: FileServiceProtocol,
+    ) -> None:
         """
         Initialize SMB storage.
 
         Args:
             config: Validated SMB configuration
-            rclone_service: Injected rclone service for I/O operations
+            command_executor: Command executor for running external commands
+            file_service: File service for file operations
         """
         self._config = config
-        self._rclone_service = rclone_service
+        self._command_executor = command_executor
+        self._file_service = file_service
 
     async def upload_repository(
         self,
@@ -153,7 +167,7 @@ class SMBStorage(CloudStorage):
             )
 
         try:
-            async for progress in self._rclone_service.sync_repository_to_smb(
+            async for progress in self.sync_repository_to_smb(
                 repository_path=repository_path,
                 host=self._config.host,
                 user=self._config.user,
@@ -169,7 +183,11 @@ class SMBStorage(CloudStorage):
                 case_insensitive=self._config.case_insensitive,
                 kerberos_ccache=self._config.kerberos_ccache,
             ):
-                if progress_callback and progress.get("type") == "progress":
+                if not progress_callback:
+                    continue
+
+                progress_type = progress.get("type")
+                if progress_type == "progress":
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
@@ -177,6 +195,34 @@ class SMBStorage(CloudStorage):
                             progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
+                elif progress_type == "log":
+                    progress_callback(
+                        SyncEvent(
+                            type=SyncEventType.LOG,
+                            message=str(progress.get("message", "")),
+                        )
+                    )
+                elif progress_type == "error":
+                    error_msg = str(progress.get("message", "Unknown error"))
+                    progress_callback(
+                        SyncEvent(
+                            type=SyncEventType.ERROR,
+                            message=error_msg,
+                            error=error_msg,
+                        )
+                    )
+                    raise Exception(error_msg)
+                elif progress_type == "completed":
+                    if progress.get("status") != "success":
+                        error_msg = f"SMB sync failed with return code {progress.get('return_code')}"
+                        progress_callback(
+                            SyncEvent(
+                                type=SyncEventType.ERROR,
+                                message=error_msg,
+                                error=error_msg,
+                            )
+                        )
+                        raise Exception(error_msg)
 
             if progress_callback:
                 progress_callback(
@@ -197,7 +243,7 @@ class SMBStorage(CloudStorage):
     async def test_connection(self) -> bool:
         """Test SMB connection"""
         try:
-            result = await self._rclone_service.test_smb_connection(
+            result = await self.test_smb_connection(
                 host=self._config.host,
                 user=self._config.user,
                 password=self._config.pass_,
@@ -282,6 +328,434 @@ class SMBStorage(CloudStorage):
             required_params=["repository", "host", "user", "share_name"],
             optional_params={"port": 445, "domain": "WORKGROUP", "path_prefix": ""},
         )
+
+    def _obscure_password(self, password: str) -> str:
+        """Obscure password using rclone's method"""
+        try:
+            result = subprocess.run(
+                ["rclone", "obscure", password],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                return password
+
+        except Exception:
+            return password
+
+    def _build_smb_flags(
+        self,
+        host: str,
+        user: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+    ) -> List[str]:
+        """Build SMB configuration flags for rclone command"""
+        flags = [
+            "--smb-host",
+            host,
+            "--smb-user",
+            user,
+            "--smb-port",
+            str(port),
+            "--smb-domain",
+            domain,
+            "--smb-idle-timeout",
+            idle_timeout,
+        ]
+
+        if password:
+            obscured_password = self._obscure_password(password)
+            flags.extend(["--smb-pass", obscured_password])
+
+        if spn:
+            flags.extend(["--smb-spn", spn])
+
+        if use_kerberos:
+            flags.append("--smb-use-kerberos")
+
+        if kerberos_ccache:
+            flags.extend(["--smb-kerberos-ccache", kerberos_ccache])
+
+        if hide_special_share:
+            flags.append("--smb-hide-special-share")
+
+        if case_insensitive:
+            flags.append("--smb-case-insensitive")
+
+        return flags
+
+    async def sync_repository_to_smb(
+        self,
+        repository_path: str,
+        host: str,
+        user: str,
+        share_name: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        path_prefix: str = "",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+        progress_callback: Optional[Callable[[ProgressData], None]] = None,
+    ) -> AsyncGenerator[ProgressData, None]:
+        """Sync a Borg repository to SMB using Rclone with SMB backend"""
+
+        smb_path = f":smb:{share_name}"
+        if path_prefix:
+            smb_path = f"{smb_path}/{path_prefix}"
+
+        command = [
+            "rclone",
+            "sync",
+            repository_path,
+            smb_path,
+            "--progress",
+            "--stats",
+            "1s",
+            "--verbose",
+        ]
+
+        smb_flags = self._build_smb_flags(
+            host,
+            user,
+            password,
+            port,
+            domain,
+            spn,
+            use_kerberos,
+            idle_timeout,
+            hide_special_share,
+            case_insensitive,
+            kerberos_ccache,
+        )
+        command.extend(smb_flags)
+
+        try:
+            process = await self._command_executor.create_subprocess(
+                command=command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            yield cast(
+                ProgressData,
+                {
+                    "type": "started",
+                    "command": " ".join(
+                        [c for c in command if not c.startswith("--smb-pass")]
+                    ),
+                    "pid": process.pid,
+                },
+            )
+
+            async def read_stream(
+                stream: Optional[asyncio.StreamReader], stream_type: str
+            ) -> AsyncGenerator[ProgressData, None]:
+                if stream is None:
+                    return
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+
+                    decoded_line = line.decode("utf-8").strip()
+                    progress_data = self.parse_rclone_progress(decoded_line)
+
+                    if progress_data:
+                        yield cast(ProgressData, {"type": "progress", **progress_data})
+                    else:
+                        yield cast(
+                            ProgressData,
+                            {
+                                "type": "log",
+                                "stream": stream_type,
+                                "message": decoded_line,
+                            },
+                        )
+
+            async for item in self._merge_async_generators(
+                read_stream(process.stdout, "stdout"),
+                read_stream(process.stderr, "stderr"),
+            ):
+                yield item
+
+            return_code = await process.wait()
+
+            yield cast(
+                ProgressData,
+                {
+                    "type": "completed",
+                    "return_code": return_code,
+                    "status": "success" if return_code == 0 else "failed",
+                },
+            )
+
+        except Exception as e:
+            yield cast(ProgressData, {"type": "error", "message": str(e)})
+
+    async def test_smb_connection(
+        self,
+        host: str,
+        user: str,
+        share_name: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+    ) -> ConnectionTestResult:
+        """Test SMB connection by listing share contents"""
+        try:
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            smb_path = f":smb:{share_name}"
+
+            command = ["rclone", "lsd", smb_path, "--max-depth", "1", "--verbose"]
+
+            smb_flags = self._build_smb_flags(
+                host,
+                user,
+                password,
+                port,
+                domain,
+                spn,
+                use_kerberos,
+                idle_timeout,
+                hide_special_share,
+                case_insensitive,
+                kerberos_ccache,
+            )
+            command.extend(smb_flags)
+
+            result = await self._command_executor.execute_command(
+                command=command, timeout=30.0
+            )
+
+            logger.info(f"SMB test command return code: {result.return_code}")
+            if result.stderr.strip():
+                logger.info(f"SMB test stderr: {result.stderr.strip()}")
+            if result.stdout.strip():
+                logger.info(f"SMB test stdout: {result.stdout.strip()}")
+
+            if result.success:
+                test_result = await self._test_smb_write_permissions(
+                    host,
+                    user,
+                    share_name,
+                    password,
+                    port,
+                    domain,
+                    spn,
+                    use_kerberos,
+                    idle_timeout,
+                    hide_special_share,
+                    case_insensitive,
+                    kerberos_ccache,
+                )
+
+                if test_result.get("status") == "success":
+                    return {
+                        "status": "success",
+                        "message": f"Successfully connected to SMB share {share_name} on {host}",
+                        "details": {
+                            "can_list": True,
+                            "can_write": bool(test_result.get("can_write", False)),
+                            "stdout": result.stdout,
+                        },
+                    }
+                else:
+                    return {
+                        "status": "warning",
+                        "message": f"Connected to SMB share but write test failed: {test_result.get('message', 'Unknown error')}",
+                        "details": {
+                            "can_list": True,
+                            "can_write": False,
+                            "stdout": result.stdout,
+                            "write_error": test_result.get("message"),
+                        },
+                    }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to connect to SMB share {share_name} on {host}",
+                    "details": {
+                        "return_code": result.return_code,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                    },
+                }
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"SMB connection test failed: {e}")
+            return {
+                "status": "error",
+                "message": f"Connection test failed: {str(e)}",
+                "details": {"exception": str(e)},
+            }
+
+    async def _test_smb_write_permissions(
+        self,
+        host: str,
+        user: str,
+        share_name: str,
+        password: Optional[str] = None,
+        port: int = 445,
+        domain: str = "WORKGROUP",
+        spn: Optional[str] = None,
+        use_kerberos: bool = False,
+        idle_timeout: str = "1m0s",
+        hide_special_share: bool = True,
+        case_insensitive: bool = True,
+        kerberos_ccache: Optional[str] = None,
+    ) -> ConnectionTestResult:
+        """Test write permissions on SMB share"""
+
+        temp_file = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".borgitory_test"
+            ) as f:
+                f.write(f"Borgitory SMB test file - {time.time()}")
+                temp_file = f.name
+
+            test_filename = f"borgitory_test_{int(time.time())}.txt"
+            remote_test_path = f":smb:{share_name}/{test_filename}"
+
+            command = ["rclone", "copy", temp_file, remote_test_path, "--verbose"]
+
+            smb_flags = self._build_smb_flags(
+                host,
+                user,
+                password,
+                port,
+                domain,
+                spn,
+                use_kerberos,
+                idle_timeout,
+                hide_special_share,
+                case_insensitive,
+                kerberos_ccache,
+            )
+            command.extend(smb_flags)
+
+            upload_result = await self._command_executor.execute_command(
+                command=command, timeout=30.0
+            )
+
+            if upload_result.success:
+                delete_command = [
+                    "rclone",
+                    "deletefile",
+                    f"{remote_test_path}/{test_filename}",
+                    "--verbose",
+                ]
+                delete_command.extend(smb_flags)
+
+                await self._command_executor.execute_command(
+                    command=delete_command, timeout=30.0
+                )
+
+                return {
+                    "status": "success",
+                    "can_write": True,
+                    "message": "Write permissions confirmed",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "can_write": False,
+                    "message": f"Write test failed: {upload_result.stderr}",
+                }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "can_write": False,
+                "message": f"Write permission test failed: {str(e)}",
+            }
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except OSError:
+                    pass
+
+    def parse_rclone_progress(
+        self, line: str
+    ) -> Optional[Dict[str, Union[str, int, float]]]:
+        """Parse Rclone progress output"""
+        if "Transferred:" in line:
+            try:
+                parts = line.split()
+                if len(parts) >= 6:
+                    transferred = parts[1]
+                    total = parts[4].rstrip(",")
+                    percentage = parts[5].rstrip("%,")
+                    speed = parts[6] if len(parts) > 6 else "0"
+
+                    return {
+                        "transferred": transferred,
+                        "total": total,
+                        "percentage": float(percentage)
+                        if percentage.replace(".", "").isdigit()
+                        else 0,
+                        "speed": speed,
+                    }
+            except (IndexError, ValueError):
+                pass
+
+        if "ETA" in line:
+            try:
+                eta_part = line.split("ETA")[-1].strip()
+                return {"eta": eta_part}
+            except (ValueError, KeyError):
+                pass
+
+        return None
+
+    async def _merge_async_generators(
+        self, *async_generators: AsyncGenerator[ProgressData, None]
+    ) -> AsyncGenerator[ProgressData, None]:
+        """Merge multiple async generators into one"""
+        tasks = []
+        for gen in async_generators:
+
+            async def wrapper(
+                g: AsyncGenerator[ProgressData, None],
+            ) -> AsyncGenerator[ProgressData, None]:
+                async for item in g:
+                    yield item
+
+            tasks.append(wrapper(gen))
+
+        for task in tasks:
+            async for item in task:
+                yield item
 
 
 @register_provider(

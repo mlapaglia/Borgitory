@@ -32,8 +32,9 @@ class TestS3DisplayDetails:
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
-        mock_rclone = Mock()
-        storage = S3Storage(s3_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = S3Storage(s3_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {
             "bucket_name": "my-backup-bucket",
@@ -57,8 +58,9 @@ class TestS3DisplayDetails:
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
-        mock_rclone = Mock()
-        storage = S3Storage(s3_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = S3Storage(s3_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {"bucket_name": "test-bucket"}  # Minimal config
 
@@ -77,8 +79,9 @@ class TestS3DisplayDetails:
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
-        mock_rclone = Mock()
-        storage = S3Storage(s3_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = S3Storage(s3_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {}  # Empty config
 
@@ -100,8 +103,9 @@ class TestSFTPDisplayDetails:
             remote_path="/test/path",
             password="testpassword",
         )
-        mock_rclone = Mock()
-        storage = SFTPStorage(sftp_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = SFTPStorage(sftp_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {
             "host": "sftp.example.com",
@@ -128,8 +132,9 @@ class TestSFTPDisplayDetails:
             remote_path="/test/path",
             password="testpassword",
         )
-        mock_rclone = Mock()
-        storage = SFTPStorage(sftp_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = SFTPStorage(sftp_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {
             "host": "server.example.com",
@@ -154,8 +159,9 @@ class TestSFTPDisplayDetails:
             remote_path="/test/path",
             password="testpassword",
         )
-        mock_rclone = Mock()
-        storage = SFTPStorage(sftp_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = SFTPStorage(sftp_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {"host": "test.example.com", "username": "testuser"}
 
@@ -175,8 +181,9 @@ class TestSMBDisplayDetails:
     def test_smb_display_details_basic(self) -> None:
         """Test SMB display details with basic configuration"""
         smb_config = SMBStorageConfig(host="test.example.com", share_name="testshare")
-        mock_rclone = Mock()
-        storage = SMBStorage(smb_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = SMBStorage(smb_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {
             "host": "fileserver.company.com",
@@ -199,8 +206,9 @@ class TestSMBDisplayDetails:
     def test_smb_display_details_kerberos(self) -> None:
         """Test SMB display details with Kerberos authentication"""
         smb_config = SMBStorageConfig(host="test.example.com", share_name="testshare")
-        mock_rclone = Mock()
-        storage = SMBStorage(smb_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = SMBStorage(smb_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {
             "host": "server.domain.com",
@@ -223,8 +231,9 @@ class TestSMBDisplayDetails:
     def test_smb_display_details_defaults(self) -> None:
         """Test SMB display details with default values"""
         smb_config = SMBStorageConfig(host="test.example.com", share_name="testshare")
-        mock_rclone = Mock()
-        storage = SMBStorage(smb_config, mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        storage = SMBStorage(smb_config, mock_command_executor, mock_file_service)
 
         config: Dict[str, Any] = {
             "host": "nas.local",

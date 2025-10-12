@@ -6,22 +6,22 @@ from typing import Dict, List, Optional, Union, cast, Mapping
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import ValidationError
 
 from borgitory.custom_types import ConfigDict
-from borgitory.models.database import get_db, CloudSyncConfig
+from borgitory.models.database import CloudSyncConfig
 from borgitory.models.schemas import (
     CloudSyncConfigCreate,
     CloudSyncConfigUpdate,
     CloudSyncConfig as CloudSyncConfigSchema,
 )
-from borgitory.services.cloud_sync_service import CloudSyncConfigService
 from borgitory.dependencies import (
-    RcloneServiceDep,
+    CloudSyncServiceDep,
     EncryptionServiceDep,
     StorageFactoryDep,
     ProviderRegistryDep,
+    get_db,
     get_templates,
     get_browser_timezone_offset,
 )
@@ -106,17 +106,12 @@ def _get_provider_display_details(
     try:
         storage_class = registry.get_storage_class(provider)
         if storage_class:
-            # Create a temporary instance to call get_display_details
-            # We don't need a valid config for this method, just the dict
-            temp_storage = storage_class(
-                None, None
-            )  # rclone_service and config not needed
+            temp_storage = storage_class(None, None, None)
             result = temp_storage.get_display_details(provider_config)
             return cast(Dict[str, str], result)
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 
-    # Fallback to hardcoded behavior for unknown providers
     provider_name = provider.upper() if provider else "Unknown"
     provider_details = "<div><strong>Configuration:</strong> Unknown provider</div>"
 
@@ -170,23 +165,6 @@ def _parse_form_data_to_config_update(
     )
 
 
-def get_cloud_sync_service(
-    registry: ProviderRegistryDep,
-    rclone_service: RcloneServiceDep,
-    storage_factory: StorageFactoryDep,
-    encryption_service: EncryptionServiceDep,
-    db: Session = Depends(get_db),
-) -> CloudSyncConfigService:
-    """Dependency to get cloud sync service instance."""
-    return CloudSyncConfigService(
-        db=db,
-        rclone_service=rclone_service,
-        storage_factory=storage_factory,
-        encryption_service=encryption_service,
-        get_metadata_func=registry.get_metadata,
-    )
-
-
 @router.get("/add-form", response_class=HTMLResponse)
 async def get_add_form(
     request: Request,
@@ -225,8 +203,9 @@ async def get_provider_fields(
 @router.post("/", response_class=HTMLResponse)
 async def create_cloud_sync_config(
     request: Request,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Create a new cloud sync configuration"""
     try:
@@ -234,7 +213,7 @@ async def create_cloud_sync_config(
         form_dict = dict(form_data)
         config = _parse_form_data_to_config(form_dict)
 
-        cloud_sync_service.create_cloud_sync_config(config)
+        await cloud_sync_service.create_cloud_sync_config(config, db=db)
 
         response = templates.TemplateResponse(
             request,
@@ -270,15 +249,16 @@ async def create_cloud_sync_config(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_cloud_sync_configs_html(
+async def get_cloud_sync_configs_html(
     request: Request,
     registry: ProviderRegistryDep,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> str:
     """Get cloud sync configurations as HTML"""
     try:
-        configs_raw = cloud_sync_service.get_cloud_sync_configs()
+        configs_raw = await cloud_sync_service.get_cloud_sync_configs(db)
 
         # Process configs to add computed fields for template
         processed_configs = []
@@ -311,20 +291,22 @@ def get_cloud_sync_configs_html(
 
 
 @router.get("/", response_model=List[CloudSyncConfigSchema])
-def list_cloud_sync_configs(
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+async def list_cloud_sync_configs(
+    cloud_sync_service: CloudSyncServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> List[CloudSyncConfig]:
     """List all cloud sync configurations"""
-    return cloud_sync_service.get_cloud_sync_configs()
+    return await cloud_sync_service.get_cloud_sync_configs(db)
 
 
 @router.get("/{config_id}", response_model=CloudSyncConfigSchema)
-def get_cloud_sync_config(
+async def get_cloud_sync_config(
     config_id: int,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> CloudSyncConfig:
     """Get a specific cloud sync configuration"""
-    return cloud_sync_service.get_cloud_sync_config_by_id(config_id)
+    return await cloud_sync_service.get_cloud_sync_config_by_id(config_id, db)
 
 
 @router.get("/{config_id}/edit", response_class=HTMLResponse)
@@ -334,13 +316,14 @@ async def get_cloud_sync_edit_form(
     registry: ProviderRegistryDep,
     encryption_service: EncryptionServiceDep,
     storage_factory: StorageFactoryDep,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get edit form for a specific cloud sync configuration"""
     try:
-        decrypted_config = cloud_sync_service.get_decrypted_config_for_editing(
-            config_id, encryption_service, storage_factory
+        decrypted_config = await cloud_sync_service.get_decrypted_config_for_editing(
+            config_id, encryption_service, storage_factory, db
         )
 
         config_obj = type("Config", (), decrypted_config)()
@@ -371,8 +354,9 @@ async def get_cloud_sync_edit_form(
 async def update_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Update a cloud sync configuration"""
     try:
@@ -380,7 +364,9 @@ async def update_cloud_sync_config(
         form_dict = dict(form_data)
         config_update = _parse_form_data_to_config_update(form_dict)
 
-        result = cloud_sync_service.update_cloud_sync_config(config_id, config_update)
+        result = await cloud_sync_service.update_cloud_sync_config(
+            config_id, config_update, db
+        )
 
         response = templates.TemplateResponse(
             request,
@@ -409,18 +395,19 @@ async def update_cloud_sync_config(
 
 
 @router.delete("/{config_id}", response_class=HTMLResponse)
-def delete_cloud_sync_config(
+async def delete_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Delete a cloud sync configuration"""
 
     try:
-        config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
+        config = await cloud_sync_service.get_cloud_sync_config_by_id(config_id, db)
         config_name = config.name
-        cloud_sync_service.delete_cloud_sync_config(config_id)
+        await cloud_sync_service.delete_cloud_sync_config(config_id, db)
         message = f"Cloud sync configuration '{config_name}' deleted successfully!"
 
         response = templates.TemplateResponse(
@@ -445,19 +432,19 @@ def delete_cloud_sync_config(
 async def test_cloud_sync_config(
     request: Request,
     config_id: int,
-    rclone: RcloneServiceDep,
     encryption_service: EncryptionServiceDep,
     storage_factory: StorageFactoryDep,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Test a cloud sync configuration"""
 
     try:
         result = await cloud_sync_service.test_cloud_sync_config(
-            config_id, rclone, encryption_service, storage_factory
+            config_id, encryption_service, storage_factory, db
         )
-        config = cloud_sync_service.get_cloud_sync_config_by_id(config_id)
+        config = await cloud_sync_service.get_cloud_sync_config_by_id(config_id, db)
 
         if result["status"] == "success":
             message = f"Successfully connected to {config.name}"
@@ -498,16 +485,17 @@ async def test_cloud_sync_config(
 
 
 @router.post("/{config_id}/enable", response_class=HTMLResponse)
-def enable_cloud_sync_config(
+async def enable_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Enable a cloud sync configuration"""
 
     try:
-        config = cloud_sync_service.enable_cloud_sync_config(config_id)
+        config = await cloud_sync_service.enable_cloud_sync_config(config_id, db)
         message = f"Cloud sync configuration '{config.name}' enabled successfully!"
 
         response = templates.TemplateResponse(
@@ -529,16 +517,17 @@ def enable_cloud_sync_config(
 
 
 @router.post("/{config_id}/disable", response_class=HTMLResponse)
-def disable_cloud_sync_config(
+async def disable_cloud_sync_config(
     request: Request,
     config_id: int,
-    cloud_sync_service: CloudSyncConfigService = Depends(get_cloud_sync_service),
+    cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Disable a cloud sync configuration"""
 
     try:
-        config = cloud_sync_service.disable_cloud_sync_config(config_id)
+        config = await cloud_sync_service.disable_cloud_sync_config(config_id, db)
         message = f"Cloud sync configuration '{config.name}' disabled successfully!"
 
         response = templates.TemplateResponse(

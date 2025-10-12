@@ -3,10 +3,10 @@ Tests for tabs API endpoints
 """
 
 import pytest
-from typing import Any, Generator
+from typing import Any, AsyncGenerator
 from unittest.mock import Mock
 from httpx import AsyncClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.api.auth import get_current_user
@@ -15,14 +15,14 @@ from borgitory.dependencies import get_provider_registry
 
 
 @pytest.fixture
-def mock_current_user(test_db: Session) -> Generator[User, None, None]:
+async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]:
     """Create a mock current user for testing."""
     test_user = User()
     test_user.username = "testuser"
     test_user.set_password("testpass")
     test_db.add(test_user)
-    test_db.commit()
-    test_db.refresh(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
 
     def override_get_current_user() -> User:
         return test_user
@@ -35,7 +35,6 @@ def mock_current_user(test_db: Session) -> Generator[User, None, None]:
 class TestTabsAPI:
     """Test class for tabs API endpoints."""
 
-    @pytest.mark.asyncio
     async def test_get_repositories_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -44,7 +43,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_backups_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -53,7 +51,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_schedules_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -62,7 +59,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_cloud_sync_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -71,7 +67,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_cloud_sync_tab_contains_provider_dropdown(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -96,7 +91,6 @@ class TestTabsAPI:
         assert "SFTP (SSH)" in content
         assert "SMB/CIFS" in content
 
-    @pytest.mark.asyncio
     async def test_get_cloud_sync_tab_uses_registry(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -141,7 +135,6 @@ class TestTabsAPI:
             # Clean up dependency override
             app.dependency_overrides.clear()
 
-    @pytest.mark.asyncio
     async def test_get_cloud_sync_tab_empty_providers(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -171,7 +164,6 @@ class TestTabsAPI:
             # Clean up dependency override
             app.dependency_overrides.clear()
 
-    @pytest.mark.asyncio
     async def test_provider_fields_endpoint_uses_registry_for_submit_text(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -205,7 +197,6 @@ class TestTabsAPI:
         # Should not have submit button when provider is empty
         assert "submit-button" not in content
 
-    @pytest.mark.asyncio
     async def test_provider_fields_endpoint_handles_unknown_provider(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -217,7 +208,6 @@ class TestTabsAPI:
         content = response.text
         assert "Add Sync Location" in content  # Should fallback to generic text
 
-    @pytest.mark.asyncio
     async def test_get_archives_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -226,7 +216,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_archives_tab_with_preselect_repo(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -239,7 +228,6 @@ class TestTabsAPI:
         content = response.text
         assert "preselect_repo=123" in content
 
-    @pytest.mark.asyncio
     async def test_get_statistics_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -248,7 +236,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_jobs_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -257,7 +244,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_notifications_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -266,7 +252,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_prune_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -275,7 +260,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_repository_check_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -284,7 +268,6 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_get_debug_tab(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:
@@ -293,14 +276,12 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    @pytest.mark.asyncio
     async def test_tabs_require_authentication(self, async_client: AsyncClient) -> None:
         """Test that tabs endpoints require authentication."""
         # Without mocking auth, this should fail
         response = await async_client.get("/api/tabs/repositories")
         assert response.status_code == 401
 
-    @pytest.mark.asyncio
     async def test_all_tabs_return_html(
         self, async_client: AsyncClient, mock_current_user: Any
     ) -> None:

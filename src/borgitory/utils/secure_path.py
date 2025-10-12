@@ -44,19 +44,21 @@ class DirectoryInfo:
         return self.path + "/"
 
 
-def _is_borg_repository(
+async def _is_borg_repository(
     directory_path: str, file_service: "FileServiceProtocol"
 ) -> bool:
     """Check if a directory is a Borg repository by looking for a config file."""
     try:
         config_path = os.path.join(directory_path, "config")
 
-        if not file_service.exists(config_path) or not file_service.isfile(config_path):
+        if not await file_service.exists(config_path) or not await file_service.isfile(
+            config_path
+        ):
             return False
 
         # Try to read the config file and check for [repository] section
         try:
-            with file_service.open_file(config_path, "r") as f:
+            with await file_service.open_file(config_path, "r") as f:
                 config_content = f.read().decode("utf-8")
 
             config = configparser.ConfigParser()
@@ -71,17 +73,21 @@ def _is_borg_repository(
         return False
 
 
-def _is_borg_cache(directory_path: str, file_service: "FileServiceProtocol") -> bool:
+async def _is_borg_cache(
+    directory_path: str, file_service: "FileServiceProtocol"
+) -> bool:
     """Check if a directory is a Borg cache by looking for a config file with [cache] section."""
     try:
         config_path = os.path.join(directory_path, "config")
 
-        if not file_service.exists(config_path) or not file_service.isfile(config_path):
+        if not await file_service.exists(config_path) or not await file_service.isfile(
+            config_path
+        ):
             return False
 
         # Try to read the config file and check for [cache] section
         try:
-            with file_service.open_file(config_path, "r") as f:
+            with await file_service.open_file(config_path, "r") as f:
                 config_content = f.read().decode("utf-8")
 
             config = configparser.ConfigParser()
@@ -262,7 +268,7 @@ def secure_remove_file(file_path: str) -> bool:
         return False
 
 
-def get_directory_listing(
+async def get_directory_listing(
     path: str,
     file_service: "FileServiceProtocol",
     include_files: bool = False,
@@ -287,8 +293,8 @@ def get_directory_listing(
     try:
         for item in validated_path.iterdir():
             if item.is_dir():
-                is_borg_repo = _is_borg_repository(str(item), file_service)
-                is_borg_cache = _is_borg_cache(str(item), file_service)
+                is_borg_repo = await _is_borg_repository(str(item), file_service)
+                is_borg_cache = await _is_borg_cache(str(item), file_service)
                 items.append(
                     DirectoryInfo(
                         name=item.name,

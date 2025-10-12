@@ -12,13 +12,10 @@ from typing import (
     runtime_checkable,
 )
 import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from borgitory.services.rclone_service import RcloneService
-    from borgitory.services.cloud_providers import StorageFactory
-    from borgitory.services.encryption_service import EncryptionService
-    from borgitory.services.cloud_providers.registry import ProviderRegistry
+    from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
 
 
 class CommandResult:
@@ -119,11 +116,8 @@ class ProcessExecutorProtocol(Protocol):
         self,
         repository_path: str,
         cloud_sync_config_id: int,
-        db_session_factory: Callable[[], "Session"],
-        rclone_service: "RcloneService",
-        encryption_service: "EncryptionService",
-        storage_factory: "StorageFactory",
-        provider_registry: "ProviderRegistry",
+        session_maker: "async_sessionmaker[AsyncSession]",
+        cloud_sync_service: "CloudSyncService",
         output_callback: Optional[Callable[[str], None]] = None,
     ) -> "ProcessResult":
         """Execute a cloud sync task."""

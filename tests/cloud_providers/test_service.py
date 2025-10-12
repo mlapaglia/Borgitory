@@ -11,7 +11,7 @@ import json
 from unittest.mock import Mock, AsyncMock, patch
 
 from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.service import (
+from borgitory.services.cloud_providers.cloud_sync_service import (
     ConfigValidator,
     StorageFactory,
     CloudSyncService,
@@ -40,8 +40,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("s3", config)
 
-        # Check by class name to avoid identity issues after module reloading
-        assert result.__class__.__name__ == "S3StorageConfig"
+        assert type(result).__name__ == "S3StorageConfig"
         assert result.bucket_name == "test-bucket"
         assert result.access_key == "AKIAIOSFODNN7EXAMPLE"
         assert result.region == "us-east-1"
@@ -56,7 +55,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("s3", config)
 
-        assert result.__class__.__name__ == "S3StorageConfig"
+        assert type(result).__name__ == "S3StorageConfig"
         assert result.bucket_name == "test-bucket"
         # Should have defaults
         assert result.region is not None
@@ -98,7 +97,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("sftp", config)
 
-        assert result.__class__.__name__ == "SFTPStorageConfig"
+        assert type(result).__name__ == "SFTPStorageConfig"
         assert result.host == "sftp.example.com"
         assert result.username == "testuser"
         assert result.password == "testpass"
@@ -119,7 +118,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("sftp", config)
 
-        assert result.__class__.__name__ == "SFTPStorageConfig"
+        assert type(result).__name__ == "SFTPStorageConfig"
         assert result.host == "sftp.example.com"
         assert result.private_key is not None
         assert result.port == 2222
@@ -136,7 +135,7 @@ class TestConfigValidator:
 
         result = validator.validate_config("sftp", config)
 
-        assert result.__class__.__name__ == "SFTPStorageConfig"
+        assert type(result).__name__ == "SFTPStorageConfig"
         assert result.port == 22  # Default port
         assert result.host_key_checking is True  # Default
 
@@ -183,11 +182,28 @@ class TestStorageFactory:
         return Mock()
 
     @pytest.fixture
+    def mock_command_executor(self) -> Mock:
+        return Mock()
+
+    @pytest.fixture
+    def mock_file_service(self) -> Mock:
+        return Mock()
+
+    @pytest.fixture
     def factory(
-        self, mock_rclone_service: Mock, production_registry: ProviderRegistry
+        self,
+        mock_rclone_service: Mock,
+        mock_command_executor: Mock,
+        mock_file_service: Mock,
+        production_registry: ProviderRegistry,
     ) -> StorageFactory:
         """Create factory with injected registry for proper test isolation"""
-        return StorageFactory(mock_rclone_service, registry=production_registry)
+        return StorageFactory(
+            rclone_service=mock_rclone_service,
+            command_executor=mock_command_executor,
+            file_service=mock_file_service,
+            registry=production_registry,
+        )
 
     def test_create_s3_storage_success(
         self, factory: StorageFactory, mock_rclone_service: Mock
@@ -238,10 +254,19 @@ class TestStorageFactory:
             factory.create_storage("unknown", config)
 
     def test_factory_uses_injected_rclone_service(
-        self, mock_rclone_service: Mock, production_registry: ProviderRegistry
+        self,
+        mock_rclone_service: Mock,
+        mock_command_executor: Mock,
+        mock_file_service: Mock,
+        production_registry: ProviderRegistry,
     ) -> None:
         """Test that factory uses the injected rclone service"""
-        factory = StorageFactory(mock_rclone_service, registry=production_registry)
+        factory = StorageFactory(
+            rclone_service=mock_rclone_service,
+            command_executor=mock_command_executor,
+            file_service=mock_file_service,
+            registry=production_registry,
+        )
 
         config: Dict[str, Any] = {
             "bucket_name": "test-bucket",
@@ -499,7 +524,6 @@ class TestCloudSyncService:
             name="test-sftp",
         )
 
-    @pytest.mark.asyncio
     async def test_execute_sync_success(
         self,
         service: CloudSyncService,
@@ -519,7 +543,7 @@ class TestCloudSyncService:
         repository_path = "/test/repo"
 
         with patch(
-            "borgitory.services.cloud_providers.service.CloudSyncer"
+            "borgitory.services.cloud_providers.cloud_sync_service.CloudSyncer"
         ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.return_value = expected_result
@@ -539,7 +563,6 @@ class TestCloudSyncService:
         mock_syncer_class.assert_called_once()
         mock_syncer.sync_repository.assert_called_once_with(repository_path, "backups/")
 
-    @pytest.mark.asyncio
     async def test_execute_sync_with_output_callback(
         self,
         service: CloudSyncService,
@@ -556,7 +579,7 @@ class TestCloudSyncService:
             output_messages.append(message)
 
         with patch(
-            "borgitory.services.cloud_providers.service.CloudSyncer"
+            "borgitory.services.cloud_providers.cloud_sync_service.CloudSyncer"
         ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.return_value = SyncResult.success_result()
@@ -568,7 +591,6 @@ class TestCloudSyncService:
         mock_syncer_class.assert_called_once()
         # The handler should have been passed to the syncer constructor
 
-    @pytest.mark.asyncio
     async def test_execute_sync_storage_creation_failure(
         self,
         service: CloudSyncService,
@@ -587,7 +609,6 @@ class TestCloudSyncService:
         assert "Failed to execute sync" in result.error
         assert "Invalid configuration" in result.error
 
-    @pytest.mark.asyncio
     async def test_execute_sync_syncer_failure(
         self,
         service: CloudSyncService,
@@ -599,7 +620,7 @@ class TestCloudSyncService:
         mock_storage_factory.create_storage.return_value = mock_storage
 
         with patch(
-            "borgitory.services.cloud_providers.service.CloudSyncer"
+            "borgitory.services.cloud_providers.cloud_sync_service.CloudSyncer"
         ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.side_effect = Exception("Sync failed")
@@ -612,7 +633,6 @@ class TestCloudSyncService:
         assert "Failed to execute sync" in result.error
         assert "Sync failed" in result.error
 
-    @pytest.mark.asyncio
     async def test_execute_sync_with_callback_on_error(
         self,
         service: CloudSyncService,
@@ -634,7 +654,6 @@ class TestCloudSyncService:
         assert result.success is False
         assert any("Storage error" in msg for msg in output_messages)
 
-    @pytest.mark.asyncio
     async def test_test_connection_success(
         self,
         service: CloudSyncService,
@@ -651,7 +670,6 @@ class TestCloudSyncService:
         assert result is True
         mock_storage.test_connection.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_test_connection_failure(
         self,
         service: CloudSyncService,
@@ -667,7 +685,6 @@ class TestCloudSyncService:
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_test_connection_exception(
         self,
         service: CloudSyncService,
@@ -803,7 +820,6 @@ class TestCloudSyncService:
         assert service_with_defaults._encryption_service is not None
         assert isinstance(service_with_defaults._encryption_service, EncryptionService)
 
-    @pytest.mark.asyncio
     async def test_execute_sync_different_providers(
         self, service: CloudSyncService, mock_storage_factory: Mock
     ) -> None:
@@ -821,7 +837,7 @@ class TestCloudSyncService:
         mock_storage_factory.create_storage.return_value = mock_storage
 
         with patch(
-            "borgitory.services.cloud_providers.service.CloudSyncer"
+            "borgitory.services.cloud_providers.cloud_sync_service.CloudSyncer"
         ) as mock_syncer_class:
             mock_syncer = AsyncMock()
             mock_syncer.sync_repository.return_value = SyncResult.success_result()

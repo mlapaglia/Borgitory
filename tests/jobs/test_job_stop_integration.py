@@ -6,15 +6,14 @@ Tests full flow with real database and services
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import Mock, AsyncMock
 
 from borgitory.main import app
-from borgitory.models.database import Repository, Job
+from borgitory.models.database import Repository, Job, StringUUID
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.models.database import get_db
-from borgitory.dependencies import get_job_manager_dependency
+from borgitory.dependencies import get_db, get_job_manager_dependency
 
 
 class TestJobStopIntegration:
@@ -31,8 +30,8 @@ class TestJobStopIntegration:
         mock_manager = Mock()
         return mock_manager
 
-    def test_stop_database_job_full_integration(
-        self, client: TestClient, test_db: Session, mock_job_manager: Mock
+    async def test_stop_database_job_full_integration(
+        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping a database job through full API integration"""
         # Arrange - Create real database entities
@@ -41,17 +40,17 @@ class TestJobStopIntegration:
         repository.path = "/tmp/integration-test"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()  # Short ID to trigger database path
+        job.id = StringUUID(uuid.uuid4().hex)  # Short ID to trigger database path
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock job manager
         mock_job_manager.stop_job = AsyncMock(
@@ -86,7 +85,7 @@ class TestJobStopIntegration:
             app.dependency_overrides.clear()
 
     def test_stop_composite_job_full_integration(
-        self, client: TestClient, test_db: Session, mock_job_manager: Mock
+        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping a composite job through full API integration"""
         # Arrange - Mock job manager for composite job
@@ -123,7 +122,7 @@ class TestJobStopIntegration:
             app.dependency_overrides.clear()
 
     def test_stop_job_not_found_integration(
-        self, client: TestClient, test_db: Session, mock_job_manager: Mock
+        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping non-existent job through full API integration"""
         # Arrange - Mock job manager to return not found
@@ -156,8 +155,8 @@ class TestJobStopIntegration:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_invalid_status_integration(
-        self, client: TestClient, test_db: Session, mock_job_manager: Mock
+    async def test_stop_job_invalid_status_integration(
+        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping job in invalid status through full API integration"""
         # Arrange - Create completed database job
@@ -166,10 +165,10 @@ class TestJobStopIntegration:
         repository.path = "/tmp/completed-job"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()
+        job.id = StringUUID(uuid.uuid4().hex)
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.COMPLETED
@@ -177,7 +176,7 @@ class TestJobStopIntegration:
         job.finished_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock job manager to return invalid status error
         mock_job_manager.stop_job = AsyncMock(
@@ -208,8 +207,8 @@ class TestJobStopIntegration:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_with_real_templates(
-        self, client: TestClient, test_db: Session, mock_job_manager: Mock
+    async def test_stop_job_with_real_templates(
+        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stop job with real template rendering (no template mocking)"""
         # Arrange - Create running database job
@@ -218,17 +217,17 @@ class TestJobStopIntegration:
         repository.path = "/tmp/template-test"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()
+        job.id = StringUUID(uuid.uuid4().hex)
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock job manager
         mock_job_manager.stop_job = AsyncMock(
@@ -264,8 +263,8 @@ class TestJobStopIntegration:
         finally:
             app.dependency_overrides.clear()
 
-    def test_stop_job_htmx_headers(
-        self, client: TestClient, test_db: Session, mock_job_manager: Mock
+    async def test_stop_job_htmx_headers(
+        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test that stop job endpoint works with HTMX headers"""
         # Arrange
@@ -274,17 +273,17 @@ class TestJobStopIntegration:
         repository.path = "/tmp/htmx-test"
         repository.set_passphrase("test-passphrase")
         test_db.add(repository)
-        test_db.flush()
+        await test_db.flush()
 
         job = Job()
-        job.id = uuid.uuid4()
+        job.id = StringUUID(uuid.uuid4().hex)
         job.repository_id = repository.id
         job.type = "backup"  # Required field
         job.status = JobStatusEnum.RUNNING
         job.started_at = now_utc()
         job.job_type = "simple"  # This is the correct field name
         test_db.add(job)
-        test_db.commit()
+        await test_db.commit()
 
         # Configure mock job manager
         mock_job_manager.stop_job = AsyncMock(

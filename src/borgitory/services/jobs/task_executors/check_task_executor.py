@@ -4,14 +4,15 @@ Check Task Executor - Handles repository check task execution
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Dict
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
 )
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
+from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.utils.datetime_utils import now_utc
-from borgitory.utils.security import secure_borg_command
+from borgitory.utils.security import create_borg_command
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
@@ -25,10 +26,12 @@ class CheckTaskExecutor:
         job_executor: ProcessExecutorProtocol,
         output_manager: JobOutputManagerProtocol,
         event_broadcaster: JobEventBroadcasterProtocol,
+        database_manager: JobDatabaseManagerProtocol,
     ):
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
+        self.database_manager = database_manager
 
     async def execute_check_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
@@ -41,7 +44,9 @@ class CheckTaskExecutor:
                 task.status = TaskStatusEnum.FAILED
                 task.error = "Repository ID is missing"
                 return False
-            repo_data = await self._get_repository_data(job.repository_id)
+            repo_data = await self.database_manager.get_repository_data(
+                job.repository_id
+            )
             if not repo_data:
                 task.status = TaskStatusEnum.FAILED
                 task.return_code = 1
@@ -81,26 +86,27 @@ class CheckTaskExecutor:
             if repository_path:
                 additional_args.append(str(repository_path))
 
-            async with secure_borg_command(
+            borg_command = create_borg_command(
                 base_command="borg check",
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
-                keyfile_content=keyfile_content,
                 additional_args=additional_args,
-            ) as (command, env, _):
-                process = await self.job_executor.start_process(command, env)
+            )
+            process = await self.job_executor.start_process(
+                borg_command.command, borg_command.environment
+            )
 
-                result = await self.job_executor.monitor_process_output(
-                    process, output_callback=task_output_callback
-                )
+            result = await self.job_executor.monitor_process_output(
+                process, output_callback=task_output_callback
+            )
 
-                task.return_code = result.return_code
-                task.status = (
-                    TaskStatusEnum.COMPLETED
-                    if result.return_code == 0
-                    else TaskStatusEnum.FAILED
-                )
-                task.completed_at = now_utc()
+            task.return_code = result.return_code
+            task.status = (
+                TaskStatusEnum.COMPLETED
+                if result.return_code == 0
+                else TaskStatusEnum.FAILED
+            )
+            task.completed_at = now_utc()
 
             if result.stdout:
                 full_output = result.stdout.decode("utf-8", errors="replace").strip()
@@ -140,10 +146,3 @@ class CheckTaskExecutor:
             task.error = str(e)
             task.completed_at = now_utc()
             return False
-
-    async def _get_repository_data(
-        self, repository_id: int
-    ) -> Optional[Dict[str, Any]]:
-        """Get repository data by ID - this will be injected by the job manager"""
-        # This method will be overridden by the job manager
-        return None

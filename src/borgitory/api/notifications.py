@@ -9,6 +9,7 @@ import html
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.templating import _TemplateResponse
 
 from borgitory.dependencies import (
@@ -16,6 +17,7 @@ from borgitory.dependencies import (
     NotificationProviderRegistryDep,
     TemplatesDep,
     get_browser_timezone_offset,
+    get_db,
     get_notification_service,
 )
 from borgitory.services.notifications.service import NotificationService
@@ -95,6 +97,7 @@ async def create_notification_config(
     request: Request,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Create a new notification configuration using the provider system"""
     try:
@@ -120,8 +123,8 @@ async def create_notification_config(
                 provider_config[key] = value
 
         try:
-            db_config = config_service.create_config(
-                name=name, provider=provider, provider_config=provider_config
+            db_config = await config_service.create_config(
+                db=db, name=name, provider=provider, provider_config=provider_config
             )
         except HTTPException as e:
             return templates.TemplateResponse(
@@ -150,14 +153,15 @@ async def create_notification_config(
 
 
 @router.get("/html", response_class=HTMLResponse)
-def get_notification_configs_html(
+async def get_notification_configs_html(
     request: Request,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get notification configurations as formatted HTML"""
     try:
-        configs = config_service.get_all_configs()
+        configs = await config_service.get_all_configs(db)
 
         browser_tz_offset = get_browser_timezone_offset(request)
         return HTMLResponse(
@@ -184,11 +188,12 @@ async def test_notification_config(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     notification_service: NotificationService = Depends(get_notification_service),
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Test a notification configuration using the provider system"""
     try:
         success, message = await config_service.test_config_with_service(
-            config_id, notification_service
+            db, config_id, notification_service
         )
 
         if success:
@@ -228,10 +233,11 @@ async def enable_notification_config(
     config_id: int,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Enable a notification configuration"""
     try:
-        success, message = config_service.enable_config(config_id)
+        success, message = await config_service.enable_config(db, config_id)
 
         response = templates.TemplateResponse(
             request,
@@ -263,10 +269,11 @@ async def disable_notification_config(
     config_id: int,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Disable a notification configuration"""
     try:
-        success, message = config_service.disable_config(config_id)
+        success, message = await config_service.disable_config(db, config_id)
 
         response = templates.TemplateResponse(
             request,
@@ -298,11 +305,12 @@ async def get_notification_config_edit_form(
     config_id: int,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Get edit form for a specific notification configuration"""
     try:
-        config, decrypted_config = config_service.get_config_with_decrypted_data(
-            config_id
+        config, decrypted_config = await config_service.get_config_with_decrypted_data(
+            db, config_id
         )
 
         context = {
@@ -333,6 +341,7 @@ async def update_notification_config(
     config_id: int,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Update a notification configuration"""
     try:
@@ -363,11 +372,12 @@ async def update_notification_config(
 
         # Update config using service
         try:
-            updated_config = config_service.update_config(
+            updated_config = await config_service.update_config(
                 config_id=config_id,
                 name=name,
                 provider=provider,
                 provider_config=provider_config,
+                db=db,
             )
         except HTTPException as e:
             return templates.TemplateResponse(
@@ -424,10 +434,11 @@ async def delete_notification_config(
     config_id: int,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
     """Delete a notification configuration"""
     try:
-        success, config_name = config_service.delete_config(config_id)
+        success, config_name = await config_service.delete_config(db, config_id)
 
         message = f"Notification configuration '{config_name}' deleted successfully!"
 
