@@ -74,7 +74,7 @@ class MockCloudStorage(CloudStorage):
     def get_sensitive_fields(self) -> list[str]:
         return ["password", "secret_key"]
 
-    def get_display_details(self, config_dict: dict) -> Dict[str, object]:
+    def get_display_details(self, config_dict: dict[str, object]) -> dict[str, object]:
         return {
             "provider_name": "Mock Provider",
             "provider_details": "<div><strong>Mock:</strong> Test Provider</div>",
@@ -456,6 +456,7 @@ class TestCloudSyncer:
         ]
         assert len(error_events) == 1
         assert "Connection test failed" in error_events[0].message
+        assert error_events[0].error is not None
         assert "Connection test returned false" in error_events[0].error
 
     async def test_test_connection_exception(
@@ -501,6 +502,7 @@ class TestCloudSyncer:
         ]
         assert len(error_events) == 1
         assert "Connection test error" in error_events[0].message
+        assert error_events[0].error is not None
         assert "Network error" in error_events[0].error
 
     def test_get_connection_info(self, syncer_success: CloudSyncer) -> None:
@@ -549,7 +551,7 @@ class TestCloudSyncer:
         original_create_task = asyncio.create_task
         create_task_calls: list[Any] = []
 
-        def mock_create_task(coro: Coroutine) -> asyncio.Task:
+        def mock_create_task(coro: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
             create_task_calls.append(coro)
             return original_create_task(coro)
 

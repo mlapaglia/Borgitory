@@ -5,11 +5,8 @@ Cloud Sync Task Executor - Handles cloud sync task execution
 import asyncio
 import logging
 from typing import Dict
-from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
-from borgitory.services.encryption_service import EncryptionService
+from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
 from borgitory.services.jobs.broadcaster.event_type import EventType
-from borgitory.services.rclone_service import RcloneService
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
@@ -32,17 +29,11 @@ class CloudSyncTaskExecutor:
         output_manager: JobOutputManagerProtocol,
         event_broadcaster: JobEventBroadcasterProtocol,
         session_maker: async_sessionmaker[AsyncSession],
-        rclone_service: RcloneService,
-        encryption_service: EncryptionService,
-        storage_factory: StorageFactory,
-        provider_registry: ProviderRegistry,
+        cloud_sync_service: CloudSyncService,
         database_manager: JobDatabaseManagerProtocol,
     ):
         self.session_maker = session_maker
-        self.rclone_service = rclone_service
-        self.encryption_service = encryption_service
-        self.storage_factory = storage_factory
-        self.provider_registry = provider_registry
+        self.cloud_sync_service = cloud_sync_service
         self.job_executor = job_executor
         self.output_manager = output_manager
         self.event_broadcaster = event_broadcaster
@@ -129,10 +120,7 @@ class CloudSyncTaskExecutor:
             repository_path=str(repository_path or ""),
             cloud_sync_config_id=cloud_sync_config_id,
             session_maker=self.session_maker,
-            rclone_service=self.rclone_service,
-            encryption_service=self.encryption_service,
-            storage_factory=self.storage_factory,
-            provider_registry=self.provider_registry,
+            cloud_sync_service=self.cloud_sync_service,
             output_callback=task_output_callback,
         )
 

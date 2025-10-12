@@ -32,6 +32,18 @@ from borgitory.protocols.job_database_manager_protocol import JobDatabaseManager
 if TYPE_CHECKING:
     from asyncio.subprocess import Process
     from borgitory.models.database import Schedule
+    from borgitory.services.rclone_service import RcloneService
+    from borgitory.services.cloud_providers.cloud_sync_service import (
+        StorageFactory,
+        CloudSyncService,
+    )
+    from borgitory.services.encryption_service import EncryptionService
+    from borgitory.services.cloud_providers.registry import ProviderRegistry
+    from borgitory.services.notifications.service import (
+        NotificationService as ApplicationScopedNotificationService,
+    )
+    from borgitory.services.hooks.hook_execution_service import HookExecutionService
+    from borgitory.services.notifications.providers.discord_provider import HttpClient
 
 
 class TaskTypeEnum(str, Enum):
@@ -110,6 +122,7 @@ class JobManagerDependencies:
     provider_registry: "ProviderRegistry"
     notification_service: "ApplicationScopedNotificationService"
     hook_execution_service: "HookExecutionService"
+    cloud_sync_service: "CloudSyncService"
 
     # External dependencies (for testing/customization)
     subprocess_executor: Optional[Callable[..., Coroutine[None, None, "Process"]]] = (

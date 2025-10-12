@@ -90,6 +90,20 @@ class JobManagerFactory:
 
             file_service = get_file_service(command_executor, platform_service)
             rclone_service = get_rclone_service(command_executor, file_service)
+            encryption_service = get_encryption_service()
+            storage_factory = get_storage_factory(
+                rclone_service, command_executor, file_service
+            )
+
+            # Create cloud sync service
+            from borgitory.services.cloud_providers.cloud_sync_service import (
+                CloudSyncService,
+            )
+
+            cloud_sync_service = CloudSyncService(
+                storage_factory=storage_factory,
+                encryption_service=encryption_service,
+            )
 
             custom_dependencies = JobManagerDependencies(
                 event_broadcaster=event_broadcaster,
@@ -100,13 +114,14 @@ class JobManagerFactory:
                 async_session_maker=async_session_maker,
                 rclone_service=rclone_service,
                 http_client_factory=lambda: HttpClient(),  # type: ignore
-                encryption_service=get_encryption_service(),
-                storage_factory=get_storage_factory(rclone_service),
+                encryption_service=encryption_service,
+                storage_factory=storage_factory,
                 provider_registry=get_provider_registry(
                     registry_factory=get_registry_factory()
                 ),
                 notification_service=get_notification_service_singleton(),
                 hook_execution_service=get_hook_execution_service(),
+                cloud_sync_service=cloud_sync_service,
             )
 
         # Create core services with proper configuration
@@ -124,6 +139,7 @@ class JobManagerFactory:
             provider_registry=custom_dependencies.provider_registry,
             notification_service=custom_dependencies.notification_service,
             hook_execution_service=custom_dependencies.hook_execution_service,
+            cloud_sync_service=custom_dependencies.cloud_sync_service,
             # Use provided dependencies or create new ones
             subprocess_executor=custom_dependencies.subprocess_executor,
         )
@@ -190,6 +206,20 @@ class JobManagerFactory:
 
         file_service = get_file_service(command_executor, platform_service)
         rclone_service = get_rclone_service(command_executor, file_service)
+        encryption_service = get_encryption_service()
+        storage_factory = get_storage_factory(
+            rclone_service, command_executor, file_service
+        )
+
+        # Create cloud sync service
+        from borgitory.services.cloud_providers.cloud_sync_service import (
+            CloudSyncService,
+        )
+
+        cloud_sync_service = CloudSyncService(
+            storage_factory=storage_factory,
+            encryption_service=encryption_service,
+        )
 
         complete_deps = JobManagerDependencies(
             event_broadcaster=get_job_event_broadcaster(),
@@ -200,13 +230,14 @@ class JobManagerFactory:
             async_session_maker=async_session_maker,
             rclone_service=rclone_service,
             http_client_factory=lambda: HttpClient(),  # type: ignore
-            encryption_service=get_encryption_service(),
-            storage_factory=get_storage_factory(rclone_service),
+            encryption_service=encryption_service,
+            storage_factory=storage_factory,
             provider_registry=get_provider_registry(
                 registry_factory=get_registry_factory()
             ),
             notification_service=get_notification_service_singleton(),
             hook_execution_service=get_hook_execution_service(),
+            cloud_sync_service=cloud_sync_service,
         )
 
         return cls.create_dependencies(config=config, custom_dependencies=complete_deps)
@@ -243,6 +274,7 @@ class JobManagerFactory:
         mock_notification_service = Mock()
         mock_hook_execution_service = Mock()
         mock_http_client_factory = mock_http_client or Mock()
+        mock_cloud_sync_service = Mock()
 
         test_deps = JobManagerDependencies(
             event_broadcaster=mock_event_broadcaster,
@@ -258,6 +290,7 @@ class JobManagerFactory:
             provider_registry=mock_provider_registry,
             notification_service=mock_notification_service,
             hook_execution_service=mock_hook_execution_service,
+            cloud_sync_service=mock_cloud_sync_service,
             subprocess_executor=mock_subprocess,
         )
 

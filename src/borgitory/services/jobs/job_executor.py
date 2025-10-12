@@ -3,11 +3,10 @@ Job Executor Module - Handles subprocess execution and process management
 """
 
 import asyncio
-import json
 import logging
 import re
 import inspect
-from typing import Dict, List, Optional, Callable, TYPE_CHECKING, cast
+from typing import Dict, List, Optional, Callable, TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from borgitory.constants.retention import RetentionFieldHandler
@@ -17,14 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_protocols import ProcessResult
-from borgitory.services.rclone_service import RcloneService
-from borgitory.services.cloud_providers.registry import ProviderRegistry
-from borgitory.services.cloud_providers.cloud_sync_service import (
-    CloudSyncService,
-    StorageFactory,
-)
-from borgitory.services.encryption_service import EncryptionService
-from borgitory.custom_types import ConfigDict
+from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
 from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
@@ -307,153 +299,49 @@ class JobExecutor:
         cloud_sync_config_id: int,
         session_maker: "async_sessionmaker[AsyncSession]",
         cloud_sync_service: CloudSyncService,
-        rclone_service: RcloneService,
-        encryption_service: EncryptionService,
-        storage_factory: StorageFactory,
-        provider_registry: ProviderRegistry,
         output_callback: Optional[Callable[[str], None]] = None,
     ) -> ProcessResult:
         """
-        Execute a cloud sync task with the job executor's proper streaming
+        Execute a cloud sync task using CloudSyncService.
+
+        This method now delegates all cloud sync logic to CloudSyncService,
+        which provides a clean, unified interface for all providers.
 
         Args:
             repository_path: Path to the borg repository
             cloud_sync_config_id: ID of the cloud sync configuration
-            session_maker: Async session maker for database sessions (required)
-            rclone_service: Rclone service instance for cloud operations (required)
-            encryption_service: Service for encrypting/decrypting sensitive fields (required)
-            storage_factory: Factory for creating cloud storage instances (required)
-            provider_registry: Registry for cloud providers (required)
+            session_maker: Async session maker for database sessions
+            cloud_sync_service: Cloud sync service for executing the sync
             output_callback: Optional callback for streaming output
 
         Returns:
             ProcessResult with execution details
         """
         try:
-            from borgitory.models.database import CloudSyncConfig
-            from sqlalchemy import select
-
             logger.info(f"Starting cloud sync for repository {repository_path}")
 
             if output_callback:
                 output_callback("Starting cloud sync...")
 
             async with session_maker() as db:
-                result = await db.execute(
-                    select(CloudSyncConfig).where(
-                        CloudSyncConfig.id == cloud_sync_config_id
-                    )
+                result = await cloud_sync_service.execute_sync_from_db(
+                    config_id=cloud_sync_config_id,
+                    repository_path=repository_path,
+                    db=db,
+                    output_callback=output_callback,
                 )
-                config = result.scalar_one_or_none()
 
-                if not config or not config.enabled:
-                    logger.info(
-                        "Cloud backup configuration not found or disabled - skipping"
-                    )
-                    if output_callback:
-                        output_callback(
-                            "Cloud backup configuration not found or disabled - skipping"
-                        )
+                if result.success:
+                    logger.info("Cloud sync completed successfully")
                     return ProcessResult(
                         return_code=0,
-                        stdout=b"Cloud sync skipped - configuration disabled",
+                        stdout=b"Cloud sync completed successfully",
                         stderr=b"",
                         error=None,
                     )
-
-                try:
-                    from borgitory.models.database import Repository
-
-                    if not config.provider_config:
-                        raise ValueError(
-                            f"Cloud sync configuration '{config.name}' has no provider_config. "
-                            f"Please update the configuration through the web UI to add the required "
-                            f"connection details for {config.provider.upper()}."
-                        )
-
-                    try:
-                        encrypted_config = json.loads(config.provider_config)
-                    except json.JSONDecodeError as e:
-                        raise ValueError(
-                            f"Cloud sync configuration '{config.name}' has invalid JSON in provider_config: {e}"
-                        )
-
-                    # Validate that we have some configuration
-                    if not encrypted_config or not isinstance(encrypted_config, dict):
-                        raise ValueError(
-                            f"Cloud sync configuration '{config.name}' has empty or invalid provider_config. "
-                            f"Please update the configuration through the web UI."
-                        )
-
-                    # Get sensitive fields by creating a temporary storage with dummy config
-                    metadata = provider_registry.get_metadata(config.provider)
-                    if not metadata:
-                        raise ValueError(f"Unknown provider: {config.provider}")
-
-                    # Create minimal dummy config to get sensitive fields
-                    if config.provider == "s3":
-                        dummy_config = {
-                            "access_key": "AKIAIOSFODNN7EXAMPLE",
-                            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-                            "bucket_name": "dummy-bucket",
-                        }
-                    elif config.provider == "sftp":
-                        dummy_config = {
-                            "host": "dummy.example.com",
-                            "username": "dummy",
-                            "remote_path": "/dummy",
-                            "password": "dummy_password",
-                        }
-                    elif config.provider == "smb":
-                        dummy_config = {
-                            "host": "dummy.example.com",
-                            "user": "dummy",
-                            "pass": "dummy",
-                            "share_name": "dummy",
-                        }
-                    else:
-                        raise ValueError(
-                            f"Unsupported provider for decryption: {config.provider}"
-                        )
-
-                    # Create temporary storage to get sensitive fields
-                    temp_storage = storage_factory.create_storage(
-                        config.provider, cast(ConfigDict, dummy_config)
-                    )
-                    sensitive_fields = temp_storage.get_sensitive_fields()
-
-                    # Decrypt the configuration
-                    provider_config = encryption_service.decrypt_sensitive_fields(
-                        encrypted_config, sensitive_fields
-                    )
-
-                    # Add path prefix if specified
-                    if config.path_prefix:
-                        provider_config["path_prefix"] = config.path_prefix
-
-                    # Create repository object for rclone service
-                    repo_obj = Repository()
-                    repo_obj.path = repository_path
-
-                    logger.info(f"Syncing to {config.name} ({config.provider.upper()})")
-                    if output_callback:
-                        output_callback(
-                            f"Syncing to {config.name} ({config.provider.upper()})"
-                        )
-
-                    # Use the generic rclone dispatcher
-                    await cloud_sync_service.execute_sync(config, repository_path)
-                    progress_generator = rclone_service.sync_repository_to_provider(
-                        provider=config.provider,
-                        repository=repo_obj,
-                        **provider_config,  # type: ignore[arg-type]
-                    )
-
-                except Exception as e:
-                    error_msg = f"Failed to initialize cloud provider {config.provider}: {str(e)}"
-                    logger.error(error_msg)
-                    if output_callback:
-                        output_callback(error_msg)
+                else:
+                    error_msg = result.error or "Cloud sync failed"
+                    logger.error(f"Cloud sync failed: {error_msg}")
                     return ProcessResult(
                         return_code=1,
                         stdout=b"",
@@ -461,63 +349,11 @@ class JobExecutor:
                         error=error_msg,
                     )
 
-                async for progress in progress_generator:
-                    if progress.get("type") == "log":
-                        log_line = (
-                            f"[{progress.get('stream')}] {progress.get('message')}"
-                        )
-                        if output_callback:
-                            output_callback(log_line)
-
-                    elif progress.get("type") == "error":
-                        error_msg = str(progress.get("message", "Unknown error"))
-                        logger.error(f"Cloud sync error: {error_msg}")
-                        if output_callback:
-                            output_callback(f"Cloud sync error: {error_msg}")
-                        return ProcessResult(
-                            return_code=1,
-                            stdout=b"",
-                            stderr=error_msg.encode(),
-                            error=error_msg,
-                        )
-
-                    elif progress.get("type") == "completed":
-                        if progress.get("status") == "success":
-                            logger.info("Cloud sync completed successfully")
-                            if output_callback:
-                                output_callback("Cloud sync completed successfully")
-                            return ProcessResult(
-                                return_code=0,
-                                stdout=b"Cloud sync completed successfully",
-                                stderr=b"",
-                                error=None,
-                            )
-                        else:
-                            error_msg = "Cloud sync failed"
-                            logger.error(f"{error_msg}")
-                            if output_callback:
-                                output_callback(f"{error_msg}")
-                            return ProcessResult(
-                                return_code=1,
-                                stdout=b"",
-                                stderr=error_msg.encode(),
-                                error=error_msg,
-                            )
-
-                logger.info("Cloud sync completed")
-                if output_callback:
-                    output_callback("Cloud sync completed")
-                return ProcessResult(
-                    return_code=0,
-                    stdout=b"Cloud sync completed",
-                    stderr=b"",
-                    error=None,
-                )
-
         except Exception as e:
-            logger.error(f"Exception in cloud sync task: {str(e)}")
+            error_msg = f"Exception in cloud sync task: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             if output_callback:
-                output_callback(f"Exception in cloud sync task: {str(e)}")
+                output_callback(error_msg)
             return ProcessResult(
                 return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )

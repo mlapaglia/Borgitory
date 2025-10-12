@@ -756,10 +756,20 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     rclone_service = get_rclone_service(command_executor, file_service)
     notification_service = get_notification_service_singleton()
     encryption_service = get_encryption_service()
-    storage_factory = get_storage_factory(rclone_service)
+    storage_factory = get_storage_factory(
+        rclone_service, command_executor, file_service
+    )
     registry_factory = get_registry_factory()
     provider_registry = get_provider_registry(registry_factory)
     hook_execution_service = get_hook_execution_service()
+
+    # Create cloud sync service
+    from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
+
+    cloud_sync_service = CloudSyncService(
+        storage_factory=storage_factory,
+        encryption_service=encryption_service,
+    )
 
     # Create dependencies using resolved services
     custom_dependencies = JobManagerDependencies(
@@ -774,6 +784,7 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
         storage_factory=storage_factory,
         provider_registry=provider_registry,
         hook_execution_service=hook_execution_service,
+        cloud_sync_service=cloud_sync_service,
         async_session_maker=async_session_maker,
         http_client_factory=lambda: HttpClient(),  # type: ignore
     )

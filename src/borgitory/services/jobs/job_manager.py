@@ -106,10 +106,7 @@ class JobManager:
             self.output_manager,
             self.event_broadcaster,
             self.dependencies.async_session_maker,
-            self.dependencies.rclone_service,
-            self.dependencies.encryption_service,
-            self.dependencies.storage_factory,
-            self.dependencies.provider_registry,
+            self.dependencies.cloud_sync_service,
             self.database_manager,
         )
         self.notification_executor = NotificationTaskExecutor(

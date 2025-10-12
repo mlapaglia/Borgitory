@@ -15,10 +15,7 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
-    from borgitory.services.rclone_service import RcloneService
-    from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
-    from borgitory.services.encryption_service import EncryptionService
-    from borgitory.services.cloud_providers.registry import ProviderRegistry
+    from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
 
 
 class CommandResult:
@@ -120,10 +117,7 @@ class ProcessExecutorProtocol(Protocol):
         repository_path: str,
         cloud_sync_config_id: int,
         session_maker: "async_sessionmaker[AsyncSession]",
-        rclone_service: "RcloneService",
-        encryption_service: "EncryptionService",
-        storage_factory: "StorageFactory",
-        provider_registry: "ProviderRegistry",
+        cloud_sync_service: "CloudSyncService",
         output_callback: Optional[Callable[[str], None]] = None,
     ) -> "ProcessResult":
         """Execute a cloud sync task."""

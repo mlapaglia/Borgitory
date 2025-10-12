@@ -18,7 +18,11 @@ from typing import (
     Union,
     get_origin,
     get_args,
+    TYPE_CHECKING,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.services.rclone_service import RcloneService
 
@@ -233,6 +237,40 @@ class StorageFactory:
         """Get list of supported provider names."""
         return self._registry.get_supported_providers()
 
+    def get_sensitive_fields(self, provider: str) -> List[str]:
+        """
+        Get list of sensitive fields for a provider without requiring a config instance.
+
+        This uses a static mapping of known sensitive fields for each provider.
+        This avoids the circular dependency of needing a valid config to decrypt
+        the config.
+
+        Args:
+            provider: Provider name (e.g., s3, sftp, smb)
+
+        Returns:
+            List of sensitive field names
+
+        Raises:
+            ValueError: If provider is unknown
+        """
+        # Verify the provider exists in registry
+        storage_class = self._registry.get_storage_class(provider)
+        if storage_class is None:
+            supported = self._registry.get_supported_providers()
+            raise ValueError(
+                f"Unknown provider: {provider}. "
+                f"Supported providers: {', '.join(sorted(supported))}"
+            )
+
+        # Use static mapping of sensitive fields
+        mapping = {
+            "s3": ["access_key", "secret_key"],
+            "sftp": ["password", "private_key"],
+            "smb": ["pass"],
+        }
+        return mapping.get(provider, [])
+
 
 class CloudSyncService:
     """
@@ -291,6 +329,106 @@ class CloudSyncService:
         except Exception as e:
             error_msg = f"Failed to execute sync: {str(e)}"
             logger.error(error_msg)
+            if output_callback:
+                output_callback(error_msg)
+            return SyncResult.error_result(error_msg)
+
+    async def execute_sync_from_db(
+        self,
+        config_id: int,
+        repository_path: str,
+        db: "AsyncSession",
+        output_callback: Optional[Callable[[str], None]] = None,
+    ) -> SyncResult:
+        """
+        Execute a cloud sync operation by loading config from database.
+
+        This method handles loading the config from the database, decrypting
+        sensitive fields, and then executing the sync.
+
+        Args:
+            config_id: Database ID of the cloud sync configuration
+            repository_path: Path to the repository to sync
+            db: Database session for loading config
+            output_callback: Optional callback for real-time output
+
+        Returns:
+            SyncResult indicating success/failure and details
+        """
+        try:
+            from borgitory.models.database import CloudSyncConfig as DBCloudSyncConfig
+            from sqlalchemy import select
+
+            if output_callback:
+                output_callback("Loading cloud sync configuration...")
+
+            result = await db.execute(
+                select(DBCloudSyncConfig).where(DBCloudSyncConfig.id == config_id)
+            )
+            db_config = result.scalar_one_or_none()
+
+            if not db_config:
+                error_msg = f"Cloud sync configuration {config_id} not found"
+                logger.error(error_msg)
+                if output_callback:
+                    output_callback(error_msg)
+                return SyncResult.error_result(error_msg)
+
+            if not db_config.enabled:
+                info_msg = "Cloud sync configuration is disabled - skipping"
+                logger.info(info_msg)
+                if output_callback:
+                    output_callback(info_msg)
+                return SyncResult.success_result()
+
+            if not db_config.provider_config:
+                error_msg = f"Cloud sync configuration '{db_config.name}' has no provider_config"
+                logger.error(error_msg)
+                if output_callback:
+                    output_callback(error_msg)
+                return SyncResult.error_result(error_msg)
+
+            try:
+                encrypted_config = json.loads(db_config.provider_config)
+            except json.JSONDecodeError as e:
+                error_msg = f"Invalid JSON in provider_config: {e}"
+                logger.error(error_msg)
+                if output_callback:
+                    output_callback(error_msg)
+                return SyncResult.error_result(error_msg)
+
+            # Get sensitive fields without creating a storage instance (avoids validation errors with encrypted config)
+            sensitive_fields = self._storage_factory.get_sensitive_fields(
+                db_config.provider
+            )
+
+            # Decrypt the config before validation
+            decrypted_config = self._encryption_service.decrypt_sensitive_fields(
+                encrypted_config, sensitive_fields
+            )
+
+            if db_config.path_prefix:
+                decrypted_config["path_prefix"] = db_config.path_prefix
+
+            if output_callback:
+                output_callback(
+                    f"Syncing to {db_config.name} ({db_config.provider.upper()})"
+                )
+
+            sync_config = CloudSyncConfig(
+                provider=db_config.provider,
+                config=decrypted_config,
+                path_prefix=db_config.path_prefix or "",
+                name=db_config.name,
+            )
+
+            return await self.execute_sync(
+                sync_config, repository_path, output_callback
+            )
+
+        except Exception as e:
+            error_msg = f"Failed to execute sync from database: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             if output_callback:
                 output_callback(error_msg)
             return SyncResult.error_result(error_msg)

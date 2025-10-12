@@ -106,17 +106,12 @@ def _get_provider_display_details(
     try:
         storage_class = registry.get_storage_class(provider)
         if storage_class:
-            # Create a temporary instance to call get_display_details
-            # We don't need a valid config for this method, just the dict
-            temp_storage = storage_class(
-                None, None
-            )  # rclone_service and config not needed
+            temp_storage = storage_class(None, None, None)
             result = temp_storage.get_display_details(provider_config)
             return cast(Dict[str, str], result)
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 
-    # Fallback to hardcoded behavior for unknown providers
     provider_name = provider.upper() if provider else "Unknown"
     provider_details = "<div><strong>Configuration:</strong> Unknown provider</div>"
 

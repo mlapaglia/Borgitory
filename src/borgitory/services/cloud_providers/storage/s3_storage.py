@@ -138,11 +138,14 @@ class S3Storage(CloudStorage):
             )
 
         try:
+            final_status = None
             async for progress in self.sync_repository_to_s3(
                 repository_path=repository_path,
                 path_prefix=remote_path,
             ):
-                if progress_callback and progress.get("type") == "progress":
+                if progress.get("type") == "completed":
+                    final_status = progress.get("status")
+                elif progress_callback and progress.get("type") == "progress":
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
@@ -150,6 +153,9 @@ class S3Storage(CloudStorage):
                             progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
+
+            if final_status == "failed":
+                raise Exception("S3 sync failed with non-zero exit code")
 
             if progress_callback:
                 progress_callback(

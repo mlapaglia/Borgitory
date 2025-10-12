@@ -11,13 +11,15 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 from borgitory.services.cloud_providers.storage.s3_storage import S3StorageConfig
 from borgitory.services.cloud_sync_config_service import (
     CloudSyncConfigService,
     _get_sensitive_fields_for_provider,
 )
 from borgitory.api.cloud_sync import _get_supported_providers
-from borgitory.services.cloud_providers.registry import ProviderRegistry
+from borgitory.services.cloud_providers.registry import ProviderRegistry, get_metadata
+from borgitory.services.encryption_service import EncryptionService
 
 
 class TestRegistryBusinessLogic:
@@ -129,7 +131,9 @@ class TestSensitiveFieldsIntegration:
         """Test that unknown providers return empty list with warning"""
         # Import storage modules to trigger registration
 
-        with patch("borgitory.services.cloud_sync_service.logger") as mock_logger:
+        with patch(
+            "borgitory.services.cloud_sync_config_service.logger"
+        ) as mock_logger:
             fields = _get_sensitive_fields_for_provider("unknown")
 
             assert fields == []
@@ -142,9 +146,12 @@ class TestSensitiveFieldsIntegration:
 
         # Mock get_storage_class to return None (simulating unknown provider)
         with patch(
-            "borgitory.services.cloud_sync_service.get_storage_class", return_value=None
+            "borgitory.services.cloud_sync_config_service.get_storage_class",
+            return_value=None,
         ):
-            with patch("borgitory.services.cloud_sync_service.logger") as mock_logger:
+            with patch(
+                "borgitory.services.cloud_sync_config_service.logger"
+            ) as mock_logger:
                 fields = _get_sensitive_fields_for_provider("unknown_provider")
 
                 # Should return empty list and log warning
@@ -241,8 +248,12 @@ class TestServiceLayerIntegration:
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 
-        mock_rclone = Mock()
-        factory = StorageFactory(mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        factory = StorageFactory(
+            command_executor=mock_command_executor,
+            file_service=mock_file_service,
+        )
 
         # Test valid provider with complete config
         storage_instance = factory.create_storage(
@@ -269,8 +280,12 @@ class TestServiceLayerIntegration:
         # Import storage modules to trigger registration (if not already done)
         from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
 
-        mock_rclone = Mock()
-        factory = StorageFactory(mock_rclone)
+        mock_command_executor = Mock()
+        mock_file_service = Mock()
+        factory = StorageFactory(
+            command_executor=mock_command_executor,
+            file_service=mock_file_service,
+        )
 
         providers = factory.get_supported_providers()
         # Should include our three providers, possibly more
@@ -298,20 +313,10 @@ class TestCloudSyncConfigServiceIntegration:
         mock_result.scalar_one_or_none.return_value = None
         mock_db.execute.return_value = mock_result  # type: ignore[attr-defined]
 
-        # Get the registry for the service
-        from borgitory.services.cloud_providers.registry import get_metadata
-        from borgitory.services.rclone_service import RcloneService
-        from borgitory.services.cloud_providers.cloud_sync_service import (
-            StorageFactory,
-            EncryptionService,
-        )
-
-        mock_rclone = Mock(spec=RcloneService)
         mock_storage_factory = Mock(spec=StorageFactory)
         mock_encryption = Mock(spec=EncryptionService)
 
         service = CloudSyncConfigService(
-            rclone_service=mock_rclone,
             storage_factory=mock_storage_factory,
             encryption_service=mock_encryption,
             get_metadata_func=get_metadata,

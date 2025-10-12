@@ -9,7 +9,8 @@ import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-from typing import IO
+from typing import IO, Optional
+from contextlib import asynccontextmanager
 import io
 
 from borgitory.protocols.file_protocols import FileServiceProtocol
@@ -35,6 +36,24 @@ class MockFileService(FileServiceProtocol):
         self.mock_errors: dict[str, Exception] = {}
         self.mock_exists: dict[str, bool] = {}
         self.mock_isfile: dict[str, bool] = {}
+
+    @asynccontextmanager
+    async def create_temp_file(self, suffix: str, content: Optional[bytes] = None):
+        """Create a temporary file with optional content."""
+        temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        temp_path = temp_file.name
+
+        try:
+            if content is not None:
+                temp_file.write(content)
+            temp_file.close()
+
+            yield temp_path
+        finally:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
     async def open_file(self, file_path: str, mode: str) -> IO[bytes]:
         """Mock file opening with configurable content and errors."""
