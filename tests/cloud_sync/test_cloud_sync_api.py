@@ -254,7 +254,7 @@ class TestCloudSyncAPIHTMX:
 
         # Mock the rclone service and cloud sync service
         with patch(
-            "borgitory.services.cloud_sync_service.CloudSyncConfigService.test_cloud_sync_config"
+            "borgitory.services.cloud_sync_config_service.CloudSyncConfigService.test_cloud_sync_config"
         ) as mock_test:
             mock_test.return_value = {
                 "status": "success",
