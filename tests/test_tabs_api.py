@@ -87,7 +87,7 @@ class TestTabsAPI:
         assert 'value="smb"' in content
 
         # Check that provider labels are present
-        assert "AWS S3" in content
+        assert "S3-Compatible Storage" in content
         assert "SFTP (SSH)" in content
         assert "SMB/CIFS" in content
 
@@ -172,7 +172,7 @@ class TestTabsAPI:
         response = await async_client.get("/api/cloud-sync/provider-fields?provider=s3")
         assert response.status_code == 200
         content = response.text
-        assert "Add AWS S3 Location" in content
+        assert "Amazon Web Services (AWS) S3" in content
 
         # Test with SFTP provider
         response = await async_client.get(

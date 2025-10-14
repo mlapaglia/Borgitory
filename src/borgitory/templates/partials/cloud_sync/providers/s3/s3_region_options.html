@@ -1,0 +1,8 @@
+{% if has_regions %}
+{% for region in regions %}
+<option value="{{ region }}" {% if region == selected_region %}selected{% endif %}>{{ region }}</option>
+{% endfor %}
+{% else %}
+<option value="us-east-1" selected>us-east-1 (default)</option>
+{% endif %}
+

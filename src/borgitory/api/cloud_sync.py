@@ -48,7 +48,7 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
     return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
-def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
+def _get_provider_template(provider: str) -> Optional[str]:
     """Get the appropriate template path for a provider and mode"""
     if not provider:
         return None
@@ -58,15 +58,18 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
         return None
 
     # Automatically discover templates by checking if they exist on filesystem
-    suffix = "_edit" if mode == "edit" else ""
-    template_path = f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
+    base_templates_dir = os.path.abspath(
+        os.path.normpath(
+            f"src/borgitory/templates/partials/cloud_sync/providers/{provider}"
+        )
+    )
+
+    # Fall back to unified template (e.g., s3_fields.html)
+    template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields.html"
     full_path = f"src/borgitory/templates/{template_path}"
+    normalized_path = os.path.abspath(os.path.normpath(full_path))
 
     # Ensure normalized full_path remains inside templates using commonpath
-    base_templates_dir = os.path.abspath(
-        os.path.normpath("src/borgitory/templates/partials/cloud_sync/providers/")
-    )
-    normalized_path = os.path.abspath(os.path.normpath(full_path))
     if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
         return None
 
@@ -165,19 +168,28 @@ def _parse_form_data_to_config_update(
     )
 
 
+@router.get("/form", response_class=HTMLResponse)
+async def get_form(
+    request: Request,
+    registry: ProviderRegistryDep,
+    templates: Jinja2Templates = Depends(get_templates),
+) -> HTMLResponse:
+    """Get the form for creating a new cloud sync configuration"""
+    context = {
+        "supported_providers": _get_supported_providers(registry),
+        "config": None,
+    }
+    return templates.TemplateResponse(request, "partials/cloud_sync/form.html", context)
+
+
 @router.get("/add-form", response_class=HTMLResponse)
 async def get_add_form(
     request: Request,
     registry: ProviderRegistryDep,
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
-    """Get the add form (for cancel functionality)"""
-    context = {
-        "supported_providers": _get_supported_providers(registry),
-    }
-    return templates.TemplateResponse(
-        request, "partials/cloud_sync/add_form.html", context
-    )
+    """Get the add form (legacy endpoint for backwards compatibility)"""
+    return await get_form(request, registry, templates)
 
 
 @router.get("/provider-fields", response_class=HTMLResponse)
@@ -190,7 +202,7 @@ async def get_provider_fields(
     """Get dynamic provider fields based on selection"""
     context = {
         "provider": provider,
-        "provider_template": _get_provider_template(provider, "create"),
+        "provider_template": _get_provider_template(provider),
         "submit_text": _get_submit_button_text(registry, provider, "create"),
         "show_submit": provider != "",
     }
@@ -198,6 +210,162 @@ async def get_provider_fields(
     return templates.TemplateResponse(
         request, "partials/cloud_sync/provider_fields.html", context
     )
+
+
+@router.get("/s3/providers", response_class=HTMLResponse)
+async def get_s3_providers(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+) -> HTMLResponse:
+    """Get S3 provider options as HTML"""
+    from borgitory.services.cloud_providers.storage.s3_storage import S3Provider
+    from borgitory.services.cloud_providers.storage.s3_provider_config import (
+        S3ProviderConfig,
+    )
+
+    providers = [
+        {
+            "value": provider.value,
+            "label": S3ProviderConfig.get_provider_label(provider),
+        }
+        for provider in S3Provider
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "partials/cloud_sync/providers/s3/s3_provider_options.html",
+        {"providers": providers},
+    )
+
+
+@router.get("/s3/regions", response_class=HTMLResponse)
+async def get_s3_regions(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+) -> HTMLResponse:
+    """Get S3 regions for a specific provider as HTML"""
+    from borgitory.services.cloud_providers.storage.s3_storage import S3Provider
+    from borgitory.services.cloud_providers.storage.s3_provider_config import (
+        S3ProviderConfig,
+    )
+
+    form_data = await request.form() if request.method == "POST" else {}
+    query_params = dict(request.query_params)
+
+    s3_provider = (
+        form_data.get("provider_config[provider_type]")
+        or query_params.get("s3_provider")
+        or query_params.get("provider_config[provider_type]")
+        or "AWS"
+    )
+    current_value = query_params.get("current_value", "")
+
+    try:
+        provider_enum = S3Provider(s3_provider)
+        regions = S3ProviderConfig.get_regions(provider_enum)
+        default_region = S3ProviderConfig.get_default_region(provider_enum)
+        selected_region = current_value if current_value else default_region
+
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/providers/s3/s3_region_options.html",
+            {
+                "regions": regions,
+                "selected_region": selected_region,
+                "has_regions": len(regions) > 0,
+            },
+        )
+    except ValueError:
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/providers/s3/s3_region_options.html",
+            {"regions": [], "selected_region": "us-east-1", "has_regions": False},
+        )
+
+
+@router.get("/s3/storage-classes", response_class=HTMLResponse)
+async def get_s3_storage_classes(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+) -> HTMLResponse:
+    """Get storage classes for a specific S3 provider as HTML"""
+    from borgitory.services.cloud_providers.storage.s3_storage import S3Provider
+    from borgitory.services.cloud_providers.storage.s3_provider_config import (
+        S3ProviderConfig,
+    )
+
+    form_data = await request.form() if request.method == "POST" else {}
+    query_params = dict(request.query_params)
+
+    s3_provider = (
+        form_data.get("provider_config[provider_type]")
+        or query_params.get("s3_provider")
+        or query_params.get("provider_config[provider]")
+        or "AWS"
+    )
+    current_value = query_params.get("current_value", "")
+
+    try:
+        provider_enum = S3Provider(s3_provider)
+        storage_classes = S3ProviderConfig.get_storage_classes(provider_enum)
+        default_class = S3ProviderConfig.get_default_storage_class(provider_enum)
+        selected_class = current_value if current_value else default_class
+
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/providers/s3/s3_storage_class_options.html",
+            {
+                "storage_classes": storage_classes,
+                "selected_class": selected_class,
+            },
+        )
+    except ValueError:
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/providers/s3/s3_storage_class_options.html",
+        )
+
+
+@router.get("/s3/endpoint-field", response_class=HTMLResponse)
+async def get_s3_endpoint_field(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+) -> HTMLResponse:
+    """Get endpoint URL field if required for the selected S3 provider"""
+    from borgitory.services.cloud_providers.storage.s3_storage import S3Provider
+    from borgitory.services.cloud_providers.storage.s3_provider_config import (
+        S3ProviderConfig,
+    )
+
+    form_data = await request.form() if request.method == "POST" else {}
+    query_params = dict(request.query_params)
+
+    s3_provider = (
+        form_data.get("provider_config[provider_type]")
+        or query_params.get("s3_provider")
+        or query_params.get("provider_config[provider_type]")
+        or "AWS"
+    )
+    current_value = query_params.get("current_value", "")
+
+    try:
+        provider_enum = S3Provider(s3_provider)
+        requires_endpoint = S3ProviderConfig.requires_endpoint(provider_enum)
+
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/providers/s3/s3_endpoint_field.html",
+            {
+                "requires_endpoint": requires_endpoint,
+                "current_value": current_value,
+            },
+        )
+    except ValueError:
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/providers/s3/s3_endpoint_field.html",
+            {"requires_endpoint": False, "current_value": ""},
+        )
 
 
 @router.post("/", response_class=HTMLResponse)
@@ -331,9 +499,7 @@ async def get_cloud_sync_edit_form(
         context = {
             "config": config_obj,
             "provider": decrypted_config["provider"],
-            "provider_template": _get_provider_template(
-                decrypted_config["provider"], "edit"
-            ),
+            "provider_template": _get_provider_template(decrypted_config["provider"]),
             "supported_providers": _get_supported_providers(registry),
             "is_edit_mode": True,
             "submit_text": _get_submit_button_text(
@@ -342,7 +508,7 @@ async def get_cloud_sync_edit_form(
         }
 
         return templates.TemplateResponse(
-            request, "partials/cloud_sync/edit_form.html", context
+            request, "partials/cloud_sync/form.html", context
         )
     except Exception as e:
         raise HTTPException(

@@ -1,0 +1,12 @@
+{% if requires_endpoint %}
+<label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+    Endpoint URL
+</label>
+<input type="text"
+        name="provider_config[endpoint_url]"
+        value="{{ current_value }}"
+        placeholder="https://s3.example.com"
+        required
+        class="input-modern mt-1">
+{% endif %}
+

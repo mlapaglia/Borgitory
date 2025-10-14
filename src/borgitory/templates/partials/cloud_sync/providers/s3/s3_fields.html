@@ -1,0 +1,99 @@
+<!-- S3 Fields -->
+<div id="s3-fields" class="space-y-4">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            S3 Provider
+        </label>
+        <select name="provider_config[provider_type]"
+                id="s3-provider-select"
+                class="select-modern mt-1"
+                hx-get="/api/cloud-sync/s3/providers"
+                hx-trigger="load"
+                hx-target="this"
+                hx-swap="innerHTML">
+            <option value="{{ config.provider if config else 'AWS' }}" selected>{{ config.provider if config else 'Amazon Web Services (AWS) S3' }}</option>
+        </select>
+    </div>
+    <div id="s3-endpoint-field-container"
+         hx-get="/api/cloud-sync/s3/endpoint-field"
+         hx-trigger="load, change from:#s3-provider-select"
+         hx-target="this"
+         hx-include="[name='provider_config[provider_type]']"
+         hx-vals='{"s3_provider": ""{% if config %}, "current_value": "{{ config.endpoint_url or '' }}"{% endif %}}'
+         hx-swap="innerHTML">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Bucket Name
+        </label>
+        <input type="text"
+               name="provider_config[bucket_name]"
+               {% if config %}value="{{ config.bucket_name or '' }}"{% endif %}
+               placeholder="my-backup-bucket"
+               required
+               class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Access Key ID
+        </label>
+        <input type="text"
+               name="provider_config[access_key]"
+               {% if config %}value="{{ config.access_key or '' }}"{% endif %}
+               required
+               class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Secret Access Key
+        </label>
+        <input type="password"
+               name="provider_config[secret_key]"
+               {% if config %}value="{{ config.secret_key or '' }}"
+               placeholder="Current value will be used if left empty"
+               {% else %}required{% endif %}
+               class="input-modern mt-1">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Region
+        </label>
+        <select name="provider_config[region]"
+                id="s3-region-select"
+                class="select-modern mt-1"
+                hx-get="/api/cloud-sync/s3/regions"
+                hx-trigger="load, change from:#s3-provider-select"
+                hx-target="this"
+                hx-include="[name='provider_config[provider_type]']"
+                hx-vals='{"s3_provider": ""{% if config %}, "current_value": "{{ config.region or '' }}"{% endif %}}'
+                hx-swap="innerHTML">
+            <option value="{{ config.region if config else '' }}" selected>{{ config.region if config else '' }}</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Storage Class
+        </label>
+        <select name="provider_config[storage_class]"
+                id="s3-storage-class-select"
+                class="select-modern mt-1"
+                hx-get="/api/cloud-sync/s3/storage-classes"
+                hx-trigger="load, change from:#s3-provider-select"
+                hx-target="this"
+                hx-include="[name='provider_config[provider_type]']"
+                hx-vals='{"s3_provider": ""{% if config %}, "current_value": "{{ config.storage_class or '' }}"{% endif %}}'
+                hx-swap="innerHTML">
+            <option value="{{ config.storage_class if config else '' }}" selected>{{ config.storage_class if config else '' }}</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Path Prefix (optional)
+        </label>
+        <input type="text"
+               name="path_prefix"
+               {% if config %}value="{{ config.path_prefix or '' }}"{% endif %}
+               placeholder="backups/borgitory"
+               class="input-modern mt-1">
+    </div>
+</div>
