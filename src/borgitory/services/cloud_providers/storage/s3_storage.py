@@ -76,8 +76,8 @@ class S3StorageConfig(CloudStorageConfig):
 
     provider_type: S3Provider = Field(default=S3Provider.AWS)
     bucket_name: str = Field(..., min_length=3, max_length=63)
-    access_key: str = Field(..., min_length=1, max_length=256)
-    secret_key: str = Field(..., min_length=1, max_length=256)
+    access_key: str = Field(..., min_length=16, max_length=128)
+    secret_key: str = Field(..., min_length=16, max_length=128)
     region: str = Field(default="us-east-1")
     endpoint_url: Optional[str] = None
     storage_class: str = Field(default="STANDARD")

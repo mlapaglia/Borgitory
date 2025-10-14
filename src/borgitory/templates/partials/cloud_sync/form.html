@@ -7,17 +7,17 @@
             Add Cloud Sync Location
         {% endif %}
     </h3>
-    <form {% if config %}hx-put="/api/cloud-sync/{{ config.id }}"{% else %}hx-post="/api/cloud-sync/"{% endif %}
+    <form {%- if config -%} hx-put="/api/cloud-sync/{{ config.id }}" {%- else -%} hx-post="/api/cloud-sync/" {%- endif -%}
           hx-target="#cloud-sync-status"
           class="space-y-4"
-          id="{% if config %}cloud-sync-edit-form{% else %}cloud-sync-form{% endif %}">
+          id="{%- if config -%} cloud-sync-edit-form {%- else -%} cloud-sync-form {%- endif -%}">
         <div>
             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
             <input type="text"
                    name="name"
                    required
                    value="{{ config.name if config else '' }}"
-                   placeholder="{% if not config %}My Sync Location{% endif %}"
+                   placeholder="{%- if not config -%} My Sync Location {%- endif -%}"
                    class="input-modern mt-1">
         </div>
         <div>
@@ -25,10 +25,10 @@
                 Provider
             </label>
             <select name="provider"
-                    id="{% if config %}provider-select-edit{% else %}provider-select{% endif %}"
+                    id="{%- if config -%} provider-select-edit {%- else -%} provider-select {%- endif -%}"
                     class="select-modern w-full"
                     hx-get="/api/cloud-sync/provider-fields"
-                    hx-target="#{% if config %}provider-fields-container-edit{% else %}provider-fields-container{% endif %}"
+                    hx-target="#{%- if config -%} provider-fields-container-edit {%- else -%} provider-fields-container {%- endif -%}"
                     hx-trigger="change"
                     hx-swap="innerHTML"
                     hx-include="this"
@@ -43,7 +43,7 @@
             </select>
         </div>
         <!-- Dynamic Provider Fields Container -->
-        <div id="{% if config %}provider-fields-container-edit{% else %}provider-fields-container{% endif %}"
+        <div id="{%- if config -%} provider-fields-container-edit {%- else -%} provider-fields-container {%- endif -%}"
              {% if not config %} hx-get="/api/cloud-sync/provider-fields" hx-trigger="load" hx-swap="innerHTML" {% endif %}>
             {% if config and provider_template %}
                 {% include provider_template %}

@@ -10,7 +10,7 @@
                 hx-get="/api/cloud-sync/s3/providers"
                 hx-trigger="load"
                 hx-target="this"
-                hx-vals='{% if config %}{"current_value": "{{ config.provider_type or '' }}"{% endif %}}'
+                hx-vals='{%- if config -%} {"current_value": "{{ config.provider_type or '' }}" {%- endif -%}}'
                 hx-swap="innerHTML">
             <option value="{{ config.provider_type if config else '' }}" selected>
                 {{ config.provider_type if config else '' }}
@@ -22,7 +22,7 @@
          hx-trigger="load, change from:#s3-provider-select"
          hx-target="this"
          hx-include="[name='provider_config[provider_type]']"
-         hx-vals='{"s3_provider": ""{% if config %}, "current_value": "{{ config.endpoint_url or '' }}"{% endif %}}'
+         hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.endpoint_url or '' }}" {%- endif -%}}'
          hx-swap="innerHTML"></div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -65,7 +65,7 @@
                 hx-trigger="load, change from:#s3-provider-select"
                 hx-target="this"
                 hx-include="[name='provider_config[provider_type]']"
-                hx-vals='{"s3_provider": ""{% if config %}, "current_value": "{{ config.region or '' }}"{% endif %}}'
+                hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.region or '' }}" {%- endif -%}}'
                 hx-swap="innerHTML">
             <option value="{{ config.region if config else '' }}" selected>
                 {{ config.region if config else '' }}
@@ -83,7 +83,7 @@
                 hx-trigger="load, change from:#s3-provider-select"
                 hx-target="this"
                 hx-include="[name='provider_config[provider_type]']"
-                hx-vals='{"s3_provider": ""{% if config %}, "current_value": "{{ config.storage_class or '' }}"{% endif %}}'
+                hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.storage_class or '' }}" {%- endif -%}}'
                 hx-swap="innerHTML">
             <option value="{{ config.storage_class if config else '' }}" selected>
                 {{ config.storage_class if config else '' }}
