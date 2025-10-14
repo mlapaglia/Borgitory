@@ -284,7 +284,7 @@ class S3Storage(CloudStorage):
 
         provider_details = "\n".join(provider_details_parts)
         provider_label = "S3-Compatible"
-        
+
         return {"provider_name": provider_label, "provider_details": provider_details}
 
     @classmethod

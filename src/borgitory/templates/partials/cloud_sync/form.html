@@ -22,7 +22,7 @@
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Provider Type
+                Provider
             </label>
             <select name="provider"
                     id="{% if config %}provider-select-edit{% else %}provider-select{% endif %}"
@@ -33,7 +33,7 @@
                     hx-swap="innerHTML"
                     hx-include="this"
                     {% if config %}hx-vals='{"mode": "edit"}'{% endif %}>
-                <option value="">Select Provider Type</option>
+                <option value="">Select Provider</option>
                 {% for provider in supported_providers %}
                     <option value="{{ provider.value }}"
                             {% if config and config.provider == provider.value %}selected{% endif %}>{{ provider.label }}

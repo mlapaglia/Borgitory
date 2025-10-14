@@ -2,7 +2,7 @@
 <div id="s3-fields" class="space-y-4">
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-            S3 Provider
+            S3 Provider Type
         </label>
         <select name="provider_config[provider_type]"
                 id="s3-provider-select"
@@ -10,8 +10,9 @@
                 hx-get="/api/cloud-sync/s3/providers"
                 hx-trigger="load"
                 hx-target="this"
+                hx-vals='{% if config %}{"current_value": "{{ config.provider_type or '' }}"{% endif %}}'
                 hx-swap="innerHTML">
-            <option value="{{ config.provider if config else 'AWS' }}" selected>{{ config.provider if config else 'Amazon Web Services (AWS) S3' }}</option>
+            <option value="{{ config.provider_type if config else '' }}" selected>{{ config.provider_type if config else '' }}</option>
         </select>
     </div>
     <div id="s3-endpoint-field-container"
