@@ -154,7 +154,7 @@ class TestS3StorageConfig:
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
-        assert "at least 1 character" in str(exc_info.value)
+        assert "String should have at least 16 char" in str(exc_info.value)
 
     def test_empty_secret_key(self) -> None:
         """Test validation of empty secret key"""
@@ -165,7 +165,7 @@ class TestS3StorageConfig:
                 secret_key="",  # Empty
             )
 
-        assert "at least 1 character" in str(exc_info.value)
+        assert "String should have at least 16 char" in str(exc_info.value)
 
     def test_invalid_access_key_format(self) -> None:
         """Test validation of access key format"""
@@ -185,7 +185,7 @@ class TestS3StorageConfig:
                 access_key="AKIA123",  # Too short
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
-        assert "must be exactly 20 characters long" in str(exc_info.value)
+        assert "String should have at least 16 characters" in str(exc_info.value)
 
         # Test key with non-alphanumeric characters (exactly 20 chars)
         with pytest.raises(ValidationError) as exc_info:
