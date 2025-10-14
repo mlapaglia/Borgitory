@@ -1,4 +1,6 @@
 {% for provider in providers %}
-<option value="{{ provider.value }}" {% if provider.value == selected_provider %}selected{% endif %}>{{ provider.label }}</option>
+    <option value="{{ provider.value }}"
+            {% if provider.value == selected_provider %}selected{% endif %}>
+        {{ provider.label }}
+    </option>
 {% endfor %}
-

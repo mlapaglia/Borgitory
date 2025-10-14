@@ -36,18 +36,15 @@
                 <option value="">Select Provider</option>
                 {% for provider in supported_providers %}
                     <option value="{{ provider.value }}"
-                            {% if config and config.provider == provider.value %}selected{% endif %}>{{ provider.label }}
+                            {% if config and config.provider == provider.value %}selected{% endif %}>
+                        {{ provider.label }}
                     </option>
                 {% endfor %}
             </select>
         </div>
         <!-- Dynamic Provider Fields Container -->
         <div id="{% if config %}provider-fields-container-edit{% else %}provider-fields-container{% endif %}"
-             {% if not config %}
-             hx-get="/api/cloud-sync/provider-fields"
-             hx-trigger="load"
-             hx-swap="innerHTML"
-             {% endif %}>
+             {% if not config %} hx-get="/api/cloud-sync/provider-fields" hx-trigger="load" hx-swap="innerHTML" {% endif %}>
             {% if config and provider_template %}
                 {% include provider_template %}
                 <div class="flex space-x-2 mt-4">
@@ -69,4 +66,3 @@
     </form>
     <div id="cloud-sync-status" class="mt-4"></div>
 </div>
-
