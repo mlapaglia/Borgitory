@@ -7,10 +7,10 @@
             Add Cloud Sync Location
         {% endif %}
     </h3>
-    <form {%- if config -%} hx-put="/api/cloud-sync/{{ config.id }}" {%- else -%} hx-post="/api/cloud-sync/" {%- endif -%}
+    <form {% if config %}hx-put="/api/cloud-sync/{{ config.id }}"{% else %}hx-post="/api/cloud-sync/"{% endif %}
           hx-target="#cloud-sync-status"
           class="space-y-4"
-          id="{%- if config -%} cloud-sync-edit-form {%- else -%} cloud-sync-form {%- endif -%}">
+          id="cloud-sync-form-container">
         <div>
             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
             <input type="text"

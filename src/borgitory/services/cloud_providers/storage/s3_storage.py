@@ -190,7 +190,7 @@ class S3Storage(CloudStorage):
             ):
                 if progress.get("type") == "completed":
                     final_status = progress.get("status")
-                elif progress_callback and progress.get("type") == "progress":
+                elif progress_callback and progress.get("type") == "log":
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
