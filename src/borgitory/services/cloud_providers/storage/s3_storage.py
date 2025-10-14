@@ -85,28 +85,20 @@ class S3StorageConfig(CloudStorageConfig):
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3StorageConfig":
         """Validate credentials based on provider"""
-        if self.provider_type == S3Provider.AWS:
-            if not self.access_key.startswith("AKIA"):
-                raise ValueError("AWS Access Key ID must start with 'AKIA'")
-            if len(self.access_key) != 20:
-                raise ValueError("AWS Access Key ID must be exactly 20 characters long")
-            if not self.access_key.isalnum():
-                raise ValueError(
-                    "AWS Access Key ID must contain only alphanumeric characters"
-                )
-            self.access_key = self.access_key.upper()
+        if not self.access_key.startswith("AKIA"):
+            raise ValueError("AWS Access Key ID must start with 'AKIA'")
+        if len(self.access_key) != 20:
+            raise ValueError("AWS Access Key ID must be exactly 20 characters long")
+        if not self.access_key.isalnum():
+            raise ValueError(
+                "AWS Access Key ID must contain only alphanumeric characters"
+            )
+        self.access_key = self.access_key.upper()
 
-            if len(self.secret_key) != 40:
-                raise ValueError(
-                    "AWS Secret Access Key must be exactly 40 characters long"
-                )
-            if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
-                raise ValueError("AWS Secret Access Key contains invalid characters")
-        else:
-            if len(self.access_key) < 1:
-                raise ValueError("Access Key cannot be empty")
-            if len(self.secret_key) < 1:
-                raise ValueError("Secret Key cannot be empty")
+        if len(self.secret_key) != 40:
+            raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
+        if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
+            raise ValueError("AWS Secret Access Key contains invalid characters")
 
         return self
 

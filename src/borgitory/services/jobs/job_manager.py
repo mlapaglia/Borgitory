@@ -505,8 +505,6 @@ class JobManager:
                                         f"Failed to update tasks in database after critical failure: {e}"
                                     )
 
-                            # Don't break - continue loop to execute notification tasks
-
                 except Exception as e:
                     task.status = TaskStatusEnum.FAILED
                     task.error = str(e)
@@ -569,8 +567,6 @@ class JobManager:
                                 logger.error(
                                     f"Failed to update tasks in database after critical exception: {db_e}"
                                 )
-
-                        # Don't break - continue loop to execute notification tasks
 
             failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
             completed_tasks = [

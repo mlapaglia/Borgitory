@@ -64,12 +64,10 @@ def _get_provider_template(provider: str) -> Optional[str]:
         )
     )
 
-    # Fall back to unified template (e.g., s3_fields.html)
     template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields.html"
     full_path = f"src/borgitory/templates/{template_path}"
     normalized_path = os.path.abspath(os.path.normpath(full_path))
 
-    # Ensure normalized full_path remains inside templates using commonpath
     if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
         return None
 
@@ -180,16 +178,6 @@ async def get_form(
         "config": None,
     }
     return templates.TemplateResponse(request, "partials/cloud_sync/form.html", context)
-
-
-@router.get("/add-form", response_class=HTMLResponse)
-async def get_add_form(
-    request: Request,
-    registry: ProviderRegistryDep,
-    templates: Jinja2Templates = Depends(get_templates),
-) -> HTMLResponse:
-    """Get the add form (legacy endpoint for backwards compatibility)"""
-    return await get_form(request, registry, templates)
 
 
 @router.get("/provider-fields", response_class=HTMLResponse)
