@@ -142,6 +142,11 @@ class PruneService:
                 )
 
             update_dict = prune_config_update.model_dump(exclude_unset=True)
+
+            # Handle checkbox fields: if not present in update, set to False
+            if "compact_after" not in update_dict:
+                update_dict["compact_after"] = False
+
             if "name" in update_dict and update_dict["name"] != config.name:
                 result = await db.execute(
                     select(PruneConfig).where(

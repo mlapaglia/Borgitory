@@ -51,7 +51,7 @@ async def get_policy_form(
     """Get policy creation form"""
     return templates.TemplateResponse(
         request,
-        "partials/prune/create_form.html",
+        "partials/prune/form.html",
         {},
     )
 
@@ -197,7 +197,7 @@ async def get_prune_config_edit_form(
         "is_edit_mode": True,
     }
 
-    return templates.TemplateResponse(request, "partials/prune/edit_form.html", context)
+    return templates.TemplateResponse(request, "partials/prune/form.html", context)
 
 
 @router.put("/{config_id}", response_class=HTMLResponse)

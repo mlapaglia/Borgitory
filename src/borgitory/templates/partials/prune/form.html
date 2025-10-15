@@ -1,0 +1,52 @@
+<!-- Create/Edit Prune Policy -->
+<form {% if config %}hx-put="/api/prune/{{ config.id }}"{% else %}hx-post="/api/prune/"{% endif %}
+      hx-ext="json-enc"
+      hx-target="#cleanup-policy-status"
+      class="space-y-3">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Policy Name
+        </label>
+        <input type="text"
+               name="name"
+               required
+               value="{{ config.name if config else '' }}"
+               placeholder="{% if not config %}Daily Cleanup{% endif %}"
+               class="input-modern mt-1">
+    </div>
+    {% if config %}
+        {% set retention_config = config %}
+    {% endif %}
+    {% include "partials/prune/retention_fields.html" %}
+    <input type="hidden" name="strategy" value="{% if config %}{{ config.strategy }}{% else %}advanced{% endif %}">
+    <div class="flex items-center mt-3">
+        <input type="checkbox"
+               name="compact_after"
+               {% if config %}{% if config.compact_after %}checked{% endif %}{% else %}checked{% endif %}
+               class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+        <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">
+            Run compact after prune (reclaim space)
+        </label>
+    </div>
+    {% if config %}
+        <div class="flex space-x-2">
+            <button type="submit"
+                    class="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 text-sm">
+                Update Prune Policy
+            </button>
+            <button type="button"
+                    hx-get="/api/prune/policy-form"
+                    hx-target="#cleanup-policy-form-container"
+                    hx-swap="innerHTML"
+                    class="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm">
+                Cancel
+            </button>
+        </div>
+    {% else %}
+        <button type="submit"
+                class="w-full bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 text-sm mt-3">
+            Create Prune Policy
+        </button>
+    {% endif %}
+</form>
+
