@@ -798,3 +798,28 @@ async def extract_file(
         return await archive_manager.extract_file_stream(repository, archive_name, file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{repo_id}/archives/{archive_name}", response_class=HTMLResponse)
+async def delete_archive(
+    repo_id: int,
+    archive_name: str,
+    request: Request,
+    repo_svc: RepositoryServiceDep,
+    templates: TemplatesDep,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> HTMLResponse:
+    """Delete a specific archive from a repository."""
+    result = await repo_svc.delete_archive(repo_id, archive_name, db)
+
+    if not result["success"]:
+        return templates.TemplateResponse(
+            request,
+            "partials/common/error_message.html",
+            {"error_message": result["error_message"]},
+        )
+
+    return await get_archives_list(
+        request, repo_svc.borg_service, templates, str(repo_id), db
+    )
