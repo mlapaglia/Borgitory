@@ -2,14 +2,36 @@
 Tests for archive browser HTMX functionality
 """
 
+import pytest
+from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, ANY
 
 from borgitory.main import app
-from borgitory.models.database import Repository
+from borgitory.models.database import Repository, User
 from borgitory.dependencies import get_borg_service
 from borgitory.services.borg_service import BorgService
+from borgitory.api.auth import get_current_user
+
+
+@pytest.fixture
+async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]:
+    """Create a mock current user for testing."""
+    test_user = User()
+    test_user.username = "testuser"
+    test_user.set_password("testpass")
+    test_db.add(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
+
+    def override_get_current_user() -> User:
+        return test_user
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    yield test_user
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
 
 
 class TestArchiveBrowserHTMX:
@@ -748,3 +770,135 @@ class TestArchiveBrowserHTMX:
             # Clean up
             if get_borg_service in app.dependency_overrides:
                 del app.dependency_overrides[get_borg_service]
+
+    async def test_delete_archive_htmx_success(
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: User
+    ) -> None:
+        """Test deleting an archive via HTMX returns updated archive list."""
+        repo = Repository()
+        repo.name = "delete-test-repo"
+        repo.path = "/tmp/delete-test"
+        repo.set_passphrase("delete-passphrase")
+        test_db.add(repo)
+        await test_db.commit()
+
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+
+        mock_delete_result = {
+            "success": True,
+            "message": "Archive 'test-archive' deleted successfully",
+        }
+
+        mock_repo_service = AsyncMock(spec=RepositoryService)
+        mock_repo_service.delete_archive.return_value = mock_delete_result
+        mock_repo_service.borg_service = Mock()
+        mock_repo_service.borg_service.list_archives = AsyncMock()
+
+        from borgitory.models.borg_info import BorgArchive, BorgArchiveListResponse
+
+        mock_remaining_archives = BorgArchiveListResponse(
+            archives=[
+                BorgArchive(
+                    name="archive1",
+                    id="arch1",
+                    start="2023-01-01T10:00:00",
+                    end="2023-01-01T11:00:00",
+                    duration=3600.0,
+                )
+            ]
+        )
+        mock_repo_service.borg_service.list_archives.return_value = (
+            mock_remaining_archives
+        )
+
+        app.dependency_overrides[get_repository_service] = lambda: mock_repo_service
+
+        try:
+            response = await async_client.delete(
+                f"/api/repositories/{repo.id}/archives/test-archive",
+                headers={"hx-request": "true"},
+            )
+
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
+
+            assert "archive1" in response.text
+            assert "test-archive" not in response.text
+
+            mock_repo_service.delete_archive.assert_called_once_with(
+                repo.id, "test-archive", ANY
+            )
+        finally:
+            if get_repository_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_service]
+
+    async def test_delete_archive_htmx_error(
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: User
+    ) -> None:
+        """Test deleting an archive when service throws error."""
+        repo = Repository()
+        repo.name = "delete-error-repo"
+        repo.path = "/tmp/delete-error"
+        repo.set_passphrase("delete-error-passphrase")
+        test_db.add(repo)
+        await test_db.commit()
+
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+
+        mock_delete_result = {
+            "success": False,
+            "error_message": "Failed to delete archive: Archive not found",
+        }
+
+        mock_repo_service = AsyncMock(spec=RepositoryService)
+        mock_repo_service.delete_archive.return_value = mock_delete_result
+
+        app.dependency_overrides[get_repository_service] = lambda: mock_repo_service
+
+        try:
+            response = await async_client.delete(
+                f"/api/repositories/{repo.id}/archives/nonexistent-archive",
+                headers={"hx-request": "true"},
+            )
+
+            assert response.status_code == 200
+
+            assert "Failed to delete archive: Archive not found" in response.text
+
+            mock_repo_service.delete_archive.assert_called_once_with(
+                repo.id, "nonexistent-archive", ANY
+            )
+        finally:
+            if get_repository_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_service]
+
+    async def test_delete_archive_htmx_repository_not_found(
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: User
+    ) -> None:
+        """Test deleting an archive from non-existent repository."""
+        from borgitory.dependencies import get_repository_service
+        from borgitory.services.repositories.repository_service import RepositoryService
+
+        mock_delete_result = {
+            "success": False,
+            "error_message": "Repository not found",
+        }
+
+        mock_repo_service = AsyncMock(spec=RepositoryService)
+        mock_repo_service.delete_archive.return_value = mock_delete_result
+
+        app.dependency_overrides[get_repository_service] = lambda: mock_repo_service
+
+        try:
+            response = await async_client.delete(
+                "/api/repositories/9999/archives/test-archive",
+                headers={"hx-request": "true"},
+            )
+
+            assert response.status_code == 200
+            assert "Repository not found" in response.text
+        finally:
+            if get_repository_service in app.dependency_overrides:
+                del app.dependency_overrides[get_repository_service]
