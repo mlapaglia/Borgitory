@@ -48,7 +48,7 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
     return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
-def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
+def _get_provider_template(provider: str) -> Optional[str]:
     """Get the appropriate template path for a provider and mode"""
     if not provider:
         return None
@@ -58,15 +58,16 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
         return None
 
     # Automatically discover templates by checking if they exist on filesystem
-    suffix = "_edit" if mode == "edit" else ""
-    template_path = f"partials/cloud_sync/providers/{provider}_fields{suffix}.html"
-    full_path = f"src/borgitory/templates/{template_path}"
-
-    # Ensure normalized full_path remains inside templates using commonpath
     base_templates_dir = os.path.abspath(
-        os.path.normpath("src/borgitory/templates/partials/cloud_sync/providers/")
+        os.path.normpath(
+            f"src/borgitory/templates/partials/cloud_sync/providers/{provider}"
+        )
     )
+
+    template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields.html"
+    full_path = f"src/borgitory/templates/{template_path}"
     normalized_path = os.path.abspath(os.path.normpath(full_path))
+
     if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
         return None
 
@@ -165,19 +166,18 @@ def _parse_form_data_to_config_update(
     )
 
 
-@router.get("/add-form", response_class=HTMLResponse)
-async def get_add_form(
+@router.get("/form", response_class=HTMLResponse)
+async def get_form(
     request: Request,
     registry: ProviderRegistryDep,
     templates: Jinja2Templates = Depends(get_templates),
 ) -> HTMLResponse:
-    """Get the add form (for cancel functionality)"""
+    """Get the form for creating a new cloud sync configuration"""
     context = {
         "supported_providers": _get_supported_providers(registry),
+        "config": None,
     }
-    return templates.TemplateResponse(
-        request, "partials/cloud_sync/add_form.html", context
-    )
+    return templates.TemplateResponse(request, "partials/cloud_sync/form.html", context)
 
 
 @router.get("/provider-fields", response_class=HTMLResponse)
@@ -190,7 +190,7 @@ async def get_provider_fields(
     """Get dynamic provider fields based on selection"""
     context = {
         "provider": provider,
-        "provider_template": _get_provider_template(provider, "create"),
+        "provider_template": _get_provider_template(provider),
         "submit_text": _get_submit_button_text(registry, provider, "create"),
         "show_submit": provider != "",
     }
@@ -331,9 +331,7 @@ async def get_cloud_sync_edit_form(
         context = {
             "config": config_obj,
             "provider": decrypted_config["provider"],
-            "provider_template": _get_provider_template(
-                decrypted_config["provider"], "edit"
-            ),
+            "provider_template": _get_provider_template(decrypted_config["provider"]),
             "supported_providers": _get_supported_providers(registry),
             "is_edit_mode": True,
             "submit_text": _get_submit_button_text(
@@ -342,7 +340,7 @@ async def get_cloud_sync_edit_form(
         }
 
         return templates.TemplateResponse(
-            request, "partials/cloud_sync/edit_form.html", context
+            request, "partials/cloud_sync/form.html", context
         )
     except Exception as e:
         raise HTTPException(

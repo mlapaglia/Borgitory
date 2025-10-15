@@ -393,6 +393,13 @@ class JobManager:
             for task_index, task in enumerate(job.tasks):
                 job.current_task_index = task_index
 
+                # Skip tasks that were already marked as skipped due to earlier failures
+                if task.status == TaskStatusEnum.SKIPPED:
+                    logger.info(
+                        f"Skipping task {task.task_type} at index {task_index} - already marked as skipped"
+                    )
+                    continue
+
                 task.status = TaskStatusEnum.RUNNING
                 task.started_at = now_utc()
 
@@ -461,6 +468,16 @@ class JobManager:
 
                             remaining_tasks = job.tasks[task_index + 1 :]
                             for remaining_task in remaining_tasks:
+                                # Allow notification tasks to run even after critical failure
+                                if (
+                                    remaining_task.task_type
+                                    == TaskTypeEnum.NOTIFICATION
+                                ):
+                                    logger.info(
+                                        f"Keeping notification task {remaining_task.task_name} to report failure"
+                                    )
+                                    continue
+
                                 if remaining_task.status == TaskStatusEnum.PENDING:
                                     remaining_task.status = TaskStatusEnum.SKIPPED
                                     remaining_task.completed_at = now_utc()
@@ -487,8 +504,6 @@ class JobManager:
                                     logger.error(
                                         f"Failed to update tasks in database after critical failure: {e}"
                                     )
-
-                            break
 
                 except Exception as e:
                     task.status = TaskStatusEnum.FAILED
@@ -519,6 +534,13 @@ class JobManager:
                     if task.task_type == TaskTypeEnum.BACKUP:
                         remaining_tasks = job.tasks[task_index + 1 :]
                         for remaining_task in remaining_tasks:
+                            # Allow notification tasks to run even after critical exception
+                            if remaining_task.task_type == TaskTypeEnum.NOTIFICATION:
+                                logger.info(
+                                    f"Keeping notification task {remaining_task.task_name} to report failure"
+                                )
+                                continue
+
                             if remaining_task.status == TaskStatusEnum.PENDING:
                                 remaining_task.status = TaskStatusEnum.SKIPPED
                             remaining_task.completed_at = now_utc()
@@ -545,8 +567,6 @@ class JobManager:
                                 logger.error(
                                     f"Failed to update tasks in database after critical exception: {db_e}"
                                 )
-
-                        break
 
             failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
             completed_tasks = [

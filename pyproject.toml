@@ -162,6 +162,7 @@ markers = [
 ]
 
 [tool.coverage.run]
+concurrency = ["greenlet", "thread"]
 source = ["src/borgitory"]
 omit = [
     "*/tests/*",

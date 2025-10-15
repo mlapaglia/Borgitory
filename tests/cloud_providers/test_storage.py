@@ -111,7 +111,7 @@ class TestS3StorageConfig:
                 storage_class="INVALID_CLASS",
             )
 
-        assert "Invalid storage class" in str(exc_info.value)
+        assert "is not supported by" in str(exc_info.value)
 
     def test_storage_class_normalization(self) -> None:
         """Test that storage class is normalized to uppercase"""
@@ -154,7 +154,7 @@ class TestS3StorageConfig:
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
-        assert "at least 16 characters" in str(exc_info.value)
+        assert "String should have at least 16 char" in str(exc_info.value)
 
     def test_empty_secret_key(self) -> None:
         """Test validation of empty secret key"""
@@ -165,7 +165,7 @@ class TestS3StorageConfig:
                 secret_key="",  # Empty
             )
 
-        assert "at least 40 characters" in str(exc_info.value)
+        assert "String should have at least 16 char" in str(exc_info.value)
 
     def test_invalid_access_key_format(self) -> None:
         """Test validation of access key format"""
@@ -185,7 +185,7 @@ class TestS3StorageConfig:
                 access_key="AKIA123",  # Too short
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
-        assert "at least 16 characters" in str(exc_info.value)
+        assert "String should have at least 16 characters" in str(exc_info.value)
 
         # Test key with non-alphanumeric characters (exactly 20 chars)
         with pytest.raises(ValidationError) as exc_info:
@@ -214,7 +214,7 @@ class TestS3StorageConfig:
                 access_key="AKIAIOSFODNN7EXAMPLE",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLE",  # Too short
             )
-        assert "at least 40 characters" in str(exc_info.value)
+        assert "must be exactly 40 characters long" in str(exc_info.value)
 
         # Test key with invalid characters (exactly 40 chars)
         with pytest.raises(ValidationError) as exc_info:
@@ -517,7 +517,7 @@ class TestS3Storage:
         # Verify events - START + COMPLETED at minimum
         assert len(events) >= 2
         assert events[0].type == SyncEventType.STARTED
-        assert "Starting S3 upload" in events[0].message
+        assert "upload to bucket test-bucket" in events[0].message
         assert events[-1].type == SyncEventType.COMPLETED
         assert "completed successfully" in events[-1].message
 

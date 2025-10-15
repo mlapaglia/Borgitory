@@ -1,5 +1,5 @@
 """
-Amazon S3 cloud storage implementation.
+Amazon S3 compatible cloud storage implementation.
 
 This module provides S3-specific storage operations with clean separation
 from business logic and easy testability.
@@ -7,8 +7,9 @@ from business logic and easy testability.
 
 import asyncio
 import re
+from enum import Enum
 from typing import AsyncGenerator, Callable, Dict, List, Optional, Union, cast
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.file_protocols import FileServiceProtocol
@@ -20,40 +21,86 @@ from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
 
 
-class S3StorageConfig(CloudStorageConfig):
-    """Configuration for Amazon S3 storage"""
+class S3Provider(str, Enum):
+    """S3-compatible storage providers"""
 
+    AWS = "AWS"
+    ALIBABA = "Alibaba"
+    ARVAN_CLOUD = "ArvanCloud"
+    BACKBLAZE = "Backblaze"
+    CEPH = "Ceph"
+    CHINA_MOBILE = "ChinaMobile"
+    CLOUDFLARE = "Cloudflare"
+    DIGITALOCEAN = "DigitalOcean"
+    DREAMHOST = "Dreamhost"
+    EXABA = "Exaba"
+    FILELU = "FileLu"
+    FLASHBLADE = "FlashBlade"
+    GCS = "GCS"
+    HETZNER = "Hetzner"
+    HUAWEI_OBS = "HuaweiOBS"
+    IBM_COS = "IBMCOS"
+    IDRIVE = "IDrive"
+    INTERCOLO = "Intercolo"
+    IONOS = "IONOS"
+    LYVE_CLOUD = "LyveCloud"
+    LEVIIA = "Leviia"
+    LIARA = "Liara"
+    LINODE = "Linode"
+    MAGALU = "Magalu"
+    MEGA = "Mega"
+    MINIO = "Minio"
+    NETEASE = "Netease"
+    OUTSCALE = "Outscale"
+    OVH_CLOUD = "OVHcloud"
+    PETABOX = "Petabox"
+    RABATA = "Rabata"
+    RACKCORP = "RackCorp"
+    RCLONE = "Rclone"
+    SCALEWAY = "Scaleway"
+    SEAWEEDFS = "SeaweedFS"
+    SELECTEL = "Selectel"
+    SPECTRA_LOGIC = "SpectraLogic"
+    STACKPATH = "StackPath"
+    STORJ = "Storj"
+    SYNOLOGY = "Synology"
+    TENCENT_COS = "TencentCOS"
+    WASABI = "Wasabi"
+    QINIU = "Qiniu"
+    ZATA = "Zata"
+    OTHER = "Other"
+
+
+class S3StorageConfig(CloudStorageConfig):
+    """Configuration for S3-compatible storage"""
+
+    provider_type: S3Provider = Field(default=S3Provider.AWS)
     bucket_name: str = Field(..., min_length=3, max_length=63)
     access_key: str = Field(..., min_length=16, max_length=128)
-    secret_key: str = Field(..., min_length=40, max_length=128)
+    secret_key: str = Field(..., min_length=16, max_length=128)
     region: str = Field(default="us-east-1")
     endpoint_url: Optional[str] = None
     storage_class: str = Field(default="STANDARD")
 
-    @field_validator("access_key")
-    @classmethod
-    def validate_access_key(cls, v: str) -> str:
-        """Validate AWS Access Key ID format"""
-        if not v.startswith("AKIA"):
+    @model_validator(mode="after")
+    def validate_credentials(self) -> "S3StorageConfig":
+        """Validate credentials based on provider"""
+        if not self.access_key.startswith("AKIA"):
             raise ValueError("AWS Access Key ID must start with 'AKIA'")
-        if len(v) != 20:
+        if len(self.access_key) != 20:
             raise ValueError("AWS Access Key ID must be exactly 20 characters long")
-        if not v.isalnum():
+        if not self.access_key.isalnum():
             raise ValueError(
                 "AWS Access Key ID must contain only alphanumeric characters"
             )
-        return v.upper()
+        self.access_key = self.access_key.upper()
 
-    @field_validator("secret_key")
-    @classmethod
-    def validate_secret_key(cls, v: str) -> str:
-        """Validate AWS Secret Access Key format"""
-        if len(v) != 40:
+        if len(self.secret_key) != 40:
             raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
-
-        if not re.match(r"^[A-Za-z0-9+/=]+$", v):
+        if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
             raise ValueError("AWS Secret Access Key contains invalid characters")
-        return v
+
+        return self
 
     @field_validator("bucket_name")
     @classmethod
@@ -77,30 +124,27 @@ class S3StorageConfig(CloudStorageConfig):
 
         return v_lower
 
-    @field_validator("storage_class")
-    @classmethod
-    def validate_storage_class(cls, v: str) -> str:
-        """Validate and normalize storage class"""
-        valid_classes = {
-            "STANDARD",
-            "REDUCED_REDUNDANCY",
-            "STANDARD_IA",
-            "ONEZONE_IA",
-            "INTELLIGENT_TIERING",
-            "GLACIER",
-            "DEEP_ARCHIVE",
-        }
-        v_upper = v.upper()
-        if v_upper not in valid_classes:
+    @model_validator(mode="after")
+    def validate_storage_class_for_provider(self) -> "S3StorageConfig":
+        """Validate storage class is supported by the selected provider"""
+        from .s3_provider_config import S3ProviderConfig
+
+        valid_classes = S3ProviderConfig.get_storage_classes(self.provider_type)
+        storage_class_upper = self.storage_class.upper()
+
+        if storage_class_upper not in valid_classes:
             raise ValueError(
-                f"Invalid storage class. Must be one of: {', '.join(valid_classes)}"
+                f"Storage class '{self.storage_class}' is not supported by {self.provider_type.value}. "
+                f"Valid options: {', '.join(valid_classes)}"
             )
-        return v_upper
+
+        self.storage_class = storage_class_upper
+        return self
 
 
 class S3Storage(CloudStorage):
     """
-    Amazon S3 cloud storage implementation.
+    Amazon S3 compatible cloud storage implementation.
 
     This class handles S3-specific operations while maintaining the clean
     CloudStorage interface for easy testing and integration.
@@ -128,12 +172,13 @@ class S3Storage(CloudStorage):
         remote_path: str,
         progress_callback: Optional[Callable[[SyncEvent], None]] = None,
     ) -> None:
-        """Upload repository to S3"""
+        """Upload repository to S3-compatible storage"""
         if progress_callback:
+            provider_name = self._config.provider_type.value
             progress_callback(
                 SyncEvent(
                     type=SyncEventType.STARTED,
-                    message=f"Starting S3 upload to bucket {self._config.bucket_name}",
+                    message=f"Starting {provider_name} upload to bucket {self._config.bucket_name}",
                 )
             )
 
@@ -145,7 +190,7 @@ class S3Storage(CloudStorage):
             ):
                 if progress.get("type") == "completed":
                     final_status = progress.get("status")
-                elif progress_callback and progress.get("type") == "progress":
+                elif progress_callback and progress.get("type") == "log":
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
@@ -155,18 +200,20 @@ class S3Storage(CloudStorage):
                     )
 
             if final_status == "failed":
-                raise Exception("S3 sync failed with non-zero exit code")
+                raise Exception(
+                    f"{self._config.provider_type.value} sync failed with non-zero exit code"
+                )
 
             if progress_callback:
                 progress_callback(
                     SyncEvent(
                         type=SyncEventType.COMPLETED,
-                        message="S3 upload completed successfully",
+                        message=f"{self._config.provider_type.value} upload completed successfully",
                     )
                 )
 
         except Exception as e:
-            error_msg = f"S3 upload failed: {str(e)}"
+            error_msg = f"{self._config.provider_type.value} upload failed: {str(e)}"
             if progress_callback:
                 progress_callback(
                     SyncEvent(type=SyncEventType.ERROR, message=error_msg, error=str(e))
@@ -192,6 +239,7 @@ class S3Storage(CloudStorage):
         return ConnectionInfo(
             provider="s3",
             details={
+                "provider_type": self._config.provider_type.value,
                 "bucket": self._config.bucket_name,
                 "region": self._config.region,
                 "endpoint": self._config.endpoint_url or "default",
@@ -208,17 +256,28 @@ class S3Storage(CloudStorage):
 
     def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         """Get S3-specific display details for the UI"""
+        provider_type = config_dict.get("provider_type", "AWS")
         bucket_name = config_dict.get("bucket_name", "Unknown")
         region = config_dict.get("region", "us-east-1")
         storage_class = config_dict.get("storage_class", "STANDARD")
+        endpoint = config_dict.get("endpoint_url", None)
 
-        provider_details = f"""
-            <div><strong>Bucket:</strong> {bucket_name}</div>
-            <div><strong>Region:</strong> {region}</div>
-            <div><strong>Storage Class:</strong> {storage_class}</div>
-        """.strip()
+        provider_details_parts = [
+            f"<div><strong>Provider Type:</strong> {provider_type}</div>",
+            f"<div><strong>Bucket:</strong> {bucket_name}</div>",
+            f"<div><strong>Region:</strong> {region}</div>",
+            f"<div><strong>Storage Class:</strong> {storage_class}</div>",
+        ]
 
-        return {"provider_name": "AWS S3", "provider_details": provider_details}
+        if endpoint:
+            provider_details_parts.append(
+                f"<div><strong>Endpoint:</strong> {endpoint}</div>"
+            )
+
+        provider_details = "\n".join(provider_details_parts)
+        provider_label = "S3-Compatible"
+
+        return {"provider_name": provider_label, "provider_details": provider_details}
 
     @classmethod
     def get_rclone_mapping(cls) -> RcloneMethodMapping:
@@ -227,6 +286,7 @@ class S3Storage(CloudStorage):
             sync_method="sync_repository_to_s3",
             test_method="test_s3_connection",
             parameter_mapping={
+                "provider_type": "provider_type",
                 "access_key": "access_key_id",
                 "secret_key": "secret_access_key",
                 "bucket_name": "bucket_name",
@@ -240,7 +300,11 @@ class S3Storage(CloudStorage):
                 "secret_access_key",
                 "bucket_name",
             ],
-            optional_params={"path_prefix": "", "region": "us-east-1"},
+            optional_params={
+                "path_prefix": "",
+                "region": "us-east-1",
+                "provider_type": "AWS",
+            },
         )
 
     def _build_s3_flags(
@@ -258,14 +322,13 @@ class S3Storage(CloudStorage):
             "--s3-secret-access-key",
             secret_access_key,
             "--s3-provider",
-            "AWS",
+            self._config.provider_type.value,
             "--s3-region",
             region,
             "--s3-storage-class",
             storage_class,
         ]
 
-        # Add endpoint URL if specified (for S3-compatible services)
         if endpoint_url:
             flags.extend(["--s3-endpoint", endpoint_url])
 
@@ -541,8 +604,8 @@ class S3Storage(CloudStorage):
 
 @register_provider(
     name="s3",
-    label="AWS S3",
-    description="Amazon S3 compatible storage",
+    label="S3-Compatible Storage",
+    description="Amazon S3-compatible storage providers",
     supports_encryption=True,
     supports_versioning=True,
     requires_credentials=True,
@@ -550,6 +613,7 @@ class S3Storage(CloudStorage):
         sync_method="sync_repository_to_s3",
         test_method="test_s3_connection",
         parameter_mapping={
+            "provider_type": "provider_type",
             "access_key": "access_key_id",
             "secret_key": "secret_access_key",
             "bucket_name": "bucket_name",
@@ -563,10 +627,14 @@ class S3Storage(CloudStorage):
             "secret_access_key",
             "bucket_name",
         ],
-        optional_params={"path_prefix": "", "region": "us-east-1"},
+        optional_params={
+            "path_prefix": "",
+            "region": "us-east-1",
+            "provider_type": "AWS",
+        },
     ),
 )
-class S3Provider:
+class S3ProviderRegistration:
     """S3 provider registration"""
 
     config_class = S3StorageConfig
