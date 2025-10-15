@@ -291,7 +291,9 @@ class PruneService:
                 if config.strategy == "simple":
                     description = f"Keep archives within {config.keep_within_days} days"
                 else:
-                    description = RetentionFieldHandler.build_description(config)
+                    description = RetentionFieldHandler.build_description(
+                        cast(RetentionConfigProtocol, config)
+                    )
 
                 processed_config = config.__dict__.copy()
                 processed_config["description"] = description
