@@ -35,6 +35,7 @@ from borgitory.services.jobs.broadcaster.job_event import JobEvent
 from borgitory.services.jobs.task_executors import (
     BackupTaskExecutor,
     PruneTaskExecutor,
+    CompactTaskExecutor,
     CheckTaskExecutor,
     CloudSyncTaskExecutor,
     NotificationTaskExecutor,
@@ -90,6 +91,12 @@ class JobManager:
             self.database_manager,
         )
         self.prune_executor = PruneTaskExecutor(
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.database_manager,
+        )
+        self.compact_executor = CompactTaskExecutor(
             self.executor,
             self.output_manager,
             self.event_broadcaster,
@@ -657,6 +664,10 @@ class JobManager:
             return await self.backup_executor.execute_backup_task(job, task)
         elif task.task_type == TaskTypeEnum.PRUNE:
             return await self.prune_executor.execute_prune_task(job, task, task_index)
+        elif task.task_type == TaskTypeEnum.COMPACT:
+            return await self.compact_executor.execute_compact_task(
+                job, task, task_index
+            )
         elif task.task_type == TaskTypeEnum.CHECK:
             return await self.check_executor.execute_check_task(job, task, task_index)
         elif task.task_type == TaskTypeEnum.CLOUD_SYNC:

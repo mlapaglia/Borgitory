@@ -293,6 +293,56 @@ class JobExecutor:
                 return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
             )
 
+    async def execute_compact_task(
+        self,
+        repository_path: str,
+        passphrase: str,
+        output_callback: Optional[Callable[[str], None]] = None,
+    ) -> ProcessResult:
+        """
+        Execute a borg compact task
+
+        Args:
+            repository_path: Path to the borg repository
+            passphrase: Repository passphrase
+            keyfile_content: Optional keyfile content
+            output_callback: Callback for streaming output
+
+        Returns:
+            ProcessResult with execution details
+        """
+        try:
+            additional_args = ["--progress", repository_path]
+
+            logger.info(f"Starting borg compact - Repository: {repository_path}")
+
+            borg_command = create_borg_command(
+                base_command="borg compact",
+                repository_path="",
+                passphrase=passphrase,
+                additional_args=additional_args,
+            )
+            process = await self.start_process(
+                borg_command.command, borg_command.environment
+            )
+
+            result = await self.monitor_process_output(process, output_callback)
+
+            if result.return_code == 0:
+                logger.info("Compact task completed successfully")
+            else:
+                logger.error(
+                    f"Compact task failed with return code {result.return_code}"
+                )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Exception in compact task: {str(e)}")
+            return ProcessResult(
+                return_code=-1, stdout=b"", stderr=str(e).encode(), error=str(e)
+            )
+
     async def execute_cloud_sync_task(
         self,
         repository_path: str,
