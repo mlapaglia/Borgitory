@@ -2,7 +2,7 @@ ARG BORGBACKUP_VERSION=1.4.0-5
 ARG RCLONE_VERSION=1.60.1+dfsg-4
 ARG FUSE3_VERSION=3.17.2-3
 ARG PYFUSE3_VERSION=3.4.0-3+b3
-FROM python:3.13.7-slim-trixie AS builder
+FROM python:3.14.0-slim-trixie AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN pip install --upgrade pip && \
 
 COPY src/ ./src/
 
-FROM python:3.13.7-slim-trixie AS test
+FROM python:3.14.0-slim-trixie AS test
 
 ARG BORGBACKUP_VERSION
 ARG RCLONE_VERSION
@@ -50,7 +50,7 @@ COPY lint.py ./
 
 CMD ["pytest"]
 
-FROM python:3.13.7-slim-trixie
+FROM python:3.14.0-slim-trixie
 
 ARG BORGBACKUP_VERSION
 ARG RCLONE_VERSION
