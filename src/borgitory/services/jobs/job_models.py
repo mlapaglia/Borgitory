@@ -51,6 +51,7 @@ class TaskTypeEnum(str, Enum):
 
     BACKUP = "backup"
     PRUNE = "prune"
+    COMPACT = "compact"
     CHECK = "check"
     CLOUD_SYNC = "cloud_sync"
     NOTIFICATION = "notification"

@@ -112,6 +112,15 @@ class ProcessExecutorProtocol(Protocol):
         """Execute a borg prune task."""
         ...
 
+    async def execute_compact_task(
+        self,
+        repository_path: str,
+        passphrase: str,
+        output_callback: Optional[Callable[[str], None]] = None,
+    ) -> "ProcessResult":
+        """Execute a borg compact task."""
+        ...
+
     async def execute_cloud_sync_task(
         self,
         repository_path: str,

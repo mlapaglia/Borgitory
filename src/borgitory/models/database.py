@@ -343,6 +343,7 @@ class PruneConfig(Base):
     show_list: Mapped[bool] = mapped_column(Boolean, default=True)
     show_stats: Mapped[bool] = mapped_column(Boolean, default=True)
     save_space: Mapped[bool] = mapped_column(Boolean, default=False)
+    compact_after: Mapped[bool] = mapped_column(Boolean, default=True)
 
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())

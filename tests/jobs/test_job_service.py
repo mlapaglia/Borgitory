@@ -128,7 +128,7 @@ class TestJobService:
         # Verify task definitions include prune task
         call_args = self.mock_job_manager.create_composite_job.call_args
         task_definitions = call_args.kwargs["task_definitions"]
-        assert len(task_definitions) == 2
+        assert len(task_definitions) == 3  # backup + prune + compact
         assert task_definitions[0].type == "backup"
         assert task_definitions[1].type == "prune"
         assert task_definitions[1].parameters["keep_within"] == "30d"
