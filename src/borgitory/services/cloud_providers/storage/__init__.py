@@ -23,6 +23,11 @@ from .smb_storage import (
     SMBStorageConfig,
     SMBProvider,
 )  # Import provider to trigger registration
+from .s3compatible_storage import (
+    S3CompatibleStorage,
+    S3CompatibleStorageConfig,
+    S3CompatibleProvider,
+)  # Import provider to trigger registration
 
 # Import registry functions for convenience
 from ..registry import get_supported_providers, get_all_provider_info
@@ -39,6 +44,9 @@ __all__ = [
     "SMBStorage",
     "SMBStorageConfig",
     "SMBProvider",
+    "S3CompatibleStorage",
+    "S3CompatibleStorageConfig",
+    "S3CompatibleProvider",
     # Registry functions
     "get_supported_providers",
     "get_all_provider_info",
