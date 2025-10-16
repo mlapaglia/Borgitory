@@ -11,18 +11,23 @@
                name="name"
                required
                value="{{ config.name if config else '' }}"
-               placeholder="{% if not config %}Daily Cleanup{% endif %}"
+               placeholder="{%- if not config -%}Daily Cleanup{%- endif -%}"
                class="input-modern mt-1">
     </div>
     {% if config %}
         {% set retention_config = config %}
     {% endif %}
     {% include "partials/prune/retention_fields.html" %}
-    <input type="hidden" name="strategy" value="{% if config %}{{ config.strategy }}{% else %}advanced{% endif %}">
+    <input type="hidden"
+           name="strategy"
+           value="{%- if config -%}{{ config.strategy }}{%- else -%}advanced{%- endif -%}">
     <div class="flex items-center mt-3">
         <input type="checkbox"
                name="compact_after"
-               {% if config %}{% if config.compact_after %}checked{% endif %}{% else %}checked{% endif %}
+               {% if config %}{% if config.compact_after %}checked{% endif %}
+               {% else %}
+               checked
+               {% endif %}
                class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
         <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">
             Run compact after prune (reclaim space)
@@ -49,4 +54,3 @@
         </button>
     {% endif %}
 </form>
-
