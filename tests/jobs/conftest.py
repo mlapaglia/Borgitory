@@ -15,6 +15,7 @@ def mock_job_executor() -> Mock:
     executor.monitor_process_output = AsyncMock()
     executor.execute_command = AsyncMock()
     executor.execute_prune_task = AsyncMock()
+    executor.execute_compact_task = AsyncMock()
     executor.execute_cloud_sync_task = AsyncMock()
     return executor
 
