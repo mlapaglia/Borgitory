@@ -22,13 +22,80 @@ async def get_s3_providers(
 ) -> HTMLResponse:
     """Get S3 provider options as HTML"""
 
-    providers = [
-        {
-            "value": provider.value,
-            "label": S3ProviderConfig.get_provider_label(provider),
-        }
-        for provider in S3Provider
-    ]
+    # Check if this is a mobile device based on User-Agent
+    user_agent = request.headers.get("user-agent", "").lower()
+    is_mobile = any(
+        keyword in user_agent
+        for keyword in ["mobile", "android", "iphone", "ipad", "windows phone"]
+    )
+
+    providers = []
+    for provider in S3Provider:
+        full_label = S3ProviderConfig.get_provider_label(provider)
+
+        # Use shorter labels for mobile devices to prevent overflow
+        if is_mobile:
+            # Mobile-friendly abbreviated labels
+            mobile_labels = {
+                S3Provider.AWS: "AWS S3",
+                S3Provider.ALIBABA: "Alibaba OSS",
+                S3Provider.ARVAN_CLOUD: "Arvan AOS",
+                S3Provider.BACKBLAZE: "Backblaze B2",
+                S3Provider.CEPH: "Ceph",
+                S3Provider.CHINA_MOBILE: "China Mobile EOS",
+                S3Provider.CLOUDFLARE: "Cloudflare R2",
+                S3Provider.DIGITALOCEAN: "DigitalOcean Spaces",
+                S3Provider.DREAMHOST: "Dreamhost Objects",
+                S3Provider.EXABA: "Exaba",
+                S3Provider.FILELU: "FileLu S5",
+                S3Provider.FLASHBLADE: "Pure FlashBlade",
+                S3Provider.GCS: "Google Cloud Storage",
+                S3Provider.HETZNER: "Hetzner",
+                S3Provider.HUAWEI_OBS: "Huawei OBS",
+                S3Provider.IBM_COS: "IBM COS",
+                S3Provider.IDRIVE: "IDrive e2",
+                S3Provider.INTERCOLO: "Intercolo",
+                S3Provider.IONOS: "IONOS",
+                S3Provider.LYVE_CLOUD: "Seagate Lyve",
+                S3Provider.LEVIIA: "Leviia",
+                S3Provider.LIARA: "Liara",
+                S3Provider.LINODE: "Linode",
+                S3Provider.MAGALU: "Magalu",
+                S3Provider.MEGA: "MEGA S4",
+                S3Provider.MINIO: "MinIO",
+                S3Provider.NETEASE: "Netease NOS",
+                S3Provider.OUTSCALE: "OUTSCALE OOS",
+                S3Provider.OVH_CLOUD: "OVHcloud",
+                S3Provider.PETABOX: "Petabox",
+                S3Provider.RABATA: "Rabata",
+                S3Provider.RACKCORP: "RackCorp",
+                S3Provider.RCLONE: "Rclone",
+                S3Provider.SCALEWAY: "Scaleway",
+                S3Provider.SEAWEEDFS: "SeaweedFS",
+                S3Provider.SELECTEL: "Selectel",
+                S3Provider.SPECTRA_LOGIC: "Spectra Logic",
+                S3Provider.STACKPATH: "StackPath",
+                S3Provider.STORJ: "Storj",
+                S3Provider.SYNOLOGY: "Synology C2",
+                S3Provider.TENCENT_COS: "Tencent COS",
+                S3Provider.WASABI: "Wasabi",
+                S3Provider.QINIU: "Qiniu Kodo",
+                S3Provider.ZATA: "Zata",
+                S3Provider.OTHER: "Other S3",
+            }
+            label = mobile_labels.get(provider, full_label)
+        else:
+            label = full_label
+
+        providers.append(
+            {
+                "value": provider.value,
+                "label": label,
+            }
+        )
+
+    # Sort providers by label for consistent ordering
+    providers = sorted(providers, key=lambda x: x["label"])
     current_value = request.query_params.get("current_value", "")
     return templates.TemplateResponse(
         request,
@@ -48,6 +115,10 @@ async def get_s3_regions(
 
     s3_provider = query_params.get("provider_config[provider_type]")
     current_value = query_params.get("current_value", "")
+
+    # If no provider specified, default to the first provider (AWS)
+    if not s3_provider:
+        s3_provider = S3Provider.AWS.value
 
     try:
         provider_enum = S3Provider(s3_provider)
@@ -104,6 +175,10 @@ async def get_s3_storage_classes(
     s3_provider = query_params.get("provider_config[provider_type]")
     current_value = query_params.get("current_value", "")
 
+    # If no provider specified, default to the first provider (AWS)
+    if not s3_provider:
+        s3_provider = S3Provider.AWS.value
+
     try:
         provider_enum = S3Provider(s3_provider)
         storage_classes = S3ProviderConfig.get_storage_classes(provider_enum)
@@ -137,14 +212,18 @@ async def get_s3_endpoint_field(
     s3_provider = query_params.get("provider_config[provider_type]")
     current_value = query_params.get("current_value", "")
 
+    # If no provider specified, default to the first provider (AWS)
+    if not s3_provider:
+        s3_provider = S3Provider.AWS.value
+
     try:
         provider_enum = S3Provider(s3_provider)
         requires_endpoint = S3ProviderConfig.requires_endpoint(provider_enum)
         immutable_endpoint = S3ProviderConfig.has_immutable_endpoint(provider_enum)
         default_endpoint = S3ProviderConfig.get_default_endpoint(provider_enum)
 
-        # Show field if not immutable (allow custom endpoints for all non-immutable providers)
-        show_field = not immutable_endpoint
+        # Always show endpoint field for all providers
+        show_field = True
         # Use current_value if set, else default_endpoint
         value = current_value or default_endpoint
 
@@ -155,6 +234,7 @@ async def get_s3_endpoint_field(
                 "show_field": show_field,
                 "requires_endpoint": requires_endpoint,
                 "immutable_endpoint": immutable_endpoint,
+                "is_optional": not requires_endpoint and not immutable_endpoint,
                 "current_value": value,
             },
         )
@@ -166,6 +246,7 @@ async def get_s3_endpoint_field(
                 "show_field": False,
                 "requires_endpoint": False,
                 "immutable_endpoint": False,
+                "is_optional": False,
                 "current_value": "",
             },
         )
