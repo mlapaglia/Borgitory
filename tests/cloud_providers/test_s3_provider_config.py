@@ -313,3 +313,56 @@ class TestS3ProviderConfigIntegrity:
                 assert isinstance(region, str)
                 assert len(region) > 0
                 assert region == region.strip()
+
+    def test_get_default_endpoint_for_providers(self) -> None:
+        """Test getting default endpoints for various providers"""
+        # Test providers with immutable endpoints
+        assert (
+            S3ProviderConfig.get_default_endpoint(S3Provider.STORJ)
+            == "gateway.storjshare.io"
+        )
+        assert (
+            S3ProviderConfig.get_default_endpoint(S3Provider.GCS)
+            == "https://storage.googleapis.com"
+        )
+
+        # Test providers with empty endpoints
+        assert S3ProviderConfig.get_default_endpoint(S3Provider.AWS) == ""
+        assert S3ProviderConfig.get_default_endpoint(S3Provider.MINIO) == ""
+
+    def test_has_immutable_endpoint_for_providers(self) -> None:
+        """Test checking if providers have immutable endpoints"""
+        # Providers with immutable endpoints
+        assert S3ProviderConfig.has_immutable_endpoint(S3Provider.STORJ) is True
+        assert S3ProviderConfig.has_immutable_endpoint(S3Provider.GCS) is True
+        assert S3ProviderConfig.has_immutable_endpoint(S3Provider.FILELU) is True
+
+        # Providers without immutable endpoints
+        assert S3ProviderConfig.has_immutable_endpoint(S3Provider.AWS) is False
+        assert S3ProviderConfig.has_immutable_endpoint(S3Provider.MINIO) is False
+
+    def test_provider_labels_are_unique(self) -> None:
+        """Test that all provider labels are unique"""
+        labels = [
+            S3ProviderConfig.get_provider_label(provider) for provider in S3Provider
+        ]
+        assert len(labels) == len(set(labels)), "Provider labels must be unique"
+
+    def test_provider_labels_contain_provider_name(self) -> None:
+        """Test that provider labels contain the provider name or a recognizable identifier"""
+        for provider in S3Provider:
+            label = S3ProviderConfig.get_provider_label(provider)
+            provider_name = provider.value
+
+            # Either the label should contain the provider name or be a well-known alias
+            assert provider_name.lower() in label.lower() or any(
+                alias in label.lower()
+                for alias in [
+                    "amazon web services",
+                    "google cloud storage",
+                    "digitalocean spaces",
+                    "minio object storage",
+                ]
+            ), (
+                f"Label '{label}' should contain provider name '{provider_name}' or be a recognizable alias"
+            )

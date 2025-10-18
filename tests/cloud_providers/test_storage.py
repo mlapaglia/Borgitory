@@ -234,6 +234,117 @@ class TestS3StorageConfig:
             )
         assert "must be exactly 40 characters long" in str(exc_info.value)
 
+    def test_s3_config_with_minio_provider(self) -> None:
+        """Test S3 config with MinIO provider (no AKIA validation)"""
+        config = S3StorageConfig(
+            provider_type="Minio",
+            bucket_name="test-bucket",
+            access_key="minioadmin",  # MinIO doesn't require AKIA prefix
+            secret_key="minioadmin123456789",  # MinIO doesn't require 40 chars
+            endpoint_url="http://localhost:9000",
+        )
+
+        assert config.provider_type.value == "Minio"
+        assert config.access_key == "minioadmin"
+        assert config.secret_key == "minioadmin123456789"
+        assert config.endpoint_url == "http://localhost:9000"
+
+    def test_s3_config_with_gcs_provider(self) -> None:
+        """Test S3 config with GCS provider"""
+        config = S3StorageConfig(
+            provider_type="GCS",
+            bucket_name="test-bucket",
+            access_key="GOOG1234567890123456",  # GCS access key format
+            secret_key="gcs_secret_key_example_12345678901234567890",
+        )
+
+        assert config.provider_type.value == "GCS"
+        assert config.access_key == "GOOG1234567890123456"
+        assert config.secret_key == "gcs_secret_key_example_12345678901234567890"
+
+    def test_storage_class_validation_for_digitalocean(self) -> None:
+        """Test that GLACIER storage class fails for DigitalOcean"""
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                provider_type="DigitalOcean",
+                bucket_name="test-bucket",
+                access_key="DO12345678901234567890",
+                secret_key="do_secret_key_123456789012345678901234567890",
+                storage_class="GLACIER",  # DigitalOcean only supports STANDARD
+            )
+
+        assert "is not supported by DigitalOcean" in str(exc_info.value)
+
+    def test_storage_class_validation_for_gcs(self) -> None:
+        """Test that NEARLINE storage class works for GCS"""
+        config = S3StorageConfig(
+            provider_type="GCS",
+            bucket_name="test-bucket",
+            access_key="GOOG1234567890123456",
+            secret_key="gcs_secret_key_example_12345678901234567890",
+            storage_class="NEARLINE",  # GCS supports NEARLINE
+        )
+
+        assert config.storage_class == "NEARLINE"
+
+    def test_storage_class_validation_for_gcs_nearline_only(self) -> None:
+        """Test that GLACIER storage class fails for GCS"""
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                provider_type="GCS",
+                bucket_name="test-bucket",
+                access_key="GOOG1234567890123456",
+                secret_key="gcs_secret_key_example_12345678901234567890",
+                storage_class="GLACIER",  # GCS doesn't support GLACIER
+            )
+
+        assert "is not supported by GCS" in str(exc_info.value)
+
+    def test_storage_class_validation_for_minio(self) -> None:
+        """Test storage class validation for MinIO"""
+        # MinIO supports STANDARD and REDUCED_REDUNDANCY
+        config = S3StorageConfig(
+            provider_type="Minio",
+            bucket_name="test-bucket",
+            access_key="minioadmin",
+            secret_key="minioadmin123456789",
+            storage_class="REDUCED_REDUNDANCY",
+        )
+
+        assert config.storage_class == "REDUCED_REDUNDANCY"
+
+        # MinIO doesn't support GLACIER
+        with pytest.raises(ValidationError) as exc_info:
+            S3StorageConfig(
+                provider_type="Minio",
+                bucket_name="test-bucket",
+                access_key="minioadmin",
+                secret_key="minioadmin123456789",
+                storage_class="GLACIER",
+            )
+
+        assert "is not supported by Minio" in str(exc_info.value)
+
+    def test_provider_specific_default_storage_class(self) -> None:
+        """Test that default storage class is set correctly for different providers"""
+        # Test AWS default
+        aws_config = S3StorageConfig(
+            bucket_name="test-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        )
+        assert aws_config.provider_type.value == "AWS"
+        assert aws_config.storage_class == "STANDARD"
+
+        # Test GCS default
+        gcs_config = S3StorageConfig(
+            provider_type="GCS",
+            bucket_name="test-bucket",
+            access_key="GOOG1234567890123456",
+            secret_key="gcs_secret_key_example_12345678901234567890",
+        )
+        assert gcs_config.storage_class == "STANDARD"  # GCS default is STANDARD
+
 
 class TestSFTPStorageConfig:
     """Test SFTP storage configuration validation"""

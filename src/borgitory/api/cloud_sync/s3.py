@@ -187,7 +187,5 @@ async def get_s3_endpoint_field(
                 "immutable_endpoint": False,
                 "is_optional": False,
                 "current_value": "",
-                "has_endpoint_options": False,
-                "endpoint_options": {},
             },
         )
