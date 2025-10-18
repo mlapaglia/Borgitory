@@ -85,20 +85,30 @@ class S3StorageConfig(CloudStorageConfig):
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3StorageConfig":
         """Validate credentials based on provider"""
-        if not self.access_key.startswith("AKIA"):
-            raise ValueError("AWS Access Key ID must start with 'AKIA'")
-        if len(self.access_key) != 20:
-            raise ValueError("AWS Access Key ID must be exactly 20 characters long")
-        if not self.access_key.isalnum():
-            raise ValueError(
-                "AWS Access Key ID must contain only alphanumeric characters"
-            )
-        self.access_key = self.access_key.upper()
+        if self.provider_type == S3Provider.AWS:
+            # AWS-specific validation
+            if not self.access_key.startswith("AKIA"):
+                raise ValueError("AWS Access Key ID must start with 'AKIA'")
+            if len(self.access_key) != 20:
+                raise ValueError("AWS Access Key ID must be exactly 20 characters long")
+            if not self.access_key.isalnum():
+                raise ValueError(
+                    "AWS Access Key ID must contain only alphanumeric characters"
+                )
+            self.access_key = self.access_key.upper()
 
-        if len(self.secret_key) != 40:
-            raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
-        if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
-            raise ValueError("AWS Secret Access Key contains invalid characters")
+            if len(self.secret_key) != 40:
+                raise ValueError(
+                    "AWS Secret Access Key must be exactly 40 characters long"
+                )
+            if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
+                raise ValueError("AWS Secret Access Key contains invalid characters")
+        else:
+            # For other providers, basic validation only
+            if not self.access_key or len(self.access_key) < 1:
+                raise ValueError("Access Key is required")
+            if not self.secret_key or len(self.secret_key) < 1:
+                raise ValueError("Secret Key is required")
 
         return self
 
@@ -316,23 +326,103 @@ class S3Storage(CloudStorage):
         storage_class: str = "STANDARD",
     ) -> List[str]:
         """Build S3 configuration flags for rclone command"""
+        # Map provider types to rclone-compatible provider names
+        rclone_provider = self._get_rclone_provider_name()
+
         flags = [
             "--s3-access-key-id",
             access_key_id,
             "--s3-secret-access-key",
             secret_access_key,
             "--s3-provider",
-            self._config.provider_type.value,
+            rclone_provider,
             "--s3-region",
             region,
             "--s3-storage-class",
             storage_class,
         ]
 
-        if endpoint_url:
-            flags.extend(["--s3-endpoint", endpoint_url])
+        # Handle provider-specific endpoint logic
+        provider_value = (
+            self._config.provider_type.value
+            if hasattr(self._config.provider_type, "value")
+            else str(self._config.provider_type)
+        )
+        effective_endpoint = endpoint_url
+        region_to_use = region
+
+        # Providers that rely on endpoints and shouldn't use region
+        endpoint_reliant_providers = {
+            "Hetzner",
+            "Minio",
+            "Ceph",
+            "SeaweedFS",
+            "Rclone",
+            "Other",
+            "LyveCloud",
+            "IDrive",
+            "IBM_COS",
+            "GCS",
+            "Storj",
+            "FileLu",
+            "Intercolo",
+            "Leviia",
+            "Petabox",
+            "Selectel",
+            "Zata",
+        }
+
+        if provider_value in endpoint_reliant_providers:
+            if effective_endpoint:
+                # Use the provided endpoint, ensure https for non-immutable providers
+                if not effective_endpoint.startswith("http") and provider_value not in {
+                    "GCS",
+                    "Storj",
+                    "FileLu",
+                    "Intercolo",
+                    "Leviia",
+                    "Petabox",
+                    "Selectel",
+                    "Zata",
+                }:
+                    effective_endpoint = f"https://{effective_endpoint}"
+            else:
+                # Construct default endpoint if needed
+                if provider_value == "Hetzner":
+                    effective_endpoint = f"https://{region}.your-objectstorage.com"
+                # Add other providers as needed
+            # Don't use region for these providers
+            region_to_use = ""
+        elif not effective_endpoint:
+            # Add other providers as needed
+            pass
+
+        if effective_endpoint:
+            flags.extend(["--s3-endpoint", effective_endpoint])
+        # Only pass region if it's not empty and the provider doesn't rely solely on endpoint
+        if region_to_use and provider_value not in endpoint_reliant_providers:
+            flags.extend(["--s3-region", region_to_use])
 
         return flags
+
+    def _get_rclone_provider_name(self) -> str:
+        """Get the rclone-compatible provider name"""
+        # Rclone has specific provider names it recognizes
+        # For providers not in rclone's list, use "Other"
+        provider_value = (
+            self._config.provider_type.value
+            if hasattr(self._config.provider_type, "value")
+            else self._config.provider_type
+        )
+        rclone_providers = {
+            "AWS": "AWS",
+            "GCS": "GCS",
+            "Storj": "Storj",
+            "Cloudflare": "Cloudflare",
+            # Add others as needed
+        }
+
+        return rclone_providers.get(provider_value, "Other")
 
     async def sync_repository_to_s3(
         self,
@@ -517,7 +607,11 @@ class S3Storage(CloudStorage):
                 upload_command = ["rclone", "copy", temp_file_path, s3_path]
 
                 s3_flags = self._build_s3_flags(
-                    self._config.access_key, self._config.secret_key
+                    self._config.access_key,
+                    self._config.secret_key,
+                    self._config.region,
+                    self._config.endpoint_url,
+                    self._config.storage_class,
                 )
                 upload_command.extend(s3_flags)
 

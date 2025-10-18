@@ -55,20 +55,40 @@ async def get_s3_regions(
         default_region = S3ProviderConfig.get_default_region(provider_enum)
         selected_region = current_value if current_value else default_region
 
-        return templates.TemplateResponse(
-            request,
-            "partials/cloud_sync/providers/s3/s3_region_options.html",
-            {
-                "regions": regions,
-                "selected_region": selected_region,
-                "has_regions": len(regions) > 0,
-            },
-        )
+        if len(regions) > 0:
+            # Has regions - show dropdown
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/providers/s3/s3_region_options.html",
+                {
+                    "regions": regions,
+                    "selected_region": selected_region,
+                    "has_regions": True,
+                    "show_text_field": False,
+                },
+            )
+        else:
+            # No regions - show text field
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/providers/s3/s3_region_options.html",
+                {
+                    "regions": [],
+                    "selected_region": selected_region,
+                    "has_regions": False,
+                    "show_text_field": True,
+                },
+            )
     except ValueError:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_region_options.html",
-            {"regions": [], "selected_region": "us-east-1", "has_regions": False},
+            {
+                "regions": [],
+                "selected_region": "us-east-1",
+                "has_regions": False,
+                "show_text_field": True,
+            },
         )
 
 
@@ -120,18 +140,32 @@ async def get_s3_endpoint_field(
     try:
         provider_enum = S3Provider(s3_provider)
         requires_endpoint = S3ProviderConfig.requires_endpoint(provider_enum)
+        immutable_endpoint = S3ProviderConfig.has_immutable_endpoint(provider_enum)
+        default_endpoint = S3ProviderConfig.get_default_endpoint(provider_enum)
+
+        # Show field if not immutable (allow custom endpoints for all non-immutable providers)
+        show_field = not immutable_endpoint
+        # Use current_value if set, else default_endpoint
+        value = current_value or default_endpoint
 
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_endpoint_field.html",
             {
+                "show_field": show_field,
                 "requires_endpoint": requires_endpoint,
-                "current_value": current_value,
+                "immutable_endpoint": immutable_endpoint,
+                "current_value": value,
             },
         )
     except ValueError:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_endpoint_field.html",
-            {"requires_endpoint": False, "current_value": ""},
+            {
+                "show_field": False,
+                "requires_endpoint": False,
+                "immutable_endpoint": False,
+                "current_value": "",
+            },
         )
