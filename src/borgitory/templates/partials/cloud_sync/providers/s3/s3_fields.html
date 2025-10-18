@@ -72,24 +72,14 @@
              </option>
          </select>
      </div>
-     <div id="s3-storage-class-field-container"
-          hx-get="/api/cloud-sync/s3/storage-classes"
-          hx-trigger="load, change from:#s3-provider-select"
-          hx-target="this"
-          hx-include="[name='provider_config[provider_type]']"
-          hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.storage_class or '' }}" {%- endif -%}}'
-          hx-swap="innerHTML">
-         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-             Storage Class
-         </label>
-         <select name="provider_config[storage_class]"
-                 id="s3-storage-class-select"
-                 class="select-modern mt-1">
-             <option value="{{ config.storage_class if config else '' }}" selected>
-                 {{ config.storage_class if config else '' }}
-             </option>
-         </select>
-     </div>
+      <div id="s3-storage-class-field-container"
+           hx-get="/api/cloud-sync/s3/storage-classes"
+           hx-trigger="load, change from:#s3-provider-select"
+           hx-target="this"
+           hx-include="[name='provider_config[provider_type]']"
+           hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.storage_class or '' }}" {%- endif -%}}'
+           hx-swap="innerHTML">
+      </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
             Path Prefix (optional)

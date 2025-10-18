@@ -1,6 +1,11 @@
-{% for storage_class in storage_classes %}
+<label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+    Storage Class
+</label>
+<select name="provider_config[storage_class]" class="select-modern mt-1">
+    {% for storage_class in storage_classes|default([]) %}
     <option value="{{ storage_class }}"
             {% if storage_class == selected_class %}selected{% endif %}>
         {{ storage_class }}
     </option>
-{% endfor %}
+    {% endfor %}
+</select>
