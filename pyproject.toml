@@ -18,11 +18,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: System :: Archiving :: Backup",
     "Topic :: System :: Systems Administration",
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "aiofiles>=24.1.0",
     "aiohttp>=3.9.0",
@@ -115,8 +115,8 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.13+.
-target-version = "py313"
+# Assume Python 3.14+.
+target-version = "py314"
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -162,7 +162,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-concurrency = ["greenlet", "thread"]
+concurrency = ["thread"]
 source = ["src/borgitory"]
 omit = [
     "*/tests/*",
@@ -183,7 +183,7 @@ exclude_lines = [
 
 [tool.mypy]
 # Basic settings
-python_version = "3.13"
+python_version = "3.14"
 strict = true
 
 # Display options
@@ -254,5 +254,5 @@ ignore="H021,J004,J018"
 [tool.pyright]
 include = ["src", "tests"]
 extraPaths = ["src"]
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 pythonPlatform = "All"
