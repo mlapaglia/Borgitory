@@ -92,7 +92,7 @@ def sanitize_passphrase(passphrase: str) -> str:
 def build_secure_borg_command(
     base_command: str,
     repository_path: str,
-    passphrase: str,
+    passphrase: Optional[str] = None,
     additional_args: Optional[List[str]] = None,
     environment_overrides: Optional[Dict[str, str]] = None,
 ) -> tuple[List[str], Dict[str, str]]:
@@ -102,7 +102,7 @@ def build_secure_borg_command(
     Args:
         base_command: The base borg command (e.g., "borg create")
         repository_path: Path to the repository (can be empty if included in additional_args)
-        passphrase: Repository passphrase
+        passphrase: Repository passphrase (optional)
         additional_args: Additional command arguments
         environment_overrides: Additional environment variables
 
@@ -111,14 +111,15 @@ def build_secure_borg_command(
     """
     # Sanitize inputs
     safe_repo_path = sanitize_path(repository_path) if repository_path else ""
-    safe_passphrase = sanitize_passphrase(passphrase)
 
     # Build environment variables
     environment = {
-        "BORG_PASSPHRASE": safe_passphrase,
         "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes",
         "BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK": "yes",
     }
+
+    if passphrase:
+        environment["BORG_PASSPHRASE"] = sanitize_passphrase(passphrase)
 
     if environment_overrides:
         for key, value in environment_overrides.items():
@@ -259,7 +260,7 @@ def get_or_generate_secret_key(data_dir: str) -> str:
 def build_secure_borg_command_with_keyfile(
     base_command: str,
     repository_path: str,
-    passphrase: str,
+    passphrase: Optional[str] = None,
     keyfile_path: Optional[str] = None,
     additional_args: Optional[List[str]] = None,
     environment_overrides: Optional[Dict[str, str]] = None,
@@ -270,7 +271,7 @@ def build_secure_borg_command_with_keyfile(
     Args:
         base_command: The base borg command (e.g., "borg create")
         repository_path: Path to the repository (can be empty if included in additional_args)
-        passphrase: Repository passphrase
+        passphrase: Repository passphrase (optional)
         keyfile_path: If provided, sets BORG_KEY_FILE
         additional_args: Additional command arguments
         environment_overrides: Additional environment variables
@@ -280,7 +281,9 @@ def build_secure_borg_command_with_keyfile(
     """
     environment_overrides = {}
 
-    # Handle keyfile creation
+    if passphrase:
+        environment_overrides["BORG_PASSPHRASE"] = passphrase
+
     if keyfile_path:
         environment_overrides["BORG_KEY_FILE"] = keyfile_path
 
@@ -299,7 +302,7 @@ def build_secure_borg_command_with_keyfile(
 def create_borg_command(
     base_command: str,
     repository_path: str,
-    passphrase: str,
+    passphrase: Optional[str] = None,
     keyfile_path: Optional[str] = None,
     additional_args: Optional[List[str]] = None,
     environment_overrides: Optional[Dict[str, str]] = None,
@@ -310,7 +313,7 @@ def create_borg_command(
     Args:
         base_command: The base borg command (e.g., "borg create")
         repository_path: Path to the repository (can be empty if included in additional_args)
-        passphrase: Repository passphrase
+        passphrase: Repository passphrase (optional)
         keyfile_path: If provided, sets BORG_KEY_FILE
         additional_args: Additional command arguments
         environment_overrides: Additional environment variables

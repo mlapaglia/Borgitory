@@ -1,0 +1,12 @@
+{% if encryption_type and encryption_type != 'none' %}
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Passphrase
+        </label>
+        <input type="password"
+               name="passphrase"
+               required
+               class="input-modern mt-1"
+               placeholder="Enter repository passphrase">
+    </div>
+{% endif %}

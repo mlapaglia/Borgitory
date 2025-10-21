@@ -12,10 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from borgitory.models.database import Repository, User
-from borgitory.models.enums import EncryptionType
 from borgitory.models.schemas import (
     Repository as RepositorySchema,
     RepositoryCreate,
+    RepositoryImport,
     RepositoryUpdate,
     RepositoryResponse,
 )
@@ -58,7 +58,7 @@ async def create_repository(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
-    """Create a new repository - thin controller using business logic service."""
+    """Create a new repository."""
     # Convert to DTO
     create_request = CreateRepositoryRequest(
         name=repo.name,
@@ -223,6 +223,20 @@ async def get_create_encryption_fields(
     )
 
 
+@router.get("/passphrase-field", response_class=HTMLResponse)
+async def get_passphrase_field(
+    request: Request,
+    templates: TemplatesDep,
+    encryption_type: str = "",
+) -> _TemplateResponse:
+    """Get the passphrase field based on encryption type selection."""
+    return templates.TemplateResponse(
+        request,
+        "partials/repositories/create/passphrase_field.html",
+        {"encryption_type": encryption_type},
+    )
+
+
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(
     request: Request, templates: TemplatesDep, path_service: PathServiceDep
@@ -261,23 +275,19 @@ async def get_edit_form(
 @router.post("/import")
 async def import_repository(
     request: Request,
+    repo: RepositoryImport,
     repo_svc: RepositoryServiceDep,
-    name: str = Form(...),
-    path: str = Form(...),
-    passphrase: str = Form(...),
-    encryption_type: EncryptionType = Form(None),
-    keyfile_content: str = Form(None),
-    cache_dir: str = Form(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
-    """Import an existing Borg repository - thin controller using business logic service."""
+    """Import an existing Borg repository."""
     import_request = ImportRepositoryRequest(
-        name=name,
-        path=path.strip(),
-        passphrase=passphrase,
-        encryption_type=encryption_type,
-        keyfile_content=keyfile_content,
-        cache_dir=cache_dir.strip(),
+        name=repo.name,
+        path=repo.path,
+        passphrase=repo.passphrase,
+        encryption_type=repo.encryption_type,
+        keyfile_content=repo.keyfile_content,
+        cache_dir=repo.cache_dir,
     )
 
     result = await repo_svc.import_repository(import_request, db)
@@ -305,7 +315,7 @@ async def update_repository(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
-    """Update a repository - thin controller using business logic service."""
+    """Update a repository."""
     result = await repo_svc.update_repository(repo_id, repo_update, db)
     return RepositoryResponseHandler.handle_update_response(request, result)
 
@@ -537,7 +547,7 @@ async def delete_repository(
     delete_borg_repo: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """Delete a repository - thin controller using business logic service."""
+    """Delete a repository."""
     delete_request = DeleteRepositoryRequest(
         repository_id=repo_id,
         delete_borg_repo=delete_borg_repo,
@@ -556,7 +566,7 @@ async def list_archives(
     repo_svc: RepositoryServiceDep,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """List repository archives - thin controller using business logic service."""
+    """List repository archives."""
     result = await repo_svc.list_archives(repo_id, db)
 
     return ArchiveResponseHandler.handle_archive_listing_response(request, result)
