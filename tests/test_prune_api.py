@@ -131,7 +131,7 @@ class TestPruneAPI:
         # Verify template was rendered
         mock_templates.TemplateResponse.assert_called_once_with(
             mock_request,
-            "partials/prune/create_form.html",
+            "partials/prune/form.html",
             {},
         )
 
@@ -370,7 +370,7 @@ class TestPruneAPI:
         # Verify correct template response
         mock_templates.TemplateResponse.assert_called_once_with(  # type: ignore[attr-defined]
             mock_request,
-            "partials/prune/edit_form.html",
+            "partials/prune/form.html",
             {
                 "config": mock_config,
                 "is_edit_mode": True,

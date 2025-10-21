@@ -666,12 +666,11 @@ class TestJobManagerTaskExecution:
             status=JobStatusEnum.RUNNING,
             started_at=now_utc(),
             tasks=[task],
-            repository_id=1,  # Add repository_id for the updated method
+            repository_id=1,
         )
         job_manager_with_mocks.jobs[job_id] = job
         job_manager_with_mocks.output_manager.create_job_output(job_id)
 
-        # Configure mock behaviors
         mock_database_manager.get_repository_data.return_value = {
             "id": 1,
             "name": "test-repo",
@@ -690,6 +689,105 @@ class TestJobManagerTaskExecution:
         assert success is True
         assert task.status == "completed"
         assert task.return_code == 0
+
+    async def test_execute_compact_task_success(
+        self,
+        job_manager_with_mocks: JobManager,
+        mock_job_executor: Mock,
+        mock_database_manager: Mock,
+    ) -> None:
+        """Test successful compact task execution"""
+        job_id = uuid.uuid4()
+        task = BorgJobTask(
+            task_type=TaskTypeEnum.COMPACT,
+            task_name="Test Compact",
+            parameters={
+                "repository_path": "/tmp/test-repo",
+                "passphrase": "test-pass",
+            },
+        )
+
+        job = BorgJob(
+            id=job_id,
+            job_type=JobTypeEnum.COMPOSITE,
+            status=JobStatusEnum.RUNNING,
+            started_at=now_utc(),
+            tasks=[task],
+            repository_id=1,
+        )
+        job_manager_with_mocks.jobs[job_id] = job
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
+
+        mock_database_manager.get_repository_data.return_value = {
+            "id": 1,
+            "name": "test-repo",
+            "path": "/tmp/test-repo",
+            "passphrase": "test-pass",
+        }
+
+        mock_job_executor.execute_compact_task.return_value = ProcessResult(
+            return_code=0, stdout=b"Compacting complete", stderr=b"", error=None
+        )
+
+        success = await job_manager_with_mocks.compact_executor.execute_compact_task(
+            job, task, 0
+        )
+
+        assert success is True
+        assert task.status == "completed"
+        assert task.return_code == 0
+
+    async def test_execute_compact_task_failure(
+        self,
+        job_manager_with_mocks: JobManager,
+        mock_job_executor: Mock,
+        mock_database_manager: Mock,
+    ) -> None:
+        """Test compact task failure handling"""
+        job_id = uuid.uuid4()
+        task = BorgJobTask(
+            task_type=TaskTypeEnum.COMPACT,
+            task_name="Test Compact",
+            parameters={
+                "repository_path": "/tmp/test-repo",
+                "passphrase": "test-pass",
+            },
+        )
+
+        job = BorgJob(
+            id=job_id,
+            job_type=JobTypeEnum.COMPOSITE,
+            status=JobStatusEnum.RUNNING,
+            started_at=now_utc(),
+            tasks=[task],
+            repository_id=1,
+        )
+        job_manager_with_mocks.jobs[job_id] = job
+        job_manager_with_mocks.output_manager.create_job_output(job_id)
+
+        mock_database_manager.get_repository_data.return_value = {
+            "id": 1,
+            "name": "test-repo",
+            "path": "/tmp/test-repo",
+            "passphrase": "test-pass",
+        }
+
+        mock_job_executor.execute_compact_task.return_value = ProcessResult(
+            return_code=2,
+            stdout=b"Repository locked",
+            stderr=b"",
+            error="Compact failed",
+        )
+
+        success = await job_manager_with_mocks.compact_executor.execute_compact_task(
+            job, task, 0
+        )
+
+        assert success is False
+        assert task.status == TaskStatusEnum.FAILED
+        assert task.return_code == 2
+        assert task.error is not None
+        assert "Compact failed" in task.error
 
     async def test_execute_check_task_success(
         self,

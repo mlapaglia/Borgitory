@@ -45,8 +45,8 @@ class TestRegistryBusinessLogic:
 
         # Check S3 info
         s3_info = provider_info["s3"]
-        assert s3_info.label == "AWS S3"
-        assert s3_info.description == "Amazon S3 compatible storage"
+        assert s3_info.label == "S3-Compatible Storage"
+        assert s3_info.description == "Amazon S3-compatible storage providers"
         assert s3_info.supports_encryption is True
         assert s3_info.supports_versioning is True
 
@@ -181,8 +181,8 @@ class TestAPIProviderIntegration:
         # Check structure of first provider (s3, since it's sorted)
         s3_provider = providers[0]
         assert s3_provider["value"] == "s3"
-        assert s3_provider["label"] == "AWS S3"
-        assert s3_provider["description"] == "Amazon S3 compatible storage"
+        assert s3_provider["label"] == "S3-Compatible Storage"
+        assert s3_provider["description"] == "Amazon S3-compatible storage providers"
 
         # Check that all providers have required fields
         for provider in providers:

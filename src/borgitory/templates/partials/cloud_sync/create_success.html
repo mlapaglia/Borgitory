@@ -1,7 +1,7 @@
 <!-- HTMX notification trigger -->
 <div hx-get="/api/shared/notification?type=success&message=Cloud sync location '{{ config_name }}' added successfully!"
-     hx-target="#cloud-sync-status"
-     hx-swap="innerHTML"
+     hx-target="body"
+     hx-swap="beforeend"
      hx-trigger="load"></div>
 <!-- Reset form by loading clean form -->
 <div hx-get="/api/cloud-sync/form"

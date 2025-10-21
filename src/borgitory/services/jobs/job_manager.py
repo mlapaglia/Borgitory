@@ -35,6 +35,7 @@ from borgitory.services.jobs.broadcaster.job_event import JobEvent
 from borgitory.services.jobs.task_executors import (
     BackupTaskExecutor,
     PruneTaskExecutor,
+    CompactTaskExecutor,
     CheckTaskExecutor,
     CloudSyncTaskExecutor,
     NotificationTaskExecutor,
@@ -90,6 +91,12 @@ class JobManager:
             self.database_manager,
         )
         self.prune_executor = PruneTaskExecutor(
+            self.executor,
+            self.output_manager,
+            self.event_broadcaster,
+            self.database_manager,
+        )
+        self.compact_executor = CompactTaskExecutor(
             self.executor,
             self.output_manager,
             self.event_broadcaster,
@@ -393,6 +400,13 @@ class JobManager:
             for task_index, task in enumerate(job.tasks):
                 job.current_task_index = task_index
 
+                # Skip tasks that were already marked as skipped due to earlier failures
+                if task.status == TaskStatusEnum.SKIPPED:
+                    logger.info(
+                        f"Skipping task {task.task_type} at index {task_index} - already marked as skipped"
+                    )
+                    continue
+
                 task.status = TaskStatusEnum.RUNNING
                 task.started_at = now_utc()
 
@@ -461,6 +475,16 @@ class JobManager:
 
                             remaining_tasks = job.tasks[task_index + 1 :]
                             for remaining_task in remaining_tasks:
+                                # Allow notification tasks to run even after critical failure
+                                if (
+                                    remaining_task.task_type
+                                    == TaskTypeEnum.NOTIFICATION
+                                ):
+                                    logger.info(
+                                        f"Keeping notification task {remaining_task.task_name} to report failure"
+                                    )
+                                    continue
+
                                 if remaining_task.status == TaskStatusEnum.PENDING:
                                     remaining_task.status = TaskStatusEnum.SKIPPED
                                     remaining_task.completed_at = now_utc()
@@ -487,8 +511,6 @@ class JobManager:
                                     logger.error(
                                         f"Failed to update tasks in database after critical failure: {e}"
                                     )
-
-                            break
 
                 except Exception as e:
                     task.status = TaskStatusEnum.FAILED
@@ -519,6 +541,13 @@ class JobManager:
                     if task.task_type == TaskTypeEnum.BACKUP:
                         remaining_tasks = job.tasks[task_index + 1 :]
                         for remaining_task in remaining_tasks:
+                            # Allow notification tasks to run even after critical exception
+                            if remaining_task.task_type == TaskTypeEnum.NOTIFICATION:
+                                logger.info(
+                                    f"Keeping notification task {remaining_task.task_name} to report failure"
+                                )
+                                continue
+
                             if remaining_task.status == TaskStatusEnum.PENDING:
                                 remaining_task.status = TaskStatusEnum.SKIPPED
                             remaining_task.completed_at = now_utc()
@@ -545,8 +574,6 @@ class JobManager:
                                 logger.error(
                                     f"Failed to update tasks in database after critical exception: {db_e}"
                                 )
-
-                        break
 
             failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
             completed_tasks = [
@@ -637,6 +664,10 @@ class JobManager:
             return await self.backup_executor.execute_backup_task(job, task)
         elif task.task_type == TaskTypeEnum.PRUNE:
             return await self.prune_executor.execute_prune_task(job, task, task_index)
+        elif task.task_type == TaskTypeEnum.COMPACT:
+            return await self.compact_executor.execute_compact_task(
+                job, task, task_index
+            )
         elif task.task_type == TaskTypeEnum.CHECK:
             return await self.check_executor.execute_check_task(job, task, task_index)
         elif task.task_type == TaskTypeEnum.CLOUD_SYNC:

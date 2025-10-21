@@ -100,6 +100,7 @@ class TaskDefinitionBuilder:
             "show_list": prune_config.show_list,
             "show_stats": prune_config.show_stats,
             "save_space": prune_config.save_space,
+            "compact_after": prune_config.compact_after,
         }
 
         # Add retention parameters based on strategy
@@ -135,6 +136,7 @@ class TaskDefinitionBuilder:
             "show_stats": True,  # Default for manual requests
             "save_space": getattr(prune_request, "save_space", True),
             "force_prune": getattr(prune_request, "force_prune", False),
+            "compact_after": getattr(prune_request, "compact_after", True),
         }
 
         # Add retention parameters based on strategy
@@ -148,6 +150,22 @@ class TaskDefinitionBuilder:
             type=TaskTypeEnum.PRUNE,
             name=f"Prune {repository_name}",
             parameters=parameters,
+        )
+
+    def build_compact_task(self, repository_name: str) -> TaskDefinition:
+        """
+        Build a compact task definition.
+
+        Args:
+            repository_name: Name of the repository for display
+
+        Returns:
+            Task definition dictionary
+        """
+        return TaskDefinition(
+            type=TaskTypeEnum.COMPACT,
+            name=f"Compact {repository_name}",
+            parameters={},
         )
 
     async def build_check_task_from_config(
@@ -432,15 +450,20 @@ class TaskDefinitionBuilder:
             )
 
         if prune_request:
-            tasks.append(
-                self.build_prune_task_from_request(prune_request, repository_name)
+            prune_task = self.build_prune_task_from_request(
+                prune_request, repository_name
             )
+            tasks.append(prune_task)
+            if prune_task.parameters.get("compact_after", False):
+                tasks.append(self.build_compact_task(repository_name))
         elif prune_config_id:
-            prune_task = await self.build_prune_task_from_config(
+            prune_task_result = await self.build_prune_task_from_config(
                 db, prune_config_id, repository_name
             )
-            if prune_task:
-                tasks.append(prune_task)
+            if prune_task_result:
+                tasks.append(prune_task_result)
+                if prune_task_result.parameters.get("compact_after", False):
+                    tasks.append(self.build_compact_task(repository_name))
 
         if check_request:
             tasks.append(

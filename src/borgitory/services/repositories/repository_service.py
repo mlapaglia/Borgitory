@@ -113,7 +113,10 @@ class RepositoryService:
             db_repo = Repository()
             db_repo.name = request.name
             db_repo.path = request.path
-            db_repo.set_passphrase(request.passphrase)
+
+            if request.encryption_type != EncryptionType.NONE and request.passphrase:
+                db_repo.set_passphrase(request.passphrase)
+
             db_repo.encryption_type = request.encryption_type
             db_repo.cache_dir = request.cache_dir
 
@@ -183,11 +186,12 @@ class RepositoryService:
             db_repo = Repository()
             db_repo.name = request.name
             db_repo.path = request.path
-            db_repo.set_passphrase(request.passphrase)
-            db_repo.cache_dir = request.cache_dir
 
-            if request.encryption_type:
-                db_repo.encryption_type = request.encryption_type
+            if request.encryption_type != EncryptionType.NONE and request.passphrase:
+                db_repo.set_passphrase(request.passphrase)
+
+            db_repo.encryption_type = request.encryption_type
+            db_repo.cache_dir = request.cache_dir
 
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)
@@ -454,6 +458,39 @@ class RepositoryService:
                 breadcrumb_parts=[],
                 error_message=f"Error loading directory contents: {str(e)}",
             )
+
+    async def delete_archive(
+        self, repository_id: int, archive_name: str, db: AsyncSession
+    ) -> Dict[str, Any]:
+        """Delete a specific archive from a repository."""
+        try:
+            result = await db.execute(
+                select(Repository).where(Repository.id == repository_id)
+            )
+            repository = result.scalar_one_or_none()
+            if not repository:
+                return {
+                    "success": False,
+                    "error_message": "Repository not found",
+                }
+
+            await self.borg_service.delete_archive(repository, archive_name)
+
+            logger.info(
+                f"Successfully deleted archive '{archive_name}' from repository '{repository.name}'"
+            )
+            return {
+                "success": True,
+                "message": f"Archive '{archive_name}' deleted successfully",
+            }
+
+        except Exception as e:
+            error_message = f"Failed to delete archive '{archive_name}': {str(e)}"
+            logger.error(error_message)
+            return {
+                "success": False,
+                "error_message": error_message,
+            }
 
     async def delete_repository(
         self, request: DeleteRepositoryRequest, db: AsyncSession

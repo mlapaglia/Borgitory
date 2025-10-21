@@ -1,0 +1,6 @@
+{% for storage_class in storage_classes %}
+    <option value="{{ storage_class }}"
+            {% if storage_class == selected_class %}selected{% endif %}>
+        {{ storage_class }}
+    </option>
+{% endfor %}

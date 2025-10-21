@@ -83,6 +83,7 @@ def mock_repository() -> Mock:
     repo = Mock(spec=Repository)
     repo.name = "test-repo"
     repo.path = "/test/repo/path"
+    repo.cache_dir = None
     repo.get_passphrase.return_value = "test-passphrase"
     repo.get_keyfile_content.return_value = None
     return repo
@@ -327,3 +328,119 @@ class TestBorgDefaultDirectories:
         """Test that PathService has get_default_directories method."""
         assert hasattr(mock_path_service, "get_default_directories")
         assert callable(getattr(mock_path_service, "get_default_directories"))
+
+
+class TestBorgServiceDeleteArchive:
+    """Test delete_archive method."""
+
+    @pytest.mark.asyncio
+    async def test_delete_archive_success(
+        self,
+        borg_service: BorgService,
+        mock_repository: Mock,
+        mock_command_runner: Mock,
+    ) -> None:
+        """Test successful archive deletion."""
+        mock_result = Mock()
+        mock_result.success = True
+        mock_result.return_code = 0
+        mock_result.stdout = ""
+        mock_result.stderr = ""
+
+        mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        result = await borg_service.delete_archive(mock_repository, "test-archive")
+
+        assert result is True
+        mock_command_runner.run_command.assert_called_once()
+
+        call_args = mock_command_runner.run_command.call_args
+        command = call_args[0][0]
+        assert "borg" in command
+        assert "delete" in command
+        assert f"{mock_repository.path}::test-archive" in " ".join(command)
+
+    @pytest.mark.asyncio
+    async def test_delete_archive_failure_nonzero_return_code(
+        self,
+        borg_service: BorgService,
+        mock_repository: Mock,
+        mock_command_runner: Mock,
+    ) -> None:
+        """Test archive deletion failure with non-zero return code."""
+        mock_result = Mock()
+        mock_result.success = False
+        mock_result.return_code = 2
+        mock_result.stdout = ""
+        mock_result.stderr = "Archive not found"
+
+        mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        with pytest.raises(Exception) as exc_info:
+            await borg_service.delete_archive(mock_repository, "nonexistent-archive")
+
+        assert "Failed to delete archive" in str(exc_info.value)
+        assert "Archive not found" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_delete_archive_failure_command_error(
+        self,
+        borg_service: BorgService,
+        mock_repository: Mock,
+        mock_command_runner: Mock,
+    ) -> None:
+        """Test archive deletion when command runner throws exception."""
+        mock_command_runner.run_command = AsyncMock(
+            side_effect=Exception("Command execution failed")
+        )
+
+        with pytest.raises(Exception) as exc_info:
+            await borg_service.delete_archive(mock_repository, "test-archive")
+
+        assert "Failed to delete archive" in str(exc_info.value)
+        assert "Command execution failed" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_delete_archive_with_cache_dir(
+        self,
+        borg_service: BorgService,
+        mock_repository: Mock,
+        mock_command_runner: Mock,
+    ) -> None:
+        """Test archive deletion works when cache directory is configured."""
+        mock_repository.cache_dir = "/custom/cache"
+
+        mock_result = Mock()
+        mock_result.success = True
+        mock_result.return_code = 0
+        mock_result.stdout = ""
+        mock_result.stderr = ""
+
+        mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        result = await borg_service.delete_archive(mock_repository, "test-archive")
+
+        assert result is True
+        mock_command_runner.run_command.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_archive_timeout_setting(
+        self,
+        borg_service: BorgService,
+        mock_repository: Mock,
+        mock_command_runner: Mock,
+    ) -> None:
+        """Test archive deletion uses appropriate timeout."""
+        mock_result = Mock()
+        mock_result.success = True
+        mock_result.return_code = 0
+        mock_result.stdout = ""
+        mock_result.stderr = ""
+
+        mock_command_runner.run_command = AsyncMock(return_value=mock_result)
+
+        await borg_service.delete_archive(mock_repository, "test-archive")
+
+        call_args = mock_command_runner.run_command.call_args
+        timeout = call_args[1]["timeout"]
+        assert timeout == 60

@@ -79,7 +79,7 @@ class TestTabsAPI:
         # Check that the provider dropdown exists
         assert 'name="provider"' in content
         assert 'id="provider-select"' in content
-        assert "Select Provider Type" in content
+        assert "Select Provider" in content
 
         # Check that provider options are populated from the registry
         assert 'value="s3"' in content
@@ -87,7 +87,7 @@ class TestTabsAPI:
         assert 'value="smb"' in content
 
         # Check that provider labels are present
-        assert "AWS S3" in content
+        assert "S3-Compatible Storage" in content
         assert "SFTP (SSH)" in content
         assert "SMB/CIFS" in content
 
@@ -154,7 +154,7 @@ class TestTabsAPI:
             # Should still have the dropdown structure
             assert 'name="provider"' in content
             assert 'id="provider-select"' in content
-            assert "Select Provider Type" in content
+            assert "Select Provider" in content
 
             # But no provider options
             assert 'value="s3"' not in content
@@ -172,7 +172,7 @@ class TestTabsAPI:
         response = await async_client.get("/api/cloud-sync/provider-fields?provider=s3")
         assert response.status_code == 200
         content = response.text
-        assert "Add AWS S3 Location" in content
+        assert "Add S3-Compatible" in content
 
         # Test with SFTP provider
         response = await async_client.get(

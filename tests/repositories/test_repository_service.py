@@ -30,6 +30,7 @@ class TestRepositoryService:
         mock.scan_for_repositories = AsyncMock()
         mock.list_archives = AsyncMock()
         mock.list_archive_directory_contents = AsyncMock()
+        mock.delete_archive = AsyncMock()
         return mock
 
     @pytest.fixture
@@ -2347,4 +2348,77 @@ class TestRepositoryService:
 
         mock_borg_service.list_archive_directory_contents.assert_called_once_with(
             repository, "empty-archive", "documents"
+        )
+
+    async def test_delete_archive_success(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test successfully deleting an archive."""
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        await test_db.commit()
+
+        mock_borg_service.delete_archive.return_value = True
+
+        result = await repository_service.delete_archive(
+            1, "archive-to-delete", test_db
+        )
+
+        assert result["success"] is True
+        assert "deleted successfully" in result["message"]
+
+        mock_borg_service.delete_archive.assert_called_once_with(
+            repository, "archive-to-delete"
+        )
+
+    async def test_delete_archive_repository_not_found(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deleting archive when repository doesn't exist."""
+        result = await repository_service.delete_archive(9999, "test-archive", test_db)
+
+        assert result["success"] is False
+        assert "Repository not found" in result["error_message"]
+
+        mock_borg_service.delete_archive.assert_not_called()
+
+    async def test_delete_archive_borg_error(
+        self,
+        repository_service: RepositoryService,
+        mock_borg_service: Mock,
+        test_db: AsyncSession,
+    ) -> None:
+        """Test deleting archive when Borg service throws error."""
+        repository = Repository()
+        repository.id = 1
+        repository.name = "test-repo"
+        repository.path = "/test/repo"
+        repository.set_passphrase("test123")
+        test_db.add(repository)
+        await test_db.commit()
+
+        mock_borg_service.delete_archive.side_effect = Exception(
+            "Archive not found in repository"
+        )
+
+        result = await repository_service.delete_archive(
+            1, "nonexistent-archive", test_db
+        )
+
+        assert result["success"] is False
+        assert "Failed to delete archive" in result["error_message"]
+        assert "Archive not found in repository" in result["error_message"]
+
+        mock_borg_service.delete_archive.assert_called_once_with(
+            repository, "nonexistent-archive"
         )

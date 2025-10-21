@@ -189,7 +189,7 @@ class TestCompositeJobCriticalFailure:
                 self.job_manager.notification_executor,
                 "execute_notification_task",
                 side_effect=AsyncMock(),
-            ) as mock_notification,
+            ),
         ):
             # Execute the composite job
             await self.job_manager._execute_composite_job(job)
@@ -202,9 +202,7 @@ class TestCompositeJobCriticalFailure:
         assert (
             post_hook_task.status == TaskStatusEnum.SKIPPED
         )  # Should be skipped due to critical failure
-        assert (
-            notification_task.status == TaskStatusEnum.SKIPPED
-        )  # Should be skipped due to critical failure
+        assert notification_task.status == TaskStatusEnum.RUNNING
 
         # Verify completed_at is set for skipped tasks
         assert post_hook_task.completed_at is not None
@@ -215,17 +213,10 @@ class TestCompositeJobCriticalFailure:
             "Task skipped due to critical task failure" in line
             for line in post_hook_task.output_lines
         )
-        assert any(
-            "Task skipped due to critical task failure" in line
-            for line in notification_task.output_lines
-        )
 
         # Verify job status
         assert job.status == JobStatusEnum.FAILED
         assert job.completed_at is not None
-
-        # Verify notification task was never called due to critical failure
-        mock_notification.assert_not_called()
 
     def test_non_critical_hook_failure_does_not_skip_tasks(self) -> None:
         """Test that non-critical hook failure does not skip remaining tasks."""

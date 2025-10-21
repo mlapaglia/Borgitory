@@ -195,8 +195,8 @@ def register_provider(
     Usage:
         @register_provider(
             name="s3",
-            label="AWS S3",
-            description="Amazon S3 compatible storage",
+            label="S3-Compatible Storage",
+            description="S3-compatible storage providers",
             supports_versioning=True
         )
         class S3Provider:

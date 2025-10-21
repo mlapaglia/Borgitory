@@ -39,6 +39,7 @@ def mock_prune_config() -> MagicMock:
     config.show_list = True
     config.show_stats = True
     config.save_space = False
+    config.compact_after = True
     return config
 
 
@@ -58,6 +59,7 @@ def mock_advanced_prune_config() -> MagicMock:
     config.show_list = True
     config.show_stats = False
     config.save_space = True
+    config.compact_after = False
     return config
 
 
@@ -157,6 +159,7 @@ class TestTaskDefinitionBuilder:
                 "show_list": True,
                 "show_stats": True,
                 "save_space": False,
+                "compact_after": True,
                 "keep_within": "30d",
             },
         )
@@ -184,6 +187,7 @@ class TestTaskDefinitionBuilder:
                 "show_list": True,
                 "show_stats": False,
                 "save_space": True,
+                "compact_after": False,
                 "keep_secondly": None,
                 "keep_minutely": None,
                 "keep_hourly": None,
@@ -220,6 +224,7 @@ class TestTaskDefinitionBuilder:
         prune_request.dry_run = True
         prune_request.save_space = True
         prune_request.force_prune = True
+        prune_request.compact_after = True
 
         task = task_builder.build_prune_task_from_request(prune_request, "test-repo")
 
@@ -232,6 +237,7 @@ class TestTaskDefinitionBuilder:
                 "show_stats": True,
                 "save_space": True,
                 "force_prune": True,
+                "compact_after": True,
                 "keep_within": "7d",
             },
         )
@@ -252,6 +258,7 @@ class TestTaskDefinitionBuilder:
         prune_request.keep_monthly = 12
         prune_request.keep_yearly = 2
         prune_request.dry_run = False
+        prune_request.compact_after = False
 
         task = task_builder.build_prune_task_from_request(prune_request, "test-repo")
 
@@ -264,6 +271,7 @@ class TestTaskDefinitionBuilder:
                 "show_stats": True,
                 "save_space": True,
                 "force_prune": False,
+                "compact_after": False,
                 "keep_secondly": None,
                 "keep_minutely": None,
                 "keep_hourly": None,
@@ -478,7 +486,9 @@ class TestTaskDefinitionBuilder:
             notification_config_id=1,
         )
 
-        assert len(tasks) == 5  # backup + prune + check + cloud_sync + notification
+        assert (
+            len(tasks) == 6
+        )  # backup + prune + compact + check + cloud_sync + notification
 
         # Verify task types
         task_types = [task.type for task in tasks]
@@ -524,10 +534,11 @@ class TestTaskDefinitionBuilder:
             include_cloud_sync=True,
         )
 
-        assert len(tasks) == 2  # prune + cloud_sync
+        assert len(tasks) == 3  # prune + compact + cloud_sync
         task_types = [task.type for task in tasks]
         assert TaskTypeEnum.BACKUP not in task_types
         assert TaskTypeEnum.PRUNE in task_types
+        assert TaskTypeEnum.COMPACT in task_types
         assert TaskTypeEnum.CLOUD_SYNC in task_types
 
     async def test_build_task_list_prune_request_over_config(
@@ -538,6 +549,7 @@ class TestTaskDefinitionBuilder:
         prune_request.strategy = "simple"
         prune_request.keep_within_days = 14
         prune_request.dry_run = True
+        prune_request.compact_after = True
 
         tasks = await task_builder.build_task_list(
             mock_db,
@@ -547,11 +559,13 @@ class TestTaskDefinitionBuilder:
             prune_request=prune_request,  # This should be used
         )
 
-        assert len(tasks) == 1
+        assert len(tasks) == 2  # prune + compact
         prune_task = tasks[0]
         assert prune_task.type == TaskTypeEnum.PRUNE
         assert prune_task.parameters["dry_run"] is True
         assert prune_task.parameters["keep_within"] == "14d"
+        compact_task = tasks[1]
+        assert compact_task.type == TaskTypeEnum.COMPACT
 
     async def test_build_task_list_check_request_over_config(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncSession

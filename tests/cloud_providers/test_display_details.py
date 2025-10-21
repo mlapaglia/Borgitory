@@ -44,7 +44,7 @@ class TestS3DisplayDetails:
 
         result = storage.get_display_details(config)
 
-        assert result["provider_name"] == "AWS S3"
+        assert result["provider_name"] == "S3-Compatible"
         assert isinstance(result["provider_details"], str)
         assert "my-backup-bucket" in result["provider_details"]
         assert "us-west-2" in result["provider_details"]
@@ -66,7 +66,7 @@ class TestS3DisplayDetails:
 
         result = storage.get_display_details(config)
 
-        assert result["provider_name"] == "AWS S3"
+        assert result["provider_name"] == "S3-Compatible"
         assert isinstance(result["provider_details"], str)
         assert "test-bucket" in result["provider_details"]
         assert "us-east-1" in result["provider_details"]  # Default region
@@ -87,7 +87,7 @@ class TestS3DisplayDetails:
 
         result = storage.get_display_details(config)
 
-        assert result["provider_name"] == "AWS S3"
+        assert result["provider_name"] == "S3-Compatible"
         assert isinstance(result["provider_details"], str)
         assert "Unknown" in result["provider_details"]
 
@@ -267,7 +267,7 @@ class TestDisplayDetailsIntegration:
         }
         result = _get_provider_display_details(registry, "s3", s3_config)
 
-        assert result["provider_name"] == "AWS S3"
+        assert result["provider_name"] == "S3-Compatible"
         assert "test-bucket" in result["provider_details"]
         assert "eu-west-1" in result["provider_details"]
 

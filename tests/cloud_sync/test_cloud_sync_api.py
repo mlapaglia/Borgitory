@@ -17,7 +17,7 @@ class TestCloudSyncAPIHTMX:
 
     async def test_get_add_form_html_response(self, async_client: AsyncClient) -> None:
         """Test getting add form returns HTML."""
-        response = await async_client.get("/api/cloud-sync/add-form")
+        response = await async_client.get("/api/cloud-sync/form")
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]

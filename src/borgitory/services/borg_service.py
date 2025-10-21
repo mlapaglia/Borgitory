@@ -146,6 +146,39 @@ class BorgService:
 
         return entries
 
+    async def delete_archive(self, repository: "Repository", archive_name: str) -> bool:
+        """Delete a specific archive from a repository"""
+        try:
+            borg_command = create_borg_command(
+                base_command="borg delete",
+                repository_path=f"{repository.path}::{archive_name}",
+                passphrase=repository.get_passphrase(),
+                additional_args=[],
+                environment_overrides=_build_repository_env_overrides(repository),
+            )
+
+            result = await self.command_runner.run_command(
+                borg_command.command, borg_command.environment, timeout=60
+            )
+
+            if result.success and result.return_code == 0:
+                logger.info(
+                    f"Successfully deleted archive {archive_name} from repository {repository.name}"
+                )
+                return True
+            else:
+                error_msg = (
+                    result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                )
+                logger.error(f"Failed to delete archive {archive_name}: {error_msg}")
+                raise Exception(
+                    f"Borg delete failed with code {result.return_code}: {error_msg}"
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to delete archive {archive_name}: {str(e)}")
+            raise Exception(f"Failed to delete archive: {str(e)}")
+
     async def verify_repository_access(
         self,
         repository: "Repository",
