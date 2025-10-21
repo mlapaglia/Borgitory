@@ -138,8 +138,8 @@ class RepositoryBase(BaseModel):
         pattern=r"^[A-Za-z0-9-_\s]+$",
         description="Repository name (alphanumeric, hyphens, underscores, spaces only)",
     )
-    passphrase: str = Field(
-        min_length=8, description="Passphrase must be at least 8 characters"
+    passphrase: Optional[str] = Field(
+        None, description="Passphrase (required for encrypted repositories)"
     )
     encryption_type: EncryptionType = Field(
         description="Encryption type",
@@ -154,6 +154,14 @@ class RepositoryBase(BaseModel):
         description="Custom cache directory path (optional, absolute path)",
     )
 
+    @field_validator("passphrase")
+    @classmethod
+    def validate_passphrase(cls, v: Optional[str]) -> Optional[str]:
+        """Validate passphrase - must be at least 8 characters if provided."""
+        if v is not None and v != "" and len(v) < 8:
+            raise ValueError("Passphrase must be at least 8 characters long")
+        return v
+
     @field_validator("cache_dir")
     @classmethod
     def validate_cache_dir(cls, v: Optional[str]) -> Optional[str]:
@@ -165,9 +173,21 @@ class RepositoryBase(BaseModel):
             raise ValueError("Cache directory must be an absolute path")
         return v
 
+    @model_validator(mode="after")
+    def validate_passphrase_required(self) -> "RepositoryBase":
+        """Ensure passphrase is provided when encryption is enabled."""
+        if self.encryption_type != EncryptionType.NONE:
+            if not self.passphrase or self.passphrase.strip() == "":
+                raise ValueError("Passphrase is required for encrypted repositories")
+        return self
+
 
 class RepositoryCreate(RepositoryBase):
     pass
+
+
+class RepositoryImport(RepositoryBase):
+    keyfile_content: Optional[str] = Field(None, description="Keyfile content as text")
 
 
 class RepositoryUpdate(BaseModel):

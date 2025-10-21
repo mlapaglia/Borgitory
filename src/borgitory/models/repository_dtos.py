@@ -15,9 +15,10 @@ class CreateRepositoryRequest:
 
     name: str
     path: str
-    passphrase: str
     encryption_type: EncryptionType
+    passphrase: Optional[str] = None
     cache_dir: Optional[str] = None
+    keyfile_content: Optional[str] = None  # Keyfile content as text
 
 
 @dataclass
@@ -26,8 +27,8 @@ class ImportRepositoryRequest:
 
     name: str
     path: str
-    passphrase: str
     encryption_type: EncryptionType
+    passphrase: Optional[str] = None
     keyfile_content: Optional[str] = None  # Keyfile content as text
     cache_dir: Optional[str] = None
 

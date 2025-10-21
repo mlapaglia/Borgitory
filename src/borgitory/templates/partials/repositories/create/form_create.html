@@ -48,7 +48,7 @@
                     </label>
                     <select name="encryption_type"
                             class="input-modern mt-1"
-                            {% if repository %}disabled{% endif %}>
+                            {% if repository %}disabled{% else %} hx-get="/api/repositories/passphrase-field" hx-trigger="change" hx-target="#passphrase-container" hx-swap="innerHTML" hx-include="this" {% endif %}>
                         <option value="">Select encryption type...</option>
                         <option value="repokey"
                                 {{ 'selected' if repository and repository.encryption_type == 'repokey' else '' }}>Repository Key (repokey)
@@ -87,19 +87,20 @@
                         {% endif %}
                     </p>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                        Passphrase
-                    </label>
-                    <input type="password"
-                           name="passphrase"
-                           {% if not repository %}required{% endif %}
-                           class="input-modern mt-1"
-                           {% if repository %} placeholder="Enter new passphrase (leave empty to keep current)" {% else %} placeholder="Enter repository passphrase" {% endif %}>
-                    {% if repository %}
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            Leave empty to keep the current passphrase
-                        </p>
+                <div id="passphrase-container">
+                    {% if repository and repository.encryption_type != 'none' %}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                Passphrase
+                            </label>
+                            <input type="password"
+                                   name="passphrase"
+                                   class="input-modern mt-1"
+                                   placeholder="Enter new passphrase (leave empty to keep current)">
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                Leave empty to keep the current passphrase
+                            </p>
+                        </div>
                     {% endif %}
                 </div>
                 <div>
