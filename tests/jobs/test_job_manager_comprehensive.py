@@ -1158,7 +1158,6 @@ class TestJobManagerStreamingAndUtility:
         manager = JobManager()
         # Create a mock output manager that returns an empty async generator
         from unittest.mock import Mock
-        from typing import AsyncGenerator
 
         async def empty_stream() -> AsyncGenerator[dict[str, object], None]:
             return
