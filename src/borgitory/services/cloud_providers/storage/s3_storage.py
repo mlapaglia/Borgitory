@@ -84,9 +84,7 @@ class S3StorageConfig(CloudStorageConfig):
 
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3StorageConfig":
-        """Validate credentials based on provider"""
         if self.provider_type == S3Provider.AWS:
-            # AWS-specific validation
             if not self.access_key.startswith("AKIA"):
                 raise ValueError("AWS Access Key ID must start with 'AKIA'")
             if len(self.access_key) != 20:
@@ -104,7 +102,6 @@ class S3StorageConfig(CloudStorageConfig):
             if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
                 raise ValueError("AWS Secret Access Key contains invalid characters")
         else:
-            # For other providers, basic validation only
             if not self.access_key or len(self.access_key) < 1:
                 raise ValueError("Access Key is required")
             if not self.secret_key or len(self.secret_key) < 1:
@@ -115,7 +112,6 @@ class S3StorageConfig(CloudStorageConfig):
     @field_validator("bucket_name")
     @classmethod
     def validate_bucket_name(cls, v: str) -> str:
-        """Validate and normalize S3 bucket name"""
         v_lower = v.lower()
 
         if not (3 <= len(v_lower) <= 63):
@@ -136,7 +132,6 @@ class S3StorageConfig(CloudStorageConfig):
 
     @model_validator(mode="after")
     def validate_storage_class_for_provider(self) -> "S3StorageConfig":
-        """Validate storage class is supported by the selected provider"""
         from .s3_provider_config import S3ProviderConfig
 
         valid_classes = S3ProviderConfig.get_storage_classes(self.provider_type)
@@ -166,12 +161,6 @@ class S3Storage(CloudStorage):
         command_executor: CommandExecutorProtocol,
         file_service: FileServiceProtocol,
     ) -> None:
-        """
-        Initialize S3 storage.
-
-        Args:
-            config: Validated S3 configuration
-        """
         self._config = config
         self._command_executor = command_executor
         self._file_service = file_service
@@ -182,7 +171,6 @@ class S3Storage(CloudStorage):
         remote_path: str,
         progress_callback: Optional[Callable[[SyncEvent], None]] = None,
     ) -> None:
-        """Upload repository to S3-compatible storage"""
         if progress_callback:
             provider_name = self._config.provider_type.value
             progress_callback(
@@ -231,7 +219,6 @@ class S3Storage(CloudStorage):
             raise Exception(error_msg) from e
 
     async def test_connection(self) -> bool:
-        """Test S3 connection"""
         try:
             result = await self.test_s3_connection(
                 access_key_id=self._config.access_key,
@@ -245,7 +232,6 @@ class S3Storage(CloudStorage):
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
-        """Get S3 connection info for display"""
         return ConnectionInfo(
             provider="s3",
             details={
@@ -261,11 +247,9 @@ class S3Storage(CloudStorage):
         )
 
     def get_sensitive_fields(self) -> list[str]:
-        """S3 sensitive fields"""
         return ["access_key", "secret_key"]
 
     def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
-        """Get S3-specific display details for the UI"""
         provider_type = config_dict.get("provider_type", "AWS")
         bucket_name = config_dict.get("bucket_name", "Unknown")
         region = config_dict.get("region", "us-east-1")
@@ -291,7 +275,6 @@ class S3Storage(CloudStorage):
 
     @classmethod
     def get_rclone_mapping(cls) -> RcloneMethodMapping:
-        """Define rclone parameter mapping for S3"""
         return RcloneMethodMapping(
             sync_method="sync_repository_to_s3",
             test_method="test_s3_connection",
@@ -325,7 +308,6 @@ class S3Storage(CloudStorage):
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
     ) -> List[str]:
-        """Build S3 configuration flags for rclone command"""
         # Map provider types to rclone-compatible provider names
         rclone_provider = self._get_rclone_provider_name()
 
@@ -406,7 +388,6 @@ class S3Storage(CloudStorage):
         return flags
 
     def _get_rclone_provider_name(self) -> str:
-        """Get the rclone-compatible provider name"""
         # Rclone has specific provider names it recognizes
         # For providers not in rclone's list, use "Other"
         provider_value = (
@@ -429,8 +410,6 @@ class S3Storage(CloudStorage):
         repository_path: str,
         path_prefix: str = "",
     ) -> AsyncGenerator[ProgressData, None]:
-        """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
-
         # Build S3 path
         s3_path = f":s3:{self._config.bucket_name}"
         if path_prefix:
@@ -524,7 +503,6 @@ class S3Storage(CloudStorage):
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
     ) -> ConnectionTestResult:
-        """Test S3 connection by checking bucket access"""
         try:
             s3_path = f":s3:{bucket_name}"
 
@@ -594,7 +572,6 @@ class S3Storage(CloudStorage):
             }
 
     async def _test_s3_write_permissions(self) -> ConnectionTestResult:
-        """Test write permissions by creating and deleting a small test file"""
         try:
             test_content = f"borgitory-test-{now_utc().isoformat()}"
             test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
@@ -643,7 +620,6 @@ class S3Storage(CloudStorage):
     def parse_rclone_progress(
         self, line: str
     ) -> Optional[Dict[str, Union[str, int, float]]]:
-        """Parse Rclone progress output"""
         # Look for progress statistics
         if "Transferred:" in line:
             try:
@@ -679,7 +655,6 @@ class S3Storage(CloudStorage):
     async def _merge_async_generators(
         self, *async_generators: AsyncGenerator[ProgressData, None]
     ) -> AsyncGenerator[ProgressData, None]:
-        """Merge multiple async generators into one"""
         tasks = []
         for gen in async_generators:
 

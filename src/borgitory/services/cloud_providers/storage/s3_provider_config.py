@@ -210,7 +210,14 @@ class S3ProviderConfig:
         S3Provider.BACKBLAZE: [],
         S3Provider.CEPH: [],
         S3Provider.CHINA_MOBILE: [],
-        S3Provider.DIGITALOCEAN: [],
+        S3Provider.DIGITALOCEAN: [
+            "nyc3",
+            "sfo3",
+            "fra1",
+            "lon1",
+            "ams3",
+            "sgp1",
+        ],
         S3Provider.DREAMHOST: [],
         S3Provider.EXABA: [],
         S3Provider.FLASHBLADE: [],
@@ -235,9 +242,16 @@ class S3ProviderConfig:
         S3Provider.SEAWEEDFS: [],
         S3Provider.SPECTRA_LOGIC: [],
         S3Provider.STACKPATH: [],
-        S3Provider.STORJ: [],
+        S3Provider.STORJ: ["global"],
         S3Provider.TENCENT_COS: [],
-        S3Provider.WASABI: [],
+        S3Provider.WASABI: [
+            "us-east-1",
+            "us-west-1",
+            "eu-central-1",
+            "eu-west-1",
+            "ap-northeast-1",
+            "ap-southeast-1",
+        ],
     }
 
     DEFAULT_REGION: Dict[S3Provider, str] = {
@@ -258,7 +272,7 @@ class S3ProviderConfig:
         S3Provider.BACKBLAZE: "",
         S3Provider.CEPH: "",
         S3Provider.CHINA_MOBILE: "",
-        S3Provider.DIGITALOCEAN: "",
+        S3Provider.DIGITALOCEAN: "nyc3",
         S3Provider.DREAMHOST: "",
         S3Provider.EXABA: "",
         S3Provider.FLASHBLADE: "",
@@ -283,9 +297,9 @@ class S3ProviderConfig:
         S3Provider.SEAWEEDFS: "",
         S3Provider.SPECTRA_LOGIC: "",
         S3Provider.STACKPATH: "",
-        S3Provider.STORJ: "",
+        S3Provider.STORJ: "global",
         S3Provider.TENCENT_COS: "",
-        S3Provider.WASABI: "",
+        S3Provider.WASABI: "us-east-1",
     }
 
     # Endpoint configurations - matching rclone's endpoint examples
@@ -361,14 +375,14 @@ class S3ProviderConfig:
     ]
 
     PROVIDER_LABELS: Dict[S3Provider, str] = {
-        S3Provider.AWS: "AWS",
+        S3Provider.AWS: "Amazon Web Services (AWS) S3",
         S3Provider.ALIBABA: "Alibaba",
         S3Provider.ARVAN_CLOUD: "ArvanCloud",
-        S3Provider.BACKBLAZE: "Backblaze",
+        S3Provider.BACKBLAZE: "Backblaze B2",
         S3Provider.CEPH: "Ceph",
         S3Provider.CHINA_MOBILE: "ChinaMobile",
-        S3Provider.CLOUDFLARE: "Cloudflare",
-        S3Provider.DIGITALOCEAN: "DigitalOcean",
+        S3Provider.CLOUDFLARE: "Cloudflare R2 Storage",
+        S3Provider.DIGITALOCEAN: "DigitalOcean Spaces",
         S3Provider.DREAMHOST: "Dreamhost",
         S3Provider.EXABA: "Exaba",
         S3Provider.FILELU: "FileLu",
@@ -386,7 +400,7 @@ class S3ProviderConfig:
         S3Provider.LINODE: "Linode",
         S3Provider.MAGALU: "Magalu",
         S3Provider.MEGA: "Mega",
-        S3Provider.MINIO: "Minio",
+        S3Provider.MINIO: "Minio Object Storage",
         S3Provider.NETEASE: "Netease",
         S3Provider.OUTSCALE: "Outscale",
         S3Provider.OVH_CLOUD: "OVHcloud",
@@ -399,13 +413,13 @@ class S3ProviderConfig:
         S3Provider.SELECTEL: "Selectel",
         S3Provider.SPECTRA_LOGIC: "SpectraLogic",
         S3Provider.STACKPATH: "StackPath",
-        S3Provider.STORJ: "Storj",
+        S3Provider.STORJ: "Storj (S3 Compatible Gateway)",
         S3Provider.SYNOLOGY: "Synology",
         S3Provider.TENCENT_COS: "TencentCOS",
         S3Provider.WASABI: "Wasabi",
         S3Provider.QINIU: "Qiniu",
         S3Provider.ZATA: "Zata",
-        S3Provider.OTHER: "Other",
+        S3Provider.OTHER: "Any other S3 compatible provider",
     }
 
     @classmethod
@@ -426,7 +440,8 @@ class S3ProviderConfig:
     @classmethod
     def get_default_region(cls, provider: S3Provider) -> str:
         """Get default region for a provider"""
-        return cls.DEFAULT_REGION.get(provider, "us-east-1")
+        default = cls.DEFAULT_REGION.get(provider, "us-east-1")
+        return default or "us-east-1"
 
     @classmethod
     def requires_endpoint(cls, provider: S3Provider) -> bool:
