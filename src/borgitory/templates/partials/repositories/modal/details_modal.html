@@ -91,18 +91,25 @@
                         Repository Management
                     </h4>
                     <div class="grid grid-cols-1 gap-4">
-                        <!-- Key Export -->
-                        <div class="space-y-2">
-                            <h5 class="font-medium text-gray-700 dark:text-gray-300">Key Export</h5>
-                            <a href="/api/repositories/{{ repository.id }}/export-key"
-                               download="{{ repository.name }}_key.txt"
-                               class="block w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-center">
-                                Export Repository Key
-                            </a>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                Download the repository encryption key for backup
-                            </p>
-                        </div>
+                        {% if repository.encryption_type != EncryptionType.NONE %}
+                            <!-- Key Export -->
+                            <div class="space-y-2">
+                                <h5 class="font-medium text-gray-700 dark:text-gray-300">Key Export</h5>
+                                <a href="/api/repositories/{{ repository.id }}/export-key"
+                                   download="{{ repository.name }}_key.txt"
+                                   class="block w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-center">
+                                    Export Repository Key
+                                </a>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    Download the repository encryption key for backup
+                                </p>
+                            </div>
+                        {% else %}
+                            <div class="space-y-2">
+                                <h5 class="font-medium text-gray-700 dark:text-gray-300">Key Export</h5>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Repository is not encrypted</p>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

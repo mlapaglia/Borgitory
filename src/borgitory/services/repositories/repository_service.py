@@ -113,7 +113,10 @@ class RepositoryService:
             db_repo = Repository()
             db_repo.name = request.name
             db_repo.path = request.path
-            db_repo.set_passphrase(request.passphrase)
+
+            if request.encryption_type != EncryptionType.NONE and request.passphrase:
+                db_repo.set_passphrase(request.passphrase)
+
             db_repo.encryption_type = request.encryption_type
             db_repo.cache_dir = request.cache_dir
 
@@ -183,11 +186,12 @@ class RepositoryService:
             db_repo = Repository()
             db_repo.name = request.name
             db_repo.path = request.path
-            db_repo.set_passphrase(request.passphrase)
-            db_repo.cache_dir = request.cache_dir
 
-            if request.encryption_type:
-                db_repo.encryption_type = request.encryption_type
+            if request.encryption_type != EncryptionType.NONE and request.passphrase:
+                db_repo.set_passphrase(request.passphrase)
+
+            db_repo.encryption_type = request.encryption_type
+            db_repo.cache_dir = request.cache_dir
 
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)

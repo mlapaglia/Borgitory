@@ -96,7 +96,7 @@ class Repository(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
-    encrypted_passphrase: Mapped[str] = mapped_column(String, nullable=False)
+    encrypted_passphrase: Mapped[str | None] = mapped_column(String, nullable=True)
     encryption_type: Mapped[EncryptionType] = mapped_column(
         String, default=EncryptionType.NONE, nullable=False
     )
@@ -120,8 +120,12 @@ class Repository(Base):
             get_cipher_suite().encrypt(passphrase.encode()).decode()
         )
 
-    def get_passphrase(self) -> str:
-        return get_cipher_suite().decrypt(self.encrypted_passphrase.encode()).decode()
+    def get_passphrase(self) -> str | None:
+        if self.encrypted_passphrase:
+            return (
+                get_cipher_suite().decrypt(self.encrypted_passphrase.encode()).decode()
+            )
+        return None
 
     def set_keyfile_content(self, keyfile_content: str) -> None:
         """Encrypt and store keyfile content."""
