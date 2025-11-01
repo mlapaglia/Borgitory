@@ -76,14 +76,19 @@ class S3StorageConfig(CloudStorageConfig):
 
     provider_type: S3Provider = Field(default=S3Provider.AWS)
     bucket_name: str = Field(..., min_length=3, max_length=63)
-    access_key: str = Field(..., min_length=16, max_length=128)
-    secret_key: str = Field(..., min_length=16, max_length=128)
+    access_key: str = Field(..., min_length=0, max_length=128)
+    secret_key: str = Field(..., min_length=0, max_length=128)
     region: str = Field(default="us-east-1")
     endpoint_url: Optional[str] = None
     storage_class: str = Field(default="STANDARD")
 
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3StorageConfig":
+        if not self.access_key.strip():
+            raise ValueError("Access Key is required")
+        if not self.secret_key.strip():
+            raise ValueError("Secret Key is required")
+
         if self.provider_type == S3Provider.AWS:
             if not self.access_key.startswith("AKIA"):
                 raise ValueError("AWS Access Key ID must start with 'AKIA'")
@@ -101,11 +106,6 @@ class S3StorageConfig(CloudStorageConfig):
                 )
             if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
                 raise ValueError("AWS Secret Access Key contains invalid characters")
-        else:
-            if not self.access_key or len(self.access_key) < 1:
-                raise ValueError("Access Key is required")
-            if not self.secret_key or len(self.secret_key) < 1:
-                raise ValueError("Secret Key is required")
 
         return self
 
@@ -308,7 +308,6 @@ class S3Storage(CloudStorage):
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
     ) -> List[str]:
-        # Map provider types to rclone-compatible provider names
         rclone_provider = self._get_rclone_provider_name()
 
         flags = [
@@ -324,7 +323,6 @@ class S3Storage(CloudStorage):
             storage_class,
         ]
 
-        # Handle provider-specific endpoint logic
         provider_value = (
             self._config.provider_type.value
             if hasattr(self._config.provider_type, "value")
@@ -356,7 +354,6 @@ class S3Storage(CloudStorage):
 
         if provider_value in endpoint_reliant_providers:
             if effective_endpoint:
-                # Use the provided endpoint, ensure https for non-immutable providers
                 if not effective_endpoint.startswith("http") and provider_value not in {
                     "GCS",
                     "Storj",
@@ -369,14 +366,11 @@ class S3Storage(CloudStorage):
                 }:
                     effective_endpoint = f"https://{effective_endpoint}"
             else:
-                # Construct default endpoint if needed
                 if provider_value == "Hetzner":
                     effective_endpoint = f"https://{region}.your-objectstorage.com"
-                # Add other providers as needed
             # Don't use region for these providers
             region_to_use = ""
         elif not effective_endpoint:
-            # Add other providers as needed
             pass
 
         if effective_endpoint:
@@ -400,7 +394,6 @@ class S3Storage(CloudStorage):
             "GCS": "GCS",
             "Storj": "Storj",
             "Cloudflare": "Cloudflare",
-            # Add others as needed
         }
 
         return rclone_providers.get(provider_value, "Other")
@@ -410,12 +403,10 @@ class S3Storage(CloudStorage):
         repository_path: str,
         path_prefix: str = "",
     ) -> AsyncGenerator[ProgressData, None]:
-        # Build S3 path
         s3_path = f":s3:{self._config.bucket_name}"
         if path_prefix:
             s3_path = f"{s3_path}/{path_prefix}"
 
-        # Build rclone command with S3 backend flags
         command = [
             "rclone",
             "sync",
@@ -427,7 +418,6 @@ class S3Storage(CloudStorage):
             "--verbose",
         ]
 
-        # Add S3 configuration flags
         s3_flags = self._build_s3_flags(
             self._config.access_key,
             self._config.secret_key,
@@ -506,7 +496,6 @@ class S3Storage(CloudStorage):
         try:
             s3_path = f":s3:{bucket_name}"
 
-            # Build rclone command with S3 backend flags
             command = [
                 "rclone",
                 "lsd",
@@ -516,7 +505,6 @@ class S3Storage(CloudStorage):
                 "--verbose",
             ]
 
-            # Add S3 configuration flags
             s3_flags = self._build_s3_flags(
                 access_key_id, secret_access_key, region, endpoint_url, storage_class
             )
@@ -524,7 +512,7 @@ class S3Storage(CloudStorage):
 
             result = await self._command_executor.execute_command(
                 command=command,
-                timeout=30.0,  # Reasonable timeout for connection test
+                timeout=30.0,
             )
 
             if result.success:
@@ -620,10 +608,8 @@ class S3Storage(CloudStorage):
     def parse_rclone_progress(
         self, line: str
     ) -> Optional[Dict[str, Union[str, int, float]]]:
-        # Look for progress statistics
         if "Transferred:" in line:
             try:
-                # Example: "Transferred:   	  123.45 MiByte / 456.78 MiByte, 27%, 12.34 MiByte/s, ETA 1m23s"
                 parts = line.split()
                 if len(parts) >= 6:
                     transferred = parts[1]
@@ -642,7 +628,6 @@ class S3Storage(CloudStorage):
             except (IndexError, ValueError):
                 pass
 
-        # Look for ETA information
         if "ETA" in line:
             try:
                 eta_part = line.split("ETA")[-1].strip()

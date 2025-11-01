@@ -14,6 +14,7 @@ from borgitory.services.cloud_providers.storage import (
     SFTPStorage,
     S3StorageConfig,
     SFTPStorageConfig,
+    S3Provider,
 )
 from borgitory.services.cloud_providers.types import (
     SyncEvent,
@@ -143,7 +144,7 @@ class TestS3StorageConfig:
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
-        assert "String should have at least 16 char" in str(exc_info.value)
+        assert "Access Key is required" in str(exc_info.value)
 
     def test_empty_secret_key(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
@@ -153,7 +154,7 @@ class TestS3StorageConfig:
                 secret_key="",
             )
 
-        assert "String should have at least 16 char" in str(exc_info.value)
+        assert "Secret Key is required" in str(exc_info.value)
 
     def test_invalid_access_key_format(self) -> None:
         # Test key not starting with AKIA
@@ -172,7 +173,9 @@ class TestS3StorageConfig:
                 access_key="AKIA123",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
-        assert "String should have at least 16 characters" in str(exc_info.value)
+        assert "AWS Access Key ID must be exactly 20 characters long" in str(
+            exc_info.value
+        )
 
         # Test key with non-alphanumeric characters (exactly 20 chars)
         with pytest.raises(ValidationError) as exc_info:
@@ -223,21 +226,26 @@ class TestS3StorageConfig:
     @pytest.mark.parametrize(
         "provider,access_key,secret_key,endpoint_url",
         [
-            ("Minio", "minioadmin", "minioadmin123456789", "http://localhost:9000"),
             (
-                "GCS",
+                S3Provider.MINIO,
+                "minioadmin",
+                "minioadmin123456789",
+                "http://localhost:9000",
+            ),
+            (
+                S3Provider.GCS,
                 "GOOG1234567890123456",
                 "gcs_secret_key_example_12345678901234567890",
                 None,
             ),
             (
-                "AWS",
+                S3Provider.AWS,
                 "AKIAIOSFODNN7EXAMPLE",
                 "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
                 None,
             ),
             (
-                "DigitalOcean",
+                S3Provider.DIGITALOCEAN,
                 "DO12345678901234567890",
                 "do_secret_key_123456789012345678901234567890",
                 None,
@@ -246,7 +254,7 @@ class TestS3StorageConfig:
     )
     def test_s3_config_with_different_providers(
         self,
-        provider: str,
+        provider: S3Provider,
         access_key: str,
         secret_key: str,
         endpoint_url: Optional[str],
@@ -260,7 +268,7 @@ class TestS3StorageConfig:
             endpoint_url=endpoint_url,
         )
 
-        assert config.provider_type.value == provider
+        assert config.provider_type == provider
         assert config.access_key == access_key
         assert config.secret_key == secret_key
         if endpoint_url:
@@ -269,14 +277,22 @@ class TestS3StorageConfig:
     @pytest.mark.parametrize(
         "provider,valid_classes,invalid_classes",
         [
-            ("DigitalOcean", ["STANDARD"], ["GLACIER"]),
-            ("GCS", ["STANDARD", "NEARLINE", "COLDLINE", "ARCHIVE"], ["GLACIER"]),
-            ("Minio", ["STANDARD", "REDUCED_REDUNDANCY"], ["GLACIER"]),
-            ("AWS", ["STANDARD", "GLACIER", "DEEP_ARCHIVE"], ["INVALID_CLASS"]),
+            (S3Provider.DIGITALOCEAN, ["STANDARD"], ["GLACIER"]),
+            (
+                S3Provider.GCS,
+                ["STANDARD", "NEARLINE", "COLDLINE", "ARCHIVE"],
+                ["GLACIER"],
+            ),
+            (S3Provider.MINIO, ["STANDARD", "REDUCED_REDUNDANCY"], ["GLACIER"]),
+            (
+                S3Provider.AWS,
+                ["STANDARD", "GLACIER", "DEEP_ARCHIVE"],
+                ["INVALID_CLASS"],
+            ),
         ],
     )
     def test_storage_class_validation_for_providers(
-        self, provider: str, valid_classes: list[str], invalid_classes: list[str]
+        self, provider: S3Provider, valid_classes: list[str], invalid_classes: list[str]
     ) -> None:
         """Test storage class validation for different providers"""
         # Test valid classes
@@ -284,8 +300,12 @@ class TestS3StorageConfig:
             config = S3StorageConfig(
                 provider_type=provider,
                 bucket_name="test-bucket",
-                access_key="TEST_ACCESS_KEY_12345678901234567890",
-                secret_key="test_secret_key_123456789012345678901234567890",
+                access_key="AKIATESTKEY123456789"
+                if provider == S3Provider.AWS
+                else "test_access_key",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                if provider == S3Provider.AWS
+                else "test_secret_key",
                 storage_class=storage_class,
             )
             assert config.storage_class == storage_class
@@ -296,11 +316,15 @@ class TestS3StorageConfig:
                 S3StorageConfig(
                     provider_type=provider,
                     bucket_name="test-bucket",
-                    access_key="TEST_ACCESS_KEY_12345678901234567890",
-                    secret_key="test_secret_key_123456789012345678901234567890",
+                    access_key="AKIATESTKEY123456789"
+                    if provider == S3Provider.AWS
+                    else "test_access_key",
+                    secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                    if provider == S3Provider.AWS
+                    else "test_secret_key",
                     storage_class=storage_class,
                 )
-            assert f"is not supported by {provider}" in str(exc_info.value)
+            assert f"is not supported by {provider.value}" in str(exc_info.value)
 
     def test_provider_specific_default_storage_class(self) -> None:
         # Test AWS default
@@ -314,7 +338,7 @@ class TestS3StorageConfig:
 
         # Test GCS default
         gcs_config = S3StorageConfig(
-            provider_type="GCS",
+            provider_type=S3Provider.GCS,
             bucket_name="test-bucket",
             access_key="GOOG1234567890123456",
             secret_key="gcs_secret_key_example_12345678901234567890",
