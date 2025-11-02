@@ -6,6 +6,7 @@ and simple assertions. Each test has a single responsibility.
 """
 
 import pytest
+from typing import Optional
 from unittest.mock import AsyncMock
 from pydantic import ValidationError
 from borgitory.services.cloud_providers.storage import (
@@ -13,6 +14,7 @@ from borgitory.services.cloud_providers.storage import (
     SFTPStorage,
     S3StorageConfig,
     SFTPStorageConfig,
+    S3Provider,
 )
 from borgitory.services.cloud_providers.types import (
     SyncEvent,
@@ -27,10 +29,7 @@ from borgitory.protocols.file_protocols import FileServiceProtocol
 
 
 class TestS3StorageConfig:
-    """Test S3 storage configuration validation"""
-
     def test_valid_s3_config(self) -> None:
-        """Test creating valid S3 config"""
         config = S3StorageConfig(
             bucket_name="my-backup-bucket",
             access_key="AKIAIOSFODNN7EXAMPLE",
@@ -47,19 +46,17 @@ class TestS3StorageConfig:
         assert config.endpoint_url is None
 
     def test_s3_config_with_defaults(self) -> None:
-        """Test S3 config with default values"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         )
 
-        assert config.region == "us-east-1"  # Default
-        assert config.storage_class == "STANDARD"  # Default
+        assert config.region == "us-east-1"
+        assert config.storage_class == "STANDARD"
         assert config.endpoint_url is None
 
     def test_s3_config_with_custom_endpoint(self) -> None:
-        """Test S3 config with custom endpoint (MinIO, etc.)"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
             access_key="AKIAIOSFODNN7EXAMPLE",
@@ -70,7 +67,6 @@ class TestS3StorageConfig:
         assert config.endpoint_url == "https://minio.example.com:9000"
 
     def test_bucket_name_normalization(self) -> None:
-        """Test that bucket names are normalized to lowercase"""
         config = S3StorageConfig(
             bucket_name="MY-UPPERCASE-BUCKET",
             access_key="AKIAIOSFODNN7EXAMPLE",
@@ -80,10 +76,9 @@ class TestS3StorageConfig:
         assert config.bucket_name == "my-uppercase-bucket"
 
     def test_invalid_bucket_name_too_short(self) -> None:
-        """Test validation of bucket name too short"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
-                bucket_name="ab",  # Too short
+                bucket_name="ab",
                 access_key="AKIAIOSFODNN7EXAMPLE",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
@@ -91,10 +86,9 @@ class TestS3StorageConfig:
         assert "at least 3 characters" in str(exc_info.value)
 
     def test_invalid_bucket_name_too_long(self) -> None:
-        """Test validation of bucket name too long"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
-                bucket_name="a" * 64,  # Too long
+                bucket_name="a" * 64,
                 access_key="AKIAIOSFODNN7EXAMPLE",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
@@ -102,7 +96,6 @@ class TestS3StorageConfig:
         assert "at most 63 characters" in str(exc_info.value)
 
     def test_invalid_storage_class(self) -> None:
-        """Test validation of invalid storage class"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
@@ -114,18 +107,16 @@ class TestS3StorageConfig:
         assert "is not supported by" in str(exc_info.value)
 
     def test_storage_class_normalization(self) -> None:
-        """Test that storage class is normalized to uppercase"""
         config = S3StorageConfig(
             bucket_name="test-bucket",
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-            storage_class="glacier",  # lowercase
+            storage_class="glacier",
         )
 
         assert config.storage_class == "GLACIER"
 
     def test_all_valid_storage_classes(self) -> None:
-        """Test all valid storage classes"""
         valid_classes = [
             "STANDARD",
             "REDUCED_REDUNDANCY",
@@ -146,29 +137,26 @@ class TestS3StorageConfig:
             assert config.storage_class == storage_class
 
     def test_empty_access_key(self) -> None:
-        """Test validation of empty access key"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="",  # Empty
+                access_key="",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
 
-        assert "String should have at least 16 char" in str(exc_info.value)
+        assert "Access Key is required" in str(exc_info.value)
 
     def test_empty_secret_key(self) -> None:
-        """Test validation of empty secret key"""
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
                 access_key="AKIAIOSFODNN7EXAMPLE",
-                secret_key="",  # Empty
+                secret_key="",
             )
 
-        assert "String should have at least 16 char" in str(exc_info.value)
+        assert "Secret Key is required" in str(exc_info.value)
 
     def test_invalid_access_key_format(self) -> None:
-        """Test validation of access key format"""
         # Test key not starting with AKIA
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
@@ -182,16 +170,18 @@ class TestS3StorageConfig:
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="AKIA123",  # Too short
+                access_key="AKIA123",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
-        assert "String should have at least 16 characters" in str(exc_info.value)
+        assert "AWS Access Key ID must be exactly 20 characters long" in str(
+            exc_info.value
+        )
 
         # Test key with non-alphanumeric characters (exactly 20 chars)
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="AKIA123456789012345-",  # Contains hyphen, exactly 20 chars
+                access_key="AKIA123456789012345-",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
         assert "must contain only alphanumeric characters" in str(exc_info.value)
@@ -200,19 +190,18 @@ class TestS3StorageConfig:
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
-                access_key="NOTAKIA123456789012",  # Exactly 20 chars but wrong prefix
+                access_key="NOTAKIA123456789012",
                 secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             )
         assert "must start with 'AKIA'" in str(exc_info.value)
 
     def test_invalid_secret_key_format(self) -> None:
-        """Test validation of secret key format"""
         # Test key with wrong length (too short)
         with pytest.raises(ValidationError) as exc_info:
             S3StorageConfig(
                 bucket_name="test-bucket",
                 access_key="AKIAIOSFODNN7EXAMPLE",
-                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLE",  # Too short
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLE",
             )
         assert "must be exactly 40 characters long" in str(exc_info.value)
 
@@ -221,7 +210,7 @@ class TestS3StorageConfig:
             S3StorageConfig(
                 bucket_name="test-bucket",
                 access_key="AKIAIOSFODNN7EXAMPLE",
-                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKE@",  # Contains @, exactly 40 chars
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKE@",
             )
         assert "contains invalid characters" in str(exc_info.value)
 
@@ -230,9 +219,131 @@ class TestS3StorageConfig:
             S3StorageConfig(
                 bucket_name="test-bucket",
                 access_key="AKIAIOSFODNN7EXAMPLE",
-                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYX",  # 41 chars
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYX",
             )
         assert "must be exactly 40 characters long" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "provider,access_key,secret_key,endpoint_url",
+        [
+            (
+                S3Provider.MINIO,
+                "minioadmin",
+                "minioadmin123456789",
+                "http://localhost:9000",
+            ),
+            (
+                S3Provider.GCS,
+                "GOOG1234567890123456",
+                "gcs_secret_key_example_12345678901234567890",
+                None,
+            ),
+            (
+                S3Provider.AWS,
+                "AKIAIOSFODNN7EXAMPLE",
+                "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                None,
+            ),
+            (
+                S3Provider.DIGITALOCEAN,
+                "DO12345678901234567890",
+                "do_secret_key_123456789012345678901234567890",
+                None,
+            ),
+        ],
+    )
+    def test_s3_config_with_different_providers(
+        self,
+        provider: S3Provider,
+        access_key: str,
+        secret_key: str,
+        endpoint_url: Optional[str],
+    ) -> None:
+        """Test S3 config with different providers"""
+        config = S3StorageConfig(
+            provider_type=provider,
+            bucket_name="test-bucket",
+            access_key=access_key,
+            secret_key=secret_key,
+            endpoint_url=endpoint_url,
+        )
+
+        assert config.provider_type == provider
+        assert config.access_key == access_key
+        assert config.secret_key == secret_key
+        if endpoint_url:
+            assert config.endpoint_url == endpoint_url
+
+    @pytest.mark.parametrize(
+        "provider,valid_classes,invalid_classes",
+        [
+            (S3Provider.DIGITALOCEAN, ["STANDARD"], ["GLACIER"]),
+            (
+                S3Provider.GCS,
+                ["STANDARD", "NEARLINE", "COLDLINE", "ARCHIVE"],
+                ["GLACIER"],
+            ),
+            (S3Provider.MINIO, ["STANDARD", "REDUCED_REDUNDANCY"], ["GLACIER"]),
+            (
+                S3Provider.AWS,
+                ["STANDARD", "GLACIER", "DEEP_ARCHIVE"],
+                ["INVALID_CLASS"],
+            ),
+        ],
+    )
+    def test_storage_class_validation_for_providers(
+        self, provider: S3Provider, valid_classes: list[str], invalid_classes: list[str]
+    ) -> None:
+        """Test storage class validation for different providers"""
+        # Test valid classes
+        for storage_class in valid_classes:
+            config = S3StorageConfig(
+                provider_type=provider,
+                bucket_name="test-bucket",
+                access_key="AKIATESTKEY123456789"
+                if provider == S3Provider.AWS
+                else "test_access_key",
+                secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                if provider == S3Provider.AWS
+                else "test_secret_key",
+                storage_class=storage_class,
+            )
+            assert config.storage_class == storage_class
+
+        # Test invalid classes
+        for storage_class in invalid_classes:
+            with pytest.raises(ValidationError) as exc_info:
+                S3StorageConfig(
+                    provider_type=provider,
+                    bucket_name="test-bucket",
+                    access_key="AKIATESTKEY123456789"
+                    if provider == S3Provider.AWS
+                    else "test_access_key",
+                    secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                    if provider == S3Provider.AWS
+                    else "test_secret_key",
+                    storage_class=storage_class,
+                )
+            assert f"is not supported by {provider.value}" in str(exc_info.value)
+
+    def test_provider_specific_default_storage_class(self) -> None:
+        # Test AWS default
+        aws_config = S3StorageConfig(
+            bucket_name="test-bucket",
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        )
+        assert aws_config.provider_type.value == "AWS"
+        assert aws_config.storage_class == "STANDARD"
+
+        # Test GCS default
+        gcs_config = S3StorageConfig(
+            provider_type=S3Provider.GCS,
+            bucket_name="test-bucket",
+            access_key="GOOG1234567890123456",
+            secret_key="gcs_secret_key_example_12345678901234567890",
+        )
+        assert gcs_config.storage_class == "STANDARD"
 
 
 class TestSFTPStorageConfig:

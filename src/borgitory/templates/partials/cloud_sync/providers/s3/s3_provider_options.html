@@ -1,6 +1,13 @@
 {% for provider in providers %}
     <option value="{{ provider.value }}"
-            {% if provider.value == selected_provider %}selected{% endif %}>
+            {% if provider.value == selected_provider or (not selected_provider and loop.first) %}selected{% endif %}>
         {{ provider.label }}
     </option>
 {% endfor %}
+<script>
+    // Trigger change event on the select to update dependent fields
+    const select = document.getElementById('s3-provider-select');
+    if (select) {
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+</script>

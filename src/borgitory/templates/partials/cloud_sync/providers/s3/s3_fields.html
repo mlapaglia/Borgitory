@@ -54,42 +54,32 @@
                {% if config %}value="{{ config.secret_key or '' }}" placeholder="Current value will be used if left empty" {% else %}required{% endif %}
                class="input-modern mt-1">
     </div>
-    <div>
-        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-            Region
-        </label>
-        <select name="provider_config[region]"
-                id="s3-region-select"
-                class="select-modern mt-1"
-                hx-get="/api/cloud-sync/s3/regions"
-                hx-trigger="load, change from:#s3-provider-select"
-                hx-target="this"
-                hx-include="[name='provider_config[provider_type]']"
-                hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.region or '' }}" {%- endif -%}}'
-                hx-swap="innerHTML">
-            <option value="{{ config.region if config else '' }}" selected>
-                {{ config.region if config else '' }}
-            </option>
-        </select>
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-            Storage Class
-        </label>
-        <select name="provider_config[storage_class]"
-                id="s3-storage-class-select"
-                class="select-modern mt-1"
-                hx-get="/api/cloud-sync/s3/storage-classes"
-                hx-trigger="load, change from:#s3-provider-select"
-                hx-target="this"
-                hx-include="[name='provider_config[provider_type]']"
-                hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.storage_class or '' }}" {%- endif -%}}'
-                hx-swap="innerHTML">
-            <option value="{{ config.storage_class if config else '' }}" selected>
-                {{ config.storage_class if config else '' }}
-            </option>
-        </select>
-    </div>
+     <div id="s3-region-field-container"
+          hx-get="/api/cloud-sync/s3/regions"
+          hx-trigger="load, change from:#s3-provider-select"
+          hx-target="this"
+          hx-include="[name='provider_config[provider_type]']"
+          hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.region or '' }}" {%- endif -%}}'
+          hx-swap="innerHTML">
+         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+             Region
+         </label>
+         <select name="provider_config[region]"
+                 id="s3-region-select"
+                 class="select-modern mt-1">
+             <option value="{{ config.region if config else '' }}" selected>
+                 {{ config.region if config else '' }}
+             </option>
+         </select>
+     </div>
+      <div id="s3-storage-class-field-container"
+           hx-get="/api/cloud-sync/s3/storage-classes"
+           hx-trigger="load, change from:#s3-provider-select"
+           hx-target="this"
+           hx-include="[name='provider_config[provider_type]']"
+           hx-vals='{"s3_provider": ""{%- if config -%} , "current_value": "{{ config.storage_class or '' }}" {%- endif -%}}'
+           hx-swap="innerHTML">
+      </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
             Path Prefix (optional)

@@ -229,18 +229,18 @@
     #sidebar {
         transform: translateX(-100%);
     }
-    
+
     /* Show sidebar when mobile menu is open */
     #sidebar.mobile-open {
         transform: translateX(0);
     }
-    
+
     /* Ensure main content takes full width on mobile */
     .flex-1 {
         width: 100%;
         margin-left: 0 !important;
     }
-    
+
     /* Adjust sidebar height for mobile navbar */
     #sidebar {
         top: 64px; /* Account for navbar height */

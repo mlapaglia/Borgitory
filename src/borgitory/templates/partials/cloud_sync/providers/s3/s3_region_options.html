@@ -1,10 +1,14 @@
+<label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+    Region
+</label>
 {% if has_regions %}
+<select name="provider_config[region]" class="select-modern mt-1">
     {% for region in regions %}
-        <option value="{{ region }}"
-                {% if region == selected_region %}selected{% endif %}>
-            {{ region }}
-        </option>
+    <option value="{{ region }}" {% if region == selected_region %}selected{% endif %}>
+        {{ region }}
+    </option>
     {% endfor %}
+</select>
 {% else %}
-    <option value="us-east-1" selected>us-east-1 (default)</option>
+<input type="text" name="provider_config[region]" value="{{ selected_region }}" placeholder="Enter region (optional)" class="input-modern mt-1">
 {% endif %}

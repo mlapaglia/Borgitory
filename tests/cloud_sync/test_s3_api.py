@@ -234,3 +234,70 @@ class TestS3APIHTMXResponses:
             response = await async_client.get(endpoint)
             assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
+
+    async def test_get_s3_regions_malformed_provider_param(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test regions endpoint with malformed provider parameter"""
+        response = await async_client.get(
+            "/api/cloud-sync/s3/regions?provider_config%5Bprovider_type%5D=AWS"  # URL encoded
+        )
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    async def test_get_s3_storage_classes_empty_provider_param(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test storage classes endpoint with empty provider parameter"""
+        response = await async_client.get(
+            "/api/cloud-sync/s3/storage-classes?provider_config[provider_type]="
+        )
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    async def test_get_s3_endpoint_field_provider_requiring_endpoint_with_value(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test endpoint field for MinIO with a custom endpoint value"""
+        response = await async_client.get(
+            "/api/cloud-sync/s3/endpoint-field?provider_config[provider_type]=Minio&current_value=https://custom.minio.endpoint:9000"
+        )
+
+        assert response.status_code == 200
+        content = response.text
+        assert "https://custom.minio.endpoint:9000" in content
+
+    async def test_get_s3_providers_sorted_alphabetically(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test that providers are returned in alphabetical order by label"""
+        response = await async_client.get("/api/cloud-sync/s3/providers")
+
+        assert response.status_code == 200
+        content = response.text
+
+        # Check that providers appear in alphabetical order
+        # This is a basic check - AWS should come before Backblaze
+        aws_pos = content.find("AWS")
+        backblaze_pos = content.find("Backblaze")
+
+        # If both are found, AWS should come first
+        if aws_pos != -1 and backblaze_pos != -1:
+            assert aws_pos < backblaze_pos
+
+    async def test_get_s3_regions_provider_with_no_regions_shows_text_field(
+        self, async_client: AsyncClient
+    ) -> None:
+        """Test that providers with no regions show a text input field"""
+        response = await async_client.get(
+            "/api/cloud-sync/s3/regions?provider_config[provider_type]=Minio"
+        )
+
+        assert response.status_code == 200
+        content = response.text
+
+        # MinIO has no predefined regions, should show text input
+        assert "input" in content.lower()
+        assert 'type="text"' in content

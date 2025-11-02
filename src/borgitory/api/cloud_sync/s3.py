@@ -29,6 +29,8 @@ async def get_s3_providers(
         }
         for provider in S3Provider
     ]
+    # Sort providers by label for consistent ordering
+    providers = sorted(providers, key=lambda x: x["label"])
     current_value = request.query_params.get("current_value", "")
     return templates.TemplateResponse(
         request,
@@ -49,26 +51,50 @@ async def get_s3_regions(
     s3_provider = query_params.get("provider_config[provider_type]")
     current_value = query_params.get("current_value", "")
 
+    # If no provider specified, default to the first provider (AWS)
+    if not s3_provider:
+        s3_provider = S3Provider.AWS.value
+
     try:
         provider_enum = S3Provider(s3_provider)
         regions = S3ProviderConfig.get_regions(provider_enum)
         default_region = S3ProviderConfig.get_default_region(provider_enum)
         selected_region = current_value if current_value else default_region
 
-        return templates.TemplateResponse(
-            request,
-            "partials/cloud_sync/providers/s3/s3_region_options.html",
-            {
-                "regions": regions,
-                "selected_region": selected_region,
-                "has_regions": len(regions) > 0,
-            },
-        )
+        if len(regions) > 0:
+            # Has regions - show dropdown
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/providers/s3/s3_region_options.html",
+                {
+                    "regions": regions,
+                    "selected_region": selected_region,
+                    "has_regions": True,
+                    "show_text_field": False,
+                },
+            )
+        else:
+            # No regions - show text field
+            return templates.TemplateResponse(
+                request,
+                "partials/cloud_sync/providers/s3/s3_region_options.html",
+                {
+                    "regions": [],
+                    "selected_region": selected_region,
+                    "has_regions": False,
+                    "show_text_field": True,
+                },
+            )
     except ValueError:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_region_options.html",
-            {"regions": [], "selected_region": "us-east-1", "has_regions": False},
+            {
+                "regions": [],
+                "selected_region": "us-east-1",
+                "has_regions": False,
+                "show_text_field": True,
+            },
         )
 
 
@@ -83,6 +109,10 @@ async def get_s3_storage_classes(
 
     s3_provider = query_params.get("provider_config[provider_type]")
     current_value = query_params.get("current_value", "")
+
+    # If no provider specified, default to the first provider (AWS)
+    if not s3_provider:
+        s3_provider = S3Provider.AWS.value
 
     try:
         provider_enum = S3Provider(s3_provider)
@@ -102,6 +132,10 @@ async def get_s3_storage_classes(
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_storage_class_options.html",
+            {
+                "storage_classes": ["STANDARD"],
+                "selected_class": "",
+            },
         )
 
 
@@ -117,21 +151,41 @@ async def get_s3_endpoint_field(
     s3_provider = query_params.get("provider_config[provider_type]")
     current_value = query_params.get("current_value", "")
 
+    # If no provider specified, default to the first provider (AWS)
+    if not s3_provider:
+        s3_provider = S3Provider.AWS.value
+
     try:
         provider_enum = S3Provider(s3_provider)
         requires_endpoint = S3ProviderConfig.requires_endpoint(provider_enum)
+        immutable_endpoint = S3ProviderConfig.has_immutable_endpoint(provider_enum)
+        default_endpoint = S3ProviderConfig.get_default_endpoint(provider_enum)
+
+        # Always show endpoint field for all providers
+        show_field = True
+        # Use current_value if set, else default_endpoint
+        value = current_value or default_endpoint
 
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_endpoint_field.html",
             {
+                "show_field": show_field,
                 "requires_endpoint": requires_endpoint,
-                "current_value": current_value,
+                "immutable_endpoint": immutable_endpoint,
+                "is_optional": not requires_endpoint and not immutable_endpoint,
+                "current_value": value,
             },
         )
     except ValueError:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/providers/s3/s3_endpoint_field.html",
-            {"requires_endpoint": False, "current_value": ""},
+            {
+                "show_field": False,
+                "requires_endpoint": False,
+                "immutable_endpoint": False,
+                "is_optional": False,
+                "current_value": "",
+            },
         )

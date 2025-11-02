@@ -76,36 +76,42 @@ class S3StorageConfig(CloudStorageConfig):
 
     provider_type: S3Provider = Field(default=S3Provider.AWS)
     bucket_name: str = Field(..., min_length=3, max_length=63)
-    access_key: str = Field(..., min_length=16, max_length=128)
-    secret_key: str = Field(..., min_length=16, max_length=128)
+    access_key: str = Field(..., min_length=0, max_length=128)
+    secret_key: str = Field(..., min_length=0, max_length=128)
     region: str = Field(default="us-east-1")
     endpoint_url: Optional[str] = None
     storage_class: str = Field(default="STANDARD")
 
     @model_validator(mode="after")
     def validate_credentials(self) -> "S3StorageConfig":
-        """Validate credentials based on provider"""
-        if not self.access_key.startswith("AKIA"):
-            raise ValueError("AWS Access Key ID must start with 'AKIA'")
-        if len(self.access_key) != 20:
-            raise ValueError("AWS Access Key ID must be exactly 20 characters long")
-        if not self.access_key.isalnum():
-            raise ValueError(
-                "AWS Access Key ID must contain only alphanumeric characters"
-            )
-        self.access_key = self.access_key.upper()
+        if not self.access_key.strip():
+            raise ValueError("Access Key is required")
+        if not self.secret_key.strip():
+            raise ValueError("Secret Key is required")
 
-        if len(self.secret_key) != 40:
-            raise ValueError("AWS Secret Access Key must be exactly 40 characters long")
-        if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
-            raise ValueError("AWS Secret Access Key contains invalid characters")
+        if self.provider_type == S3Provider.AWS:
+            if not self.access_key.startswith("AKIA"):
+                raise ValueError("AWS Access Key ID must start with 'AKIA'")
+            if len(self.access_key) != 20:
+                raise ValueError("AWS Access Key ID must be exactly 20 characters long")
+            if not self.access_key.isalnum():
+                raise ValueError(
+                    "AWS Access Key ID must contain only alphanumeric characters"
+                )
+            self.access_key = self.access_key.upper()
+
+            if len(self.secret_key) != 40:
+                raise ValueError(
+                    "AWS Secret Access Key must be exactly 40 characters long"
+                )
+            if not re.match(r"^[A-Za-z0-9+/=]+$", self.secret_key):
+                raise ValueError("AWS Secret Access Key contains invalid characters")
 
         return self
 
     @field_validator("bucket_name")
     @classmethod
     def validate_bucket_name(cls, v: str) -> str:
-        """Validate and normalize S3 bucket name"""
         v_lower = v.lower()
 
         if not (3 <= len(v_lower) <= 63):
@@ -126,7 +132,6 @@ class S3StorageConfig(CloudStorageConfig):
 
     @model_validator(mode="after")
     def validate_storage_class_for_provider(self) -> "S3StorageConfig":
-        """Validate storage class is supported by the selected provider"""
         from .s3_provider_config import S3ProviderConfig
 
         valid_classes = S3ProviderConfig.get_storage_classes(self.provider_type)
@@ -156,12 +161,6 @@ class S3Storage(CloudStorage):
         command_executor: CommandExecutorProtocol,
         file_service: FileServiceProtocol,
     ) -> None:
-        """
-        Initialize S3 storage.
-
-        Args:
-            config: Validated S3 configuration
-        """
         self._config = config
         self._command_executor = command_executor
         self._file_service = file_service
@@ -172,7 +171,6 @@ class S3Storage(CloudStorage):
         remote_path: str,
         progress_callback: Optional[Callable[[SyncEvent], None]] = None,
     ) -> None:
-        """Upload repository to S3-compatible storage"""
         if progress_callback:
             provider_name = self._config.provider_type.value
             progress_callback(
@@ -221,7 +219,6 @@ class S3Storage(CloudStorage):
             raise Exception(error_msg) from e
 
     async def test_connection(self) -> bool:
-        """Test S3 connection"""
         try:
             result = await self.test_s3_connection(
                 access_key_id=self._config.access_key,
@@ -235,7 +232,6 @@ class S3Storage(CloudStorage):
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
-        """Get S3 connection info for display"""
         return ConnectionInfo(
             provider="s3",
             details={
@@ -251,11 +247,9 @@ class S3Storage(CloudStorage):
         )
 
     def get_sensitive_fields(self) -> list[str]:
-        """S3 sensitive fields"""
         return ["access_key", "secret_key"]
 
     def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
-        """Get S3-specific display details for the UI"""
         provider_type = config_dict.get("provider_type", "AWS")
         bucket_name = config_dict.get("bucket_name", "Unknown")
         region = config_dict.get("region", "us-east-1")
@@ -281,7 +275,6 @@ class S3Storage(CloudStorage):
 
     @classmethod
     def get_rclone_mapping(cls) -> RcloneMethodMapping:
-        """Define rclone parameter mapping for S3"""
         return RcloneMethodMapping(
             sync_method="sync_repository_to_s3",
             test_method="test_s3_connection",
@@ -315,38 +308,105 @@ class S3Storage(CloudStorage):
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
     ) -> List[str]:
-        """Build S3 configuration flags for rclone command"""
+        rclone_provider = self._get_rclone_provider_name()
+
         flags = [
             "--s3-access-key-id",
             access_key_id,
             "--s3-secret-access-key",
             secret_access_key,
             "--s3-provider",
-            self._config.provider_type.value,
+            rclone_provider,
             "--s3-region",
             region,
             "--s3-storage-class",
             storage_class,
         ]
 
-        if endpoint_url:
-            flags.extend(["--s3-endpoint", endpoint_url])
+        provider_value = (
+            self._config.provider_type.value
+            if hasattr(self._config.provider_type, "value")
+            else str(self._config.provider_type)
+        )
+        effective_endpoint = endpoint_url
+        region_to_use = region
+
+        # Providers that rely on endpoints and shouldn't use region
+        endpoint_reliant_providers = {
+            "Hetzner",
+            "Minio",
+            "Ceph",
+            "SeaweedFS",
+            "Rclone",
+            "Other",
+            "LyveCloud",
+            "IDrive",
+            "IBM_COS",
+            "GCS",
+            "Storj",
+            "FileLu",
+            "Intercolo",
+            "Leviia",
+            "Petabox",
+            "Selectel",
+            "Zata",
+        }
+
+        if provider_value in endpoint_reliant_providers:
+            if effective_endpoint:
+                if not effective_endpoint.startswith("http") and provider_value not in {
+                    "GCS",
+                    "Storj",
+                    "FileLu",
+                    "Intercolo",
+                    "Leviia",
+                    "Petabox",
+                    "Selectel",
+                    "Zata",
+                }:
+                    effective_endpoint = f"https://{effective_endpoint}"
+            else:
+                if provider_value == "Hetzner":
+                    effective_endpoint = f"https://{region}.your-objectstorage.com"
+            # Don't use region for these providers
+            region_to_use = ""
+        elif not effective_endpoint:
+            pass
+
+        if effective_endpoint:
+            flags.extend(["--s3-endpoint", effective_endpoint])
+        # Only pass region if it's not empty and the provider doesn't rely solely on endpoint
+        if region_to_use and provider_value not in endpoint_reliant_providers:
+            flags.extend(["--s3-region", region_to_use])
 
         return flags
+
+    def _get_rclone_provider_name(self) -> str:
+        # Rclone has specific provider names it recognizes
+        # For providers not in rclone's list, use "Other"
+        provider_value = (
+            self._config.provider_type.value
+            if hasattr(self._config.provider_type, "value")
+            else self._config.provider_type
+        )
+        rclone_providers = {
+            "AWS": "AWS",
+            "GCS": "GCS",
+            "Storj": "Storj",
+            "Cloudflare": "Cloudflare",
+        }
+
+        return rclone_providers.get(provider_value, "Other")
 
     async def sync_repository_to_s3(
         self,
         repository_path: str,
         path_prefix: str = "",
     ) -> AsyncGenerator[ProgressData, None]:
-        """Sync a Borg repository to S3 using Rclone with direct S3 backend"""
-
-        # Build S3 path
         s3_path = f":s3:{self._config.bucket_name}"
         if path_prefix:
             s3_path = f"{s3_path}/{path_prefix}"
 
-        # Build rclone command with S3 backend flags
         command = [
             "rclone",
             "sync",
@@ -358,7 +418,6 @@ class S3Storage(CloudStorage):
             "--verbose",
         ]
 
-        # Add S3 configuration flags
         s3_flags = self._build_s3_flags(
             self._config.access_key,
             self._config.secret_key,
@@ -434,11 +493,9 @@ class S3Storage(CloudStorage):
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
     ) -> ConnectionTestResult:
-        """Test S3 connection by checking bucket access"""
         try:
             s3_path = f":s3:{bucket_name}"
 
-            # Build rclone command with S3 backend flags
             command = [
                 "rclone",
                 "lsd",
@@ -448,7 +505,6 @@ class S3Storage(CloudStorage):
                 "--verbose",
             ]
 
-            # Add S3 configuration flags
             s3_flags = self._build_s3_flags(
                 access_key_id, secret_access_key, region, endpoint_url, storage_class
             )
@@ -456,7 +512,7 @@ class S3Storage(CloudStorage):
 
             result = await self._command_executor.execute_command(
                 command=command,
-                timeout=30.0,  # Reasonable timeout for connection test
+                timeout=30.0,
             )
 
             if result.success:
@@ -504,7 +560,6 @@ class S3Storage(CloudStorage):
             }
 
     async def _test_s3_write_permissions(self) -> ConnectionTestResult:
-        """Test write permissions by creating and deleting a small test file"""
         try:
             test_content = f"borgitory-test-{now_utc().isoformat()}"
             test_filename = f"borgitory-test-{now_utc().strftime('%Y%m%d-%H%M%S')}.txt"
@@ -517,7 +572,11 @@ class S3Storage(CloudStorage):
                 upload_command = ["rclone", "copy", temp_file_path, s3_path]
 
                 s3_flags = self._build_s3_flags(
-                    self._config.access_key, self._config.secret_key
+                    self._config.access_key,
+                    self._config.secret_key,
+                    self._config.region,
+                    self._config.endpoint_url,
+                    self._config.storage_class,
                 )
                 upload_command.extend(s3_flags)
 
@@ -549,11 +608,8 @@ class S3Storage(CloudStorage):
     def parse_rclone_progress(
         self, line: str
     ) -> Optional[Dict[str, Union[str, int, float]]]:
-        """Parse Rclone progress output"""
-        # Look for progress statistics
         if "Transferred:" in line:
             try:
-                # Example: "Transferred:   	  123.45 MiByte / 456.78 MiByte, 27%, 12.34 MiByte/s, ETA 1m23s"
                 parts = line.split()
                 if len(parts) >= 6:
                     transferred = parts[1]
@@ -572,7 +628,6 @@ class S3Storage(CloudStorage):
             except (IndexError, ValueError):
                 pass
 
-        # Look for ETA information
         if "ETA" in line:
             try:
                 eta_part = line.split("ETA")[-1].strip()
@@ -585,7 +640,6 @@ class S3Storage(CloudStorage):
     async def _merge_async_generators(
         self, *async_generators: AsyncGenerator[ProgressData, None]
     ) -> AsyncGenerator[ProgressData, None]:
-        """Merge multiple async generators into one"""
         tasks = []
         for gen in async_generators:
 
