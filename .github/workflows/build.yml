@@ -56,7 +56,7 @@ jobs:
       run: docker save borgitory-test-${{ matrix.arch }} > /tmp/borgitory-test-${{ matrix.arch }}.tar
 
     - name: Upload Docker image
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: docker-test-${{ matrix.arch }}
         path: /tmp/borgitory-test-${{ matrix.arch }}.tar
