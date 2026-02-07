@@ -25,6 +25,8 @@ from borgitory.dependencies import (
     get_templates,
     get_browser_timezone_offset,
 )
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -171,6 +173,7 @@ async def get_form(
     request: Request,
     registry: ProviderRegistryDep,
     templates: Jinja2Templates = Depends(get_templates),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get the form for creating a new cloud sync configuration"""
     context = {
@@ -186,6 +189,7 @@ async def get_provider_fields(
     registry: ProviderRegistryDep,
     provider: str = "",
     templates: Jinja2Templates = Depends(get_templates),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get dynamic provider fields based on selection"""
     context = {
@@ -206,6 +210,7 @@ async def create_cloud_sync_config(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Create a new cloud sync configuration"""
     try:
@@ -255,6 +260,7 @@ async def get_cloud_sync_configs_html(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> str:
     """Get cloud sync configurations as HTML"""
     try:
@@ -294,6 +300,7 @@ async def get_cloud_sync_configs_html(
 async def list_cloud_sync_configs(
     cloud_sync_service: CloudSyncServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> List[CloudSyncConfig]:
     """List all cloud sync configurations"""
     return await cloud_sync_service.get_cloud_sync_configs(db)
@@ -304,6 +311,7 @@ async def get_cloud_sync_config(
     config_id: int,
     cloud_sync_service: CloudSyncServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CloudSyncConfig:
     """Get a specific cloud sync configuration"""
     return await cloud_sync_service.get_cloud_sync_config_by_id(config_id, db)
@@ -319,6 +327,7 @@ async def get_cloud_sync_edit_form(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get edit form for a specific cloud sync configuration"""
     try:
@@ -355,6 +364,7 @@ async def update_cloud_sync_config(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Update a cloud sync configuration"""
     try:
@@ -399,6 +409,7 @@ async def delete_cloud_sync_config(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Delete a cloud sync configuration"""
 
@@ -435,6 +446,7 @@ async def test_cloud_sync_config(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Test a cloud sync configuration"""
 
@@ -489,6 +501,7 @@ async def enable_cloud_sync_config(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Enable a cloud sync configuration"""
 
@@ -521,6 +534,7 @@ async def disable_cloud_sync_config(
     cloud_sync_service: CloudSyncServiceDep,
     templates: Jinja2Templates = Depends(get_templates),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Disable a cloud sync configuration"""
 

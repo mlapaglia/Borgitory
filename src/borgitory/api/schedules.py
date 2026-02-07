@@ -21,6 +21,8 @@ from borgitory.services.cron_description_service import CronDescriptionService
 from borgitory.models.patterns import BackupPattern, PatternType, PatternStyle
 from borgitory.services.scheduling.pattern_service import PatternService
 from borgitory.services.scheduling.hook_service import HookService
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 router = APIRouter()
 
@@ -38,6 +40,7 @@ async def get_schedules_form(
     templates: TemplatesDep,
     config_service: ConfigurationServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get schedules form with all dropdowns populated"""
     form_data = await config_service.get_schedule_form_data(db)
@@ -55,6 +58,7 @@ async def create_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     try:
         json_data = await request.json()
@@ -122,6 +126,7 @@ async def get_schedules_html(
     db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get schedules as formatted HTML"""
     schedules = await schedule_service.get_schedules(db, skip=skip, limit=limit)
@@ -139,6 +144,7 @@ async def get_upcoming_backups_html(
     templates: TemplatesDep,
     scheduler_service: SchedulerServiceDep,
     upcoming_backups_service: UpcomingBackupsServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get upcoming scheduled backups as formatted HTML"""
     try:
@@ -167,6 +173,7 @@ async def get_cron_expression_form(
     templates: TemplatesDep,
     config_service: ConfigurationServiceDep,
     preset: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get dynamic cron expression form elements based on preset selection"""
     context = config_service.get_cron_form_context(preset)
@@ -186,6 +193,7 @@ async def list_schedules(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     schedules = await schedule_service.get_schedules(db, skip=skip, limit=limit)
     return templates.TemplateResponse(
@@ -202,6 +210,7 @@ async def get_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     schedule = await schedule_service.get_schedule_by_id(schedule_id, db)
     if schedule is None:
@@ -224,6 +233,7 @@ async def get_schedule_edit_form(
     schedule_service: ScheduleServiceDep,
     config_service: ConfigurationServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get edit form for a specific schedule"""
     try:
@@ -248,6 +258,7 @@ async def update_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Update a schedule"""
     try:
@@ -297,6 +308,7 @@ async def toggle_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     result = await schedule_service.toggle_schedule(schedule_id, db)
 
@@ -325,6 +337,7 @@ async def delete_schedule(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     result = await schedule_service.delete_schedule(schedule_id, db)
 
@@ -354,6 +367,7 @@ async def run_schedule_manually(
     templates: TemplatesDep,
     schedule_service: ScheduleServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Run a schedule manually"""
     result = await schedule_service.run_schedule_manually(schedule_id, db)
@@ -387,6 +401,7 @@ async def get_active_scheduled_jobs(
     request: Request,
     templates: TemplatesDep,
     scheduler_service: SchedulerServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get all active scheduled jobs"""
     jobs = await scheduler_service.get_scheduled_jobs()
@@ -400,6 +415,7 @@ async def describe_cron_expression(
     request: Request,
     templates: TemplatesDep,
     custom_cron_input: str = Query(""),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get human-readable description of a cron expression via HTMX."""
     cron_expression = custom_cron_input.strip()
@@ -417,6 +433,7 @@ async def describe_cron_expression(
 async def add_hook_field(
     request: Request,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Add a new hook field row via HTMX."""
 
@@ -443,6 +460,7 @@ async def add_hook_field(
 async def move_hook(
     request: Request,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Move a hook up or down in the list and return updated container."""
     form_data = await request.form()
@@ -479,6 +497,7 @@ async def move_hook(
 async def remove_hook_field(
     request: Request,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Remove a hook field row via HTMX."""
 
@@ -508,6 +527,7 @@ async def remove_hook_field(
 async def get_hooks_modal(
     request: Request,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Open hooks configuration modal with current hook data passed from parent."""
 
@@ -540,6 +560,7 @@ async def get_hooks_modal(
 async def save_hooks(
     request: Request,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Save hooks configuration and update parent component via OOB swap."""
     form_data = await request.form()

@@ -9,6 +9,8 @@ from borgitory.models.database import Repository
 from borgitory.dependencies import get_db
 from borgitory.dependencies import RepositoryStatsServiceDep, get_templates
 from borgitory.services.repositories.repository_stats_service import RepositoryStats
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 router = APIRouter()
 templates = get_templates()
@@ -16,7 +18,9 @@ templates = get_templates()
 
 @router.get("/stats/selector")
 async def get_stats_repository_selector(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get repository selector with repositories populated for statistics"""
     results = await db.execute(select(Repository))
@@ -30,7 +34,11 @@ async def get_stats_repository_selector(
 
 
 @router.get("/stats/loading")
-async def get_stats_loading(request: Request, repository_id: int = 0) -> HTMLResponse:
+async def get_stats_loading(
+    request: Request,
+    repository_id: int = 0,
+    current_user: User = Depends(get_current_user),
+) -> HTMLResponse:
     """Get loading state for statistics with SSE connection"""
     return templates.TemplateResponse(
         request,
@@ -44,6 +52,7 @@ async def get_repository_statistics(
     repository_id: int,
     stats_svc: RepositoryStatsServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> RepositoryStats:
     """Get comprehensive repository statistics"""
 
@@ -72,6 +81,7 @@ async def get_repository_statistics_html(
     request: Request,
     stats_svc: RepositoryStatsServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get repository statistics as HTML partial with cancellation support"""
     result = await db.execute(select(Repository).where(Repository.id == repository_id))

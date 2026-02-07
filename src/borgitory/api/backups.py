@@ -12,6 +12,8 @@ from borgitory.models.database import (
     RepositoryCheckConfig,
 )
 from borgitory.dependencies import TemplatesDep, get_db
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,6 +24,7 @@ async def get_backup_form(
     request: Request,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get backup form with all dropdowns populated"""
     repositories_result = await db.execute(select(Repository))
