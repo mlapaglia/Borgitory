@@ -154,11 +154,12 @@ def mock_rclone_service() -> Mock:
 
 
 @pytest_asyncio.fixture
-async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with proper resource management.
     
-    This client has authentication automatically mocked by the session-level
-    disable_auth_for_tests fixture.
+    This client has authentication automatically mocked by the module-level
+    auth bypass in conftest.py. It does NOT depend on test_db, so use it for 
+    tests that don't need database access.
     """
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
@@ -167,7 +168,7 @@ async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture
-async def async_client_no_auth(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+async def async_client_no_auth() -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client WITHOUT authentication for testing auth endpoints.
     
     This fixture temporarily removes the auth override so that authentication
