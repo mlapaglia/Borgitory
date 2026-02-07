@@ -167,7 +167,7 @@ async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
         del app.dependency_overrides[get_current_user]
 
 @pytest_asyncio.fixture
-async def async_client_without_auth(test_db: Session, test_user: User) -> AsyncGenerator[AsyncClient, None]:
+async def async_client_without_auth(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication and with proper resource management."""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
