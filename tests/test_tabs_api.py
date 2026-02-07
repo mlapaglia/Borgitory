@@ -276,10 +276,10 @@ class TestTabsAPI:
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_tabs_require_authentication(self, async_client: AsyncClient) -> None:
+    async def test_tabs_require_authentication(self, async_client_no_auth: AsyncClient) -> None:
         """Test that tabs endpoints require authentication."""
         # Without mocking auth, this should fail
-        response = await async_client.get("/api/tabs/repositories")
+        response = await async_client_no_auth.get("/api/tabs/repositories")
         assert response.status_code == 401
 
     async def test_all_tabs_return_html(

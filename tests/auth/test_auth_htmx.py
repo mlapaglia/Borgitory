@@ -13,11 +13,11 @@ class TestAuthHTMX:
     """Test class for auth HTMX functionality."""
 
     async def test_register_htmx_success(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_no_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test registration via HTMX returns HTML template."""
         # Make HTMX request
-        response = await async_client.post(
+        response = await async_client_no_auth.post(
             "/auth/register",
             data={"username": "testuser", "password": "testpassword"},
             headers={"hx-request": "true"},
@@ -36,11 +36,11 @@ class TestAuthHTMX:
         assert user.username == "testuser"
 
     async def test_register_htmx_validation_error(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_no_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test registration validation error via HTMX."""
         # Make HTMX request with invalid data
-        response = await async_client.post(
+        response = await async_client_no_auth.post(
             "/auth/register",
             data={"username": "ab", "password": "123"},  # Too short
             headers={"hx-request": "true"},
@@ -53,7 +53,7 @@ class TestAuthHTMX:
         assert "Username must be at least 3 characters" in response.text
 
     async def test_login_htmx_success(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_no_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test login via HTMX returns HTML template."""
         # Create a test user
@@ -64,7 +64,7 @@ class TestAuthHTMX:
         await test_db.commit()
 
         # Make HTMX request
-        response = await async_client.post(
+        response = await async_client_no_auth.post(
             "/auth/login",
             data={"username": "testuser", "password": "testpassword"},
             headers={"hx-request": "true"},
@@ -78,11 +78,11 @@ class TestAuthHTMX:
         assert response.headers.get("HX-Redirect") == "/repositories"
 
     async def test_login_htmx_invalid_credentials(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_no_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test login with invalid credentials via HTMX."""
         # Make HTMX request with invalid credentials
-        response = await async_client.post(
+        response = await async_client_no_auth.post(
             "/auth/login",
             data={"username": "nonexistent", "password": "wrong"},
             headers={"hx-request": "true"},
@@ -95,10 +95,10 @@ class TestAuthHTMX:
         assert "Invalid username or password" in response.text
 
     async def test_check_users_no_users_returns_register_form(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_no_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test check-users endpoint returns register form when no users exist."""
-        response = await async_client.get("/auth/check-users")
+        response = await async_client_no_auth.get("/auth/check-users")
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
@@ -110,7 +110,7 @@ class TestAuthHTMX:
         assert 'action="/auth/register"' in response.text
 
     async def test_check_users_with_users_returns_login_form(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_no_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test check-users endpoint returns login form when users exist."""
         # Create a test user
@@ -120,7 +120,7 @@ class TestAuthHTMX:
         test_db.add(user)
         await test_db.commit()
 
-        response = await async_client.get("/auth/check-users")
+        response = await async_client_no_auth.get("/auth/check-users")
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
