@@ -54,19 +54,6 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
     discord_only_notification_registry,
 )
 
-
-def clear_dependency_overrides_except_auth() -> None:
-    """Clear all dependency overrides except authentication.
-    
-    This is useful in test teardown to preserve the authentication override
-    that was set up by the async_client fixture.
-    """
-    auth_override = app.dependency_overrides.get(get_current_user)
-    app.dependency_overrides.clear()
-    if auth_override:
-        app.dependency_overrides[get_current_user] = auth_override
-
-
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[Any, None, None]:
     """Create an instance of the default event loop for test session."""
