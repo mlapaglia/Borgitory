@@ -82,8 +82,7 @@ class TestJobStopIntegration:
             assert "Database job stopped successfully" in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     def test_stop_composite_job_full_integration(
         self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
@@ -120,8 +119,7 @@ class TestJobStopIntegration:
             assert "Current running task was terminated" in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     def test_stop_job_not_found_integration(
         self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
@@ -155,8 +153,7 @@ class TestJobStopIntegration:
             assert "Error Code: JOB_NOT_FOUND" in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_invalid_status_integration(
         self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
@@ -208,8 +205,7 @@ class TestJobStopIntegration:
             assert "Error Code: INVALID_STATUS" in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_with_real_templates(
         self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
@@ -265,8 +261,7 @@ class TestJobStopIntegration:
             mock_job_manager.stop_job.assert_called_once_with(job.id)
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_htmx_headers(
         self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
@@ -319,5 +314,4 @@ class TestJobStopIntegration:
             assert "Job Stopped Successfully" in response.text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()

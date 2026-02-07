@@ -105,8 +105,7 @@ class TestPackageSelectionEndpoints:
             assert "data-packages='curl'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_select_package_with_existing_selections(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -134,8 +133,7 @@ class TestPackageSelectionEndpoints:
             assert "jq" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_clear_selections(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -153,8 +151,7 @@ class TestPackageSelectionEndpoints:
             assert "data-packages=''" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_install_with_selected_packages(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -186,8 +183,7 @@ class TestPackageSelectionEndpoints:
             assert "data-installed-packages='curl,jq,sqlite3'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_install_with_no_selections(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -210,8 +206,7 @@ class TestPackageSelectionEndpoints:
             assert "No packages selected" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_install_success_triggers_clear_selections(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -235,8 +230,7 @@ class TestPackageSelectionEndpoints:
             assert response.headers["HX-Trigger"] == "clear-selections"
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_install_failure_no_trigger(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -264,8 +258,7 @@ class TestPackageSelectionEndpoints:
             assert "Installation failed" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_missing_package_name_validation(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
@@ -278,8 +271,7 @@ class TestPackageSelectionEndpoints:
             assert response.status_code == 422
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
 
 class TestPackageRemovalEndpoints:
@@ -367,8 +359,7 @@ class TestPackageRemovalEndpoints:
             assert "jq,sqlite3" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_remove_nonexistent_package(
         self, setup_removal_test: Dict[str, Any], async_client: AsyncClient
@@ -393,8 +384,7 @@ class TestPackageRemovalEndpoints:
             assert "curl,jq" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
 
 class TestErrorHandling:
@@ -478,8 +468,7 @@ class TestErrorHandling:
             assert "data-template='partials/packages/install_error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
 
 class TestPackageSearchEndpoints:
@@ -594,8 +583,7 @@ class TestPackageSearchEndpoints:
             assert "data-first-package='curl'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_search_packages_autocomplete_short_query(
         self, setup_search_test: Dict[str, Any], async_client: AsyncClient
@@ -620,8 +608,7 @@ class TestPackageSearchEndpoints:
             assert "Type at least 2 characters" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_search_packages_autocomplete_empty_query(
         self, setup_search_test: Dict[str, Any], async_client: AsyncClient
@@ -642,8 +629,7 @@ class TestPackageSearchEndpoints:
             assert "data-template='partials/packages/empty_search.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_search_packages_autocomplete_service_error(
         self, setup_search_test: Dict[str, Any], async_client: AsyncClient
@@ -666,8 +652,7 @@ class TestPackageSearchEndpoints:
             assert "data-template='partials/packages/search_error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
 
 class TestInstalledPackagesEndpoint:
@@ -794,8 +779,7 @@ class TestInstalledPackagesEndpoint:
             )  # curl should be marked as user-installed
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_list_installed_packages_service_error(
         self, setup_installed_test: Dict[str, Any], async_client: AsyncClient
@@ -816,8 +800,7 @@ class TestInstalledPackagesEndpoint:
             assert "data-template='partials/packages/error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
 
 class TestPackageRemovalEndpoint:
@@ -917,8 +900,7 @@ class TestPackageRemovalEndpoint:
             assert "data-removed-packages='curl,jq'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_remove_packages_no_selection(
         self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
@@ -940,8 +922,7 @@ class TestPackageRemovalEndpoint:
             assert "No packages selected for removal" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_remove_packages_service_failure(
         self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
@@ -963,8 +944,7 @@ class TestPackageRemovalEndpoint:
             assert "data-template='partials/packages/remove_error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_remove_packages_service_exception(
         self, setup_removal_endpoint_test: Dict[str, Any], async_client: AsyncClient
@@ -988,8 +968,7 @@ class TestPackageRemovalEndpoint:
             assert "data-template='partials/packages/remove_error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
 
 class TestPackageInfoEndpoint:
@@ -1088,8 +1067,7 @@ class TestPackageInfoEndpoint:
             assert "data-package-version='7.81.0-1'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_get_package_info_not_found(
         self, setup_info_test: Dict[str, Any], async_client: AsyncClient
@@ -1109,8 +1087,7 @@ class TestPackageInfoEndpoint:
             assert "data-template='partials/packages/error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_get_package_info_value_error(
         self, setup_info_test: Dict[str, Any], async_client: AsyncClient
@@ -1131,8 +1108,7 @@ class TestPackageInfoEndpoint:
             assert "data-template='partials/packages/error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_get_package_info_service_error(
         self, setup_info_test: Dict[str, Any], async_client: AsyncClient
@@ -1153,5 +1129,4 @@ class TestPackageInfoEndpoint:
             assert "data-template='partials/packages/error.html'" in content
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()

@@ -58,8 +58,7 @@ class TestSchedulesAPI:
         }
 
         # Clean up overrides after test
-        from tests.conftest import clear_dependency_overrides_except_auth
-        clear_dependency_overrides_except_auth()
+        app.dependency_overrides.clear()
 
     @pytest.fixture
     async def sample_repository(self, test_db: AsyncSession) -> Repository:
