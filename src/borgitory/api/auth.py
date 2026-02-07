@@ -83,7 +83,10 @@ async def register_user(
             return templates.TemplateResponse(
                 request,
                 "partials/shared/notification.html",
-                {"type": "error", "message": "Password must be at most 72 bytes (UTF-8)"},
+                {
+                    "type": "error",
+                    "message": f"Password must be at most {BCRYPT_MAX_PASSWORD_BYTES} bytes (UTF-8)",
+                },
                 status_code=400,
             )
 
