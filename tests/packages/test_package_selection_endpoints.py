@@ -11,7 +11,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
-from borgitory.models.database import User
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.dependencies import get_templates, get_package_manager_service
 

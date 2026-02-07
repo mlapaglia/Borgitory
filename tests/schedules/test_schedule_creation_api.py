@@ -2,10 +2,9 @@
 
 import pytest
 from typing import Any, Dict, AsyncGenerator
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
-
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

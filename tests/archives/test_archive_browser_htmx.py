@@ -2,17 +2,14 @@
 Tests for archive browser HTMX functionality
 """
 
-import pytest
-from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import Mock, AsyncMock, ANY
 
 from borgitory.main import app
-from borgitory.models.database import Repository, User
+from borgitory.models.database import Repository
 from borgitory.dependencies import get_borg_service
 from borgitory.services.borg_service import BorgService
-from borgitory.api.auth import get_current_user
 
 class TestArchiveBrowserHTMX:
     """Test class for archive browser HTMX functionality."""

@@ -2,15 +2,10 @@
 Tests for tabs API endpoints
 """
 
-import pytest
-from typing import Any, AsyncGenerator
 from unittest.mock import Mock
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
-from borgitory.api.auth import get_current_user
-from borgitory.models.database import User
 from borgitory.dependencies import get_provider_registry
 
 class TestTabsAPI:

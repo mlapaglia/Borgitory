@@ -6,20 +6,11 @@ Tests the full flow from clicking edit button to rendering provider-specific for
 import pytest
 from typing import Dict, Any
 from unittest.mock import Mock, ANY
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 
 from borgitory.dependencies import get_notification_config_service
 from borgitory.main import app
 from borgitory.services.notifications.config_service import NotificationConfigService
-
-
-@pytest.fixture
-def test_client() -> TestClient:
-    """Create test client for API testing"""
-    from borgitory.main import app
-
-    return TestClient(app)
-
 
 @pytest.fixture
 def mock_notification_configs() -> Dict[int, Dict[str, Any]]:

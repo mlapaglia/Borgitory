@@ -3,17 +3,11 @@ Tests for Job SSE API endpoint - Unit tests only
 Integration testing of SSE endpoints requires specialized tools due to streaming nature.
 """
 
-from fastapi.testclient import TestClient
-
 from borgitory.main import app
 
 
 class TestJobsAPISSEEndpoint:
     """Test SSE endpoint registration and basic functionality"""
-
-    def setup_method(self) -> None:
-        """Set up test fixtures"""
-        self.client = TestClient(app)
 
     def test_sse_endpoint_registration(self) -> None:
         """Test that SSE endpoint is properly registered"""

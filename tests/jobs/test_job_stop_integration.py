@@ -5,8 +5,9 @@ Tests full flow with real database and services
 
 import uuid
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from httpx import AsyncClient
+
 from unittest.mock import Mock, AsyncMock
 
 from borgitory.main import app
@@ -18,11 +19,6 @@ from borgitory.dependencies import get_db, get_job_manager_dependency
 
 class TestJobStopIntegration:
     """Integration tests for job stop functionality"""
-
-    @pytest.fixture
-    def client(self) -> TestClient:
-        """Create FastAPI test client"""
-        return TestClient(app)
 
     @pytest.fixture
     def mock_job_manager(self) -> Mock:

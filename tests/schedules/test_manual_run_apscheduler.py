@@ -6,10 +6,10 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.base import MemoryJobStore
 from apscheduler.triggers.date import DateTrigger
+from httpx import AsyncClient
 import pytest
 import uuid
 from unittest.mock import Mock, AsyncMock
-from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
@@ -21,9 +21,6 @@ from borgitory.services.scheduling.scheduler_service import (
 )
 from borgitory.dependencies import get_schedule_service
 from borgitory.protocols.job_protocols import JobManagerProtocol
-
-client = TestClient(app)
-
 
 def create_test_scheduler_service(
     job_manager: Mock, job_service_factory: Mock

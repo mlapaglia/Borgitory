@@ -22,7 +22,6 @@ if not os.getenv("SECRET_KEY"):
 from borgitory.dependencies import get_db
 from borgitory.main import app
 from borgitory.models.database import Base, CloudSyncConfig, User
-from borgitory.api.auth import get_current_user
 
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401

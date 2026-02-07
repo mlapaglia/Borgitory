@@ -7,7 +7,7 @@ and ensures it properly navigates to the archives tab with preselected repositor
 
 import pytest
 from httpx import AsyncClient
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

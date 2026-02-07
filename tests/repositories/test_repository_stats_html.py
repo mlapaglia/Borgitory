@@ -2,11 +2,10 @@
 Tests for repository statistics HTML endpoint functionality
 """
 
-from borgitory.api.auth import get_current_user
 import pytest
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
