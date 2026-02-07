@@ -20,8 +20,7 @@ if not os.getenv("SECRET_KEY"):
 
 from borgitory.dependencies import get_db
 from borgitory.main import app
-from borgitory.models.database import Base, CloudSyncConfig, User
-from borgitory.api.auth import get_current_user
+from borgitory.models.database import Base, CloudSyncConfig
 
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401
@@ -52,27 +51,6 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
     pushover_only_notification_registry,
     discord_only_notification_registry,
 )
-
-
-@pytest.fixture(scope="session", autouse=True)
-def disable_auth_for_tests() -> Generator[None, None, None]:
-    """Globally disable authentication for all tests.
-    
-    This fixture runs automatically for all tests. Auth tests that need to test
-    authentication specifically should use async_client_no_auth instead.
-    """
-    def mock_current_user() -> User:
-        user = User()
-        user.id = 1
-        user.username = "test_user"
-        return user
-    
-    app.dependency_overrides[get_current_user] = mock_current_user
-    
-    yield
-    
-    if get_current_user in app.dependency_overrides:
-        del app.dependency_overrides[get_current_user]
 
 
 @pytest.fixture(scope="session")
@@ -150,35 +128,11 @@ def mock_rclone_service() -> Mock:
 
 @pytest_asyncio.fixture
 async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client with proper resource management.
-    
-    This client has authentication automatically mocked by the session-level
-    disable_auth_for_tests fixture.
-    """
+    """Create an async test client with proper resource management."""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
     ) as client:
         yield client
-
-
-@pytest_asyncio.fixture
-async def async_client_no_auth(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client WITHOUT authentication for testing auth endpoints.
-    
-    This fixture temporarily removes the auth override so that authentication
-    can be properly tested (login, registration, etc).
-    """
-    # Temporarily remove the auth override
-    auth_override = app.dependency_overrides.pop(get_current_user, None)
-    
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://testserver"
-    ) as client:
-        yield client
-    
-    # Restore the auth override after the test
-    if auth_override:
-        app.dependency_overrides[get_current_user] = auth_override
 
 
 @pytest.fixture
