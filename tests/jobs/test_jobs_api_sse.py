@@ -3,7 +3,6 @@ Tests for Job SSE API endpoint - Unit tests only
 Integration testing of SSE endpoints requires specialized tools due to streaming nature.
 """
 
-from borgitory.main import app
 
 
 class TestJobsAPISSEEndpoint:
