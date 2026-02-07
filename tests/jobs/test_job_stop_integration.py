@@ -31,7 +31,7 @@ class TestJobStopIntegration:
         return mock_manager
 
     async def test_stop_database_job_full_integration(
-        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping a database job through full API integration"""
         # Arrange - Create real database entities
@@ -68,7 +68,7 @@ class TestJobStopIntegration:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job.id}/stop")
+            response = await async_client.post(f"/api/jobs/{job.id}/stop")
 
             # Assert
             assert response.status_code == 200
@@ -85,8 +85,8 @@ class TestJobStopIntegration:
             from tests.conftest import clear_dependency_overrides_except_auth
             clear_dependency_overrides_except_auth()
 
-    def test_stop_composite_job_full_integration(
-        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
+    async def test_stop_composite_job_full_integration(
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping a composite job through full API integration"""
         # Arrange - Mock job manager for composite job
@@ -106,7 +106,7 @@ class TestJobStopIntegration:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 200
@@ -123,8 +123,8 @@ class TestJobStopIntegration:
             from tests.conftest import clear_dependency_overrides_except_auth
             clear_dependency_overrides_except_auth()
 
-    def test_stop_job_not_found_integration(
-        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
+    async def test_stop_job_not_found_integration(
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping non-existent job through full API integration"""
         # Arrange - Mock job manager to return not found
@@ -143,7 +143,7 @@ class TestJobStopIntegration:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job_id}/stop")
+            response = await async_client.post(f"/api/jobs/{job_id}/stop")
 
             # Assert
             assert response.status_code == 400
@@ -159,7 +159,7 @@ class TestJobStopIntegration:
             clear_dependency_overrides_except_auth()
 
     async def test_stop_job_invalid_status_integration(
-        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stopping job in invalid status through full API integration"""
         # Arrange - Create completed database job
@@ -196,7 +196,7 @@ class TestJobStopIntegration:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job.id}/stop")
+            response = await async_client.post(f"/api/jobs/{job.id}/stop")
 
             # Assert
             assert response.status_code == 400
@@ -212,7 +212,7 @@ class TestJobStopIntegration:
             clear_dependency_overrides_except_auth()
 
     async def test_stop_job_with_real_templates(
-        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test stop job with real template rendering (no template mocking)"""
         # Arrange - Create running database job
@@ -249,7 +249,7 @@ class TestJobStopIntegration:
 
         try:
             # Act
-            response = client.post(f"/api/jobs/{job.id}/stop")
+            response = await async_client.post(f"/api/jobs/{job.id}/stop")
 
             # Assert
             assert response.status_code == 200
@@ -269,7 +269,7 @@ class TestJobStopIntegration:
             clear_dependency_overrides_except_auth()
 
     async def test_stop_job_htmx_headers(
-        self, client: TestClient, test_db: AsyncSession, mock_job_manager: Mock
+        self, async_client: AsyncClient, test_db: AsyncSession, mock_job_manager: Mock
     ) -> None:
         """Test that stop job endpoint works with HTMX headers"""
         # Arrange
@@ -306,7 +306,7 @@ class TestJobStopIntegration:
 
         try:
             # Act - Send request with HTMX headers
-            response = client.post(
+            response = await async_client.post(
                 f"/api/jobs/{job.id}/stop",
                 headers={
                     "HX-Request": "true",

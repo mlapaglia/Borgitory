@@ -77,9 +77,9 @@ def mock_notification_configs() -> Dict[int, Dict[str, Any]]:
 class TestNotificationEditIntegration:
     """Test notification edit form integration"""
 
-    def test_telegram_edit_form_renders_correctly(
+    async def test_telegram_edit_form_renders_correctly(
         self,
-        test_client: TestClient,
+        async_client: AsyncClient,
         mock_notification_configs: Dict[int, Dict[str, Any]],
     ) -> None:
         """Test that editing a Telegram notification renders the correct form"""
@@ -94,7 +94,7 @@ class TestNotificationEditIntegration:
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
-        response = test_client.get("/api/notifications/1/edit")
+        response = await async_client.get("/api/notifications/1/edit")
 
         # Clean up
         from tests.conftest import clear_dependency_overrides_except_auth
@@ -139,9 +139,9 @@ class TestNotificationEditIntegration:
         # Verify service was called correctly (db session is first param)
         mock_service.get_config_with_decrypted_data.assert_called_once_with(ANY, 1)
 
-    def test_discord_edit_form_renders_correctly(
+    async def test_discord_edit_form_renders_correctly(
         self,
-        test_client: TestClient,
+        async_client: AsyncClient,
         mock_notification_configs: Dict[int, Dict[str, Any]],
     ) -> None:
         """Test that editing a Discord notification renders the correct form"""
@@ -159,7 +159,7 @@ class TestNotificationEditIntegration:
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
-        response = test_client.get("/api/notifications/2/edit")
+        response = await async_client.get("/api/notifications/2/edit")
 
         # Clean up
         from tests.conftest import clear_dependency_overrides_except_auth
@@ -195,9 +195,9 @@ class TestNotificationEditIntegration:
         assert "Chat ID" not in html_content
         assert "App Token" not in html_content
 
-    def test_pushover_edit_form_renders_correctly(
+    async def test_pushover_edit_form_renders_correctly(
         self,
-        test_client: TestClient,
+        async_client: AsyncClient,
         mock_notification_configs: Dict[int, Dict[str, Any]],
     ) -> None:
         """Test that editing a Pushover notification renders the correct form"""
@@ -215,7 +215,7 @@ class TestNotificationEditIntegration:
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
-        response = test_client.get("/api/notifications/3/edit")
+        response = await async_client.get("/api/notifications/3/edit")
 
         # Clean up
         from tests.conftest import clear_dependency_overrides_except_auth
@@ -254,7 +254,7 @@ class TestNotificationEditIntegration:
         assert "Telegram Bot Token" not in html_content
         assert "Chat ID" not in html_content
 
-    def test_edit_form_handles_missing_config(self, test_client: TestClient) -> None:
+    async def test_edit_form_handles_missing_config(self, async_client: AsyncClient) -> None:
         """Test that edit form handles missing configuration gracefully"""
         # Setup mock service to raise HTTPException
         mock_service = Mock(spec=NotificationConfigService)
@@ -270,7 +270,7 @@ class TestNotificationEditIntegration:
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
-        response = test_client.get("/api/notifications/999/edit")
+        response = await async_client.get("/api/notifications/999/edit")
 
         # Clean up
         from tests.conftest import clear_dependency_overrides_except_auth
@@ -279,9 +279,9 @@ class TestNotificationEditIntegration:
         # Should get 404
         assert response.status_code == 404
 
-    def test_edit_form_includes_proper_htmx_attributes(
+    async def test_edit_form_includes_proper_htmx_attributes(
         self,
-        test_client: TestClient,
+        async_client: AsyncClient,
         mock_notification_configs: Dict[int, Dict[str, Any]],
     ) -> None:
         """Test that edit form includes proper HTMX attributes for functionality"""
@@ -299,7 +299,7 @@ class TestNotificationEditIntegration:
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
-        response = test_client.get("/api/notifications/1/edit")
+        response = await async_client.get("/api/notifications/1/edit")
 
         # Clean up
         from tests.conftest import clear_dependency_overrides_except_auth
@@ -322,9 +322,9 @@ class TestNotificationEditIntegration:
         assert 'id="notification-edit-form"' in html_content
         assert 'id="provider-fields-container"' in html_content
 
-    def test_edit_form_preserves_field_values(
+    async def test_edit_form_preserves_field_values(
         self,
-        test_client: TestClient,
+        async_client: AsyncClient,
         mock_notification_configs: Dict[int, Dict[str, Any]],
     ) -> None:
         """Test that edit form preserves all field values from decrypted config"""
@@ -355,7 +355,7 @@ class TestNotificationEditIntegration:
         app.dependency_overrides[get_notification_config_service] = lambda: mock_service
 
         # Make request to edit endpoint
-        response = test_client.get("/api/notifications/1/edit")
+        response = await async_client.get("/api/notifications/1/edit")
 
         # Clean up
         from tests.conftest import clear_dependency_overrides_except_auth
@@ -374,7 +374,7 @@ class TestNotificationEditIntegration:
             "checked" in html_content
         )  # disable_notification checkbox should be checked
 
-    def test_unified_template_discovery(self) -> None:
+    async def test_unified_template_discovery(self) -> None:
         """Test that unified templates are properly discovered for all providers"""
         from borgitory.api.notifications import _get_provider_template
 
@@ -394,7 +394,7 @@ class TestNotificationEditIntegration:
         # Test that non-existent provider returns None
         assert _get_provider_template("nonexistent", "edit") is None
 
-    def test_unified_template_mode_handling(self) -> None:
+    async def test_unified_template_mode_handling(self) -> None:
         """Test that unified templates handle create/edit modes correctly via context"""
         from borgitory.api.notifications import _get_provider_template
 

@@ -248,11 +248,12 @@ class TestManualRunAPScheduler:
             test_schedule.id, test_schedule.name
         )
 
-    def test_manual_run_api_endpoint_success(
+    async def test_manual_run_api_endpoint_success(
         self,
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
         test_db: AsyncSession,
+        async_client: AsyncClient
     ) -> None:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
@@ -264,7 +265,7 @@ class TestManualRunAPScheduler:
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
 
         try:
-            response = client.post(f"/api/schedules/{test_schedule.id}/run")
+            response = await async_client.post(f"/api/schedules/{test_schedule.id}/run")
 
             assert response.status_code == 200
             assert "Test Schedule" in response.text
@@ -277,11 +278,12 @@ class TestManualRunAPScheduler:
             from tests.conftest import clear_dependency_overrides_except_auth
             clear_dependency_overrides_except_auth()
 
-    def test_manual_run_api_endpoint_scheduler_error(
+    async def test_manual_run_api_endpoint_scheduler_error(
         self,
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
         test_db: AsyncSession,
+        async_client: AsyncClient
     ) -> None:
         """Test the API endpoint with scheduler service error"""
         # Setup dependency override
@@ -294,7 +296,7 @@ class TestManualRunAPScheduler:
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
 
         try:
-            response = client.post(f"/api/schedules/{test_schedule.id}/run")
+            response = await async_client.post(f"/api/schedules/{test_schedule.id}/run")
 
             assert response.status_code == 500
             assert (

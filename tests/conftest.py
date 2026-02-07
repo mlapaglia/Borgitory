@@ -7,6 +7,7 @@ import os
 from typing import Any, AsyncGenerator, Dict, Generator, Optional
 from unittest.mock import Mock
 
+from borgitory.api.auth import get_current_user
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -165,6 +166,21 @@ async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
     if get_current_user in app.dependency_overrides:
         del app.dependency_overrides[get_current_user]
 
+@pytest_asyncio.fixture
+async def async_client_without_auth(test_db: Session, test_user: User) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client without authentication and with proper resource management."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        yield client
+
+@pytest_asyncio.fixture
+async def async_client_without_auth_or_user(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client without authentication and with proper resource management."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        yield client
 
 @pytest.fixture
 def sample_repository_data() -> Dict[str, str]:

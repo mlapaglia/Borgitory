@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from borgitory.main import app
-from borgitory.models.database import Repository, User
+from borgitory.models.database import Repository
 from borgitory.dependencies import (
     get_schedule_service,
     get_configuration_service,
@@ -32,11 +32,6 @@ def extract_error_message(html_content: str) -> str:
 
 class TestScheduleCreationAPI:
     """Test suite for schedule creation API with validation."""
-
-    @pytest.fixture
-    def client(self) -> TestClient:
-        """Create test client."""
-        return TestClient(app)
 
     @pytest.fixture(scope="function")
     async def setup_dependencies(
@@ -64,11 +59,6 @@ class TestScheduleCreationAPI:
         )
 
         # Create test data
-        user = User()
-        user.username = "testuser"
-        user.set_password("testpass")
-        test_db.add(user)
-
         repository = Repository()
         repository.name = "test-repo"
         repository.path = "/tmp/test-repo"
@@ -81,15 +71,14 @@ class TestScheduleCreationAPI:
             "configuration_service": configuration_service,
             "scheduler_service": mock_scheduler_service,
             "repository": repository,
-            "user": user,
         }
 
         # Clean up overrides after test
         from tests.conftest import clear_dependency_overrides_except_auth
         clear_dependency_overrides_except_auth()
 
-    def test_create_schedule_valid_data(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_valid_data(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with valid data."""
         valid_data = {
@@ -102,7 +91,7 @@ class TestScheduleCreationAPI:
             "notification_config_id": None,
         }
 
-        response = client.post("/api/schedules/", json=valid_data)
+        response = await async_client.post("/api/schedules/", json=valid_data)
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
@@ -113,8 +102,8 @@ class TestScheduleCreationAPI:
             or "Daily Backup" in html_content
         )
 
-    def test_create_schedule_missing_name(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_missing_name(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule without a name."""
         invalid_data = {
@@ -124,15 +113,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200  # Returns 200 with error template
         html_content = response.text
         error_message = extract_error_message(html_content)
         assert "Schedule name is required" in error_message
 
-    def test_create_schedule_missing_repository(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_missing_repository(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule without a repository."""
         invalid_data = {
@@ -142,15 +131,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200
         html_content = response.text
         error_message = extract_error_message(html_content)
         assert "Repository is required" in error_message
 
-    def test_create_schedule_invalid_repository_id(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_invalid_repository_id(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with invalid repository ID."""
         invalid_data = {
@@ -160,15 +149,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200
         html_content = response.text
         error_message = extract_error_message(html_content)
         assert "Invalid repository ID" in error_message
 
-    def test_create_schedule_missing_cron_expression(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_missing_cron_expression(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule without cron expression."""
         invalid_data = {
@@ -178,15 +167,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200
         html_content = response.text
         error_message = extract_error_message(html_content)
         assert "Cron expression is required" in error_message
 
-    def test_create_schedule_invalid_cron_expression_too_few_parts(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_invalid_cron_expression_too_few_parts(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with cron expression having too few parts."""
         invalid_data = {
@@ -196,15 +185,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200
         html_content = response.text
         error_message = extract_error_message(html_content)
         assert "must have 5 parts" in error_message
 
-    def test_create_schedule_invalid_cron_expression_too_many_parts(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_invalid_cron_expression_too_many_parts(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with cron expression having too many parts."""
         invalid_data = {
@@ -214,15 +203,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200
         html_content = response.text
         error_message = extract_error_message(html_content)
         assert "must have 5 parts" in error_message
 
-    def test_create_schedule_complex_valid_cron_expressions(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_complex_valid_cron_expressions(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating schedules with various valid cron expressions."""
         test_cases = [
@@ -241,7 +230,7 @@ class TestScheduleCreationAPI:
                 "source_path": "/data",
             }
 
-            response = client.post("/api/schedules/", json=valid_data)
+            response = await async_client.post("/api/schedules/", json=valid_data)
 
             assert response.status_code == 200, (
                 f"Failed for cron expression: {cron_expr}"
@@ -252,8 +241,8 @@ class TestScheduleCreationAPI:
                 or description in html_content
             )
 
-    def test_create_schedule_whitespace_handling(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_whitespace_handling(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with whitespace in inputs."""
         data_with_whitespace = {
@@ -263,7 +252,7 @@ class TestScheduleCreationAPI:
             "source_path": "  /data  ",
         }
 
-        response = client.post("/api/schedules/", json=data_with_whitespace)
+        response = await async_client.post("/api/schedules/", json=data_with_whitespace)
 
         assert response.status_code == 200
         html_content = response.text
@@ -272,8 +261,8 @@ class TestScheduleCreationAPI:
             or "Test Schedule" in html_content
         )
 
-    def test_create_schedule_optional_fields_handling(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_optional_fields_handling(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with various optional field values."""
         test_cases = [
@@ -293,14 +282,14 @@ class TestScheduleCreationAPI:
                 **optional_fields,
             }
 
-            response = client.post("/api/schedules/", json=valid_data)
+            response = await async_client.post("/api/schedules/", json=valid_data)
 
             assert response.status_code == 200, (
                 f"Failed for optional fields: {optional_fields}"
             )
 
-    def test_create_schedule_nonexistent_repository(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_nonexistent_repository(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with non-existent repository."""
         invalid_data = {
@@ -310,14 +299,14 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=invalid_data)
+        response = await async_client.post("/api/schedules/", json=invalid_data)
 
         assert response.status_code == 200
         html_content = response.text
         assert "Repository not found" in html_content or "error" in html_content.lower()
 
-    def test_create_schedule_scheduler_service_failure(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_scheduler_service_failure(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule when scheduler service fails."""
         # Make the scheduler service fail
@@ -332,7 +321,7 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=valid_data)
+        response = await async_client.post("/api/schedules/", json=valid_data)
 
         assert response.status_code == 200
         html_content = response.text
@@ -340,26 +329,26 @@ class TestScheduleCreationAPI:
             "Failed to schedule job" in html_content or "error" in html_content.lower()
         )
 
-    def test_create_schedule_invalid_json(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_invalid_json(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with invalid JSON."""
-        response = client.post("/api/schedules/", content="invalid json")
+        response = await async_client.post("/api/schedules/", content="invalid json")
 
         assert response.status_code == 200  # FastAPI returns 422 for invalid JSON
 
-    def test_create_schedule_empty_json(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_empty_json(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test creating a schedule with empty JSON."""
-        response = client.post("/api/schedules/", json={})
+        response = await async_client.post("/api/schedules/", json={})
 
         assert response.status_code == 200
         html_content = response.text
         assert "required" in html_content.lower()
 
-    def test_create_schedule_htmx_headers(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_htmx_headers(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test that successful creation returns proper HTMX headers."""
         valid_data = {
@@ -369,15 +358,15 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=valid_data)
+        response = await async_client.post("/api/schedules/", json=valid_data)
 
         assert response.status_code == 200
         # Check for HTMX trigger header
         assert "HX-Trigger" in response.headers
         assert response.headers["HX-Trigger"] == "scheduleUpdate"
 
-    def test_create_schedule_response_format(
-        self, client: TestClient, setup_dependencies: Dict[str, Any]
+    async def test_create_schedule_response_format(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
         """Test that responses are properly formatted HTML for HTMX."""
         valid_data = {
@@ -387,7 +376,7 @@ class TestScheduleCreationAPI:
             "source_path": "/data",
         }
 
-        response = client.post("/api/schedules/", json=valid_data)
+        response = await async_client.post("/api/schedules/", json=valid_data)
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")

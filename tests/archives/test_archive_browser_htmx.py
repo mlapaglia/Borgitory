@@ -14,26 +14,6 @@ from borgitory.dependencies import get_borg_service
 from borgitory.services.borg_service import BorgService
 from borgitory.api.auth import get_current_user
 
-
-@pytest.fixture
-async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]:
-    """Create a mock current user for testing."""
-    test_user = User()
-    test_user.username = "testuser"
-    test_user.set_password("testpass")
-    test_db.add(test_user)
-    await test_db.commit()
-    await test_db.refresh(test_user)
-
-    def override_get_current_user() -> User:
-        return test_user
-
-    app.dependency_overrides[get_current_user] = override_get_current_user
-    yield test_user
-    if get_current_user in app.dependency_overrides:
-        del app.dependency_overrides[get_current_user]
-
-
 class TestArchiveBrowserHTMX:
     """Test class for archive browser HTMX functionality."""
 
@@ -772,7 +752,7 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_borg_service]
 
     async def test_delete_archive_htmx_success(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: User
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test deleting an archive via HTMX returns updated archive list."""
         repo = Repository()
@@ -834,7 +814,7 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_repository_service]
 
     async def test_delete_archive_htmx_error(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: User
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test deleting an archive when service throws error."""
         repo = Repository()
@@ -875,7 +855,7 @@ class TestArchiveBrowserHTMX:
                 del app.dependency_overrides[get_repository_service]
 
     async def test_delete_archive_htmx_repository_not_found(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: User
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test deleting an archive from non-existent repository."""
         from borgitory.dependencies import get_repository_service

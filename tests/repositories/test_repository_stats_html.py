@@ -2,6 +2,7 @@
 Tests for repository statistics HTML endpoint functionality
 """
 
+from borgitory.api.auth import get_current_user
 import pytest
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -35,7 +36,7 @@ class TestRepositoryStatsHTML:
         return AsyncMock(spec=AsyncSession)
 
     async def test_stats_html_basic_flow(
-        self, mock_repository: Mock, mock_db: AsyncSession
+        self, mock_repository: Mock, mock_db: AsyncSession, async_client: AsyncClient
     ) -> None:
         """Test that stats HTML endpoint returns complete HTML with charts"""
 
@@ -90,39 +91,37 @@ class TestRepositoryStatsHTML:
         )
 
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as ac:
-                # Make request to HTML stats endpoint
-                response = await ac.get(
-                    f"/api/repositories/{mock_repository.id}/stats/html"
-                )
 
-                assert response.status_code == 200
-                assert "text/html" in response.headers["content-type"]
+            # Make request to HTML stats endpoint
+            response = await async_client.get(
+                f"/api/repositories/{mock_repository.id}/stats/html"
+            )
 
-                html_content = response.text
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
 
-                # Verify HTML contains expected elements
-                assert "Total Archives" in html_content
-                assert "Space Saved" in html_content
-                assert "Compression" in html_content
-                assert "Deduplication" in html_content
+            html_content = response.text
 
-                # Verify chart elements are present
-                assert 'id="sizeChart"' in html_content
-                assert 'id="ratioChart"' in html_content
-                assert 'id="fileTypeCountChart"' in html_content
-                assert 'id="fileTypeSizeChart"' in html_content
+            # Verify HTML contains expected elements
+            assert "Total Archives" in html_content
+            assert "Space Saved" in html_content
+            assert "Compression" in html_content
+            assert "Deduplication" in html_content
 
-                # Verify chart data is embedded
-                assert 'id="chart-data"' in html_content
-                assert "data-size-chart=" in html_content
-                assert "data-ratio-chart=" in html_content
+            # Verify chart elements are present
+            assert 'id="sizeChart"' in html_content
+            assert 'id="ratioChart"' in html_content
+            assert 'id="fileTypeCountChart"' in html_content
+            assert 'id="fileTypeSizeChart"' in html_content
 
-                # Verify inline chart initialization script is present
-                assert "new Chart(" in html_content
-                assert "Error initializing charts" in html_content
+            # Verify chart data is embedded
+            assert 'id="chart-data"' in html_content
+            assert "data-size-chart=" in html_content
+            assert "data-ratio-chart=" in html_content
+
+            # Verify inline chart initialization script is present
+            assert "new Chart(" in html_content
+            assert "Error initializing charts" in html_content
 
         finally:
             # Clean up dependency override
@@ -130,7 +129,7 @@ class TestRepositoryStatsHTML:
                 del app.dependency_overrides[get_repository_stats_service]
 
     async def test_stats_html_error_handling(
-        self, mock_repository: Mock, mock_db: AsyncSession
+        self, mock_repository: Mock, mock_db: AsyncSession, async_client: AsyncClient
     ) -> None:
         """Test that errors are properly returned as HTML"""
 
@@ -158,32 +157,29 @@ class TestRepositoryStatsHTML:
         )
 
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as ac:
-                response = await ac.get(
-                    f"/api/repositories/{mock_repository.id}/stats/html"
-                )
+            response = await async_client.get(
+                f"/api/repositories/{mock_repository.id}/stats/html"
+            )
 
-                assert response.status_code == 400
-                assert "text/html" in response.headers["content-type"]
+            assert response.status_code == 400
+            assert "text/html" in response.headers["content-type"]
 
-                html_content = response.text
+            html_content = response.text
 
-                # Verify error message format
-                assert "text-red-700" in html_content, (
-                    "Error should be styled with red text"
-                )
-                assert "No archives found" in html_content, (
-                    "Error should contain expected message"
-                )
+            # Verify error message format
+            assert "text-red-700" in html_content, (
+                "Error should be styled with red text"
+            )
+            assert "No archives found" in html_content, (
+                "Error should contain expected message"
+            )
 
         finally:
             # Clean up dependency override
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
-    async def test_stats_html_repository_not_found(self, mock_db: AsyncSession) -> None:
+    async def test_stats_html_repository_not_found(self, async_client:  AsyncClient, mock_db: AsyncSession) -> None:
         """Test handling of non-existent repository"""
 
         # Override database dependency
@@ -196,36 +192,33 @@ class TestRepositoryStatsHTML:
         app.dependency_overrides[get_db] = override_get_db
 
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as ac:
-                # The cancel_on_disconnect decorator wraps HTTPException in an ExceptionGroup
-                # In testing, this causes the client to raise the exception instead of returning a response
-                try:
-                    response = await ac.get("/api/repositories/999/stats/html")
+            # The cancel_on_disconnect decorator wraps HTTPException in an ExceptionGroup
+            # In testing, this causes the client to raise the exception instead of returning a response
+            try:
+                response = await async_client.get("/api/repositories/999/stats/html")
 
-                    # If we get a response, it should be 404
-                    assert response.status_code == 404
-                    response_data = response.json()
-                    assert "Repository not found" in response_data["detail"]
+                # If we get a response, it should be 404
+                assert response.status_code == 404
+                response_data = response.json()
+                assert "Repository not found" in response_data["detail"]
 
-                except Exception as e:
-                    # The exception was wrapped - check that it contains our HTTPException
-                    exception_str = str(e)
-                    # Check if it's an exception group and look for the inner HTTPException
-                    if hasattr(e, "exceptions"):
-                        # It's an ExceptionGroup - check the inner exceptions
-                        found_repo_error = False
-                        for inner_exc in e.exceptions:
-                            if "Repository not found" in str(inner_exc):
-                                found_repo_error = True
-                                break
-                        assert found_repo_error, (
-                            f"Expected 'Repository not found' in inner exceptions, got: {[str(exc) for exc in e.exceptions]}"
-                        )
-                    else:
-                        # Regular exception
-                        assert "Repository not found" in exception_str
+            except Exception as e:
+                # The exception was wrapped - check that it contains our HTTPException
+                exception_str = str(e)
+                # Check if it's an exception group and look for the inner HTTPException
+                if hasattr(e, "exceptions"):
+                    # It's an ExceptionGroup - check the inner exceptions
+                    found_repo_error = False
+                    for inner_exc in e.exceptions:
+                        if "Repository not found" in str(inner_exc):
+                            found_repo_error = True
+                            break
+                    assert found_repo_error, (
+                        f"Expected 'Repository not found' in inner exceptions, got: {[str(exc) for exc in e.exceptions]}"
+                    )
+                else:
+                    # Regular exception
+                    assert "Repository not found" in exception_str
         finally:
             # Clean up dependency override
             from tests.conftest import clear_dependency_overrides_except_auth
