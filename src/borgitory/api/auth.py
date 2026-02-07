@@ -16,7 +16,9 @@ router = APIRouter()
 
 @router.get("/check-users")
 async def check_users_exist(
-    request: Request, templates: TemplatesDep, db: AsyncSession = Depends(get_db)
+    request: Request,
+    templates: TemplatesDep,
+    db: AsyncSession = Depends(get_db)
 ) -> _TemplateResponse:
     result = await db.execute(select(func.count(User.id)))
     user_count = result.scalar() or 0
@@ -70,11 +72,11 @@ async def register_user(
                 status_code=400,
             )
 
-        if not password or len(password) < 6:
+        if not password or len(password) < 6 or len(password) > 72:
             return templates.TemplateResponse(
                 request,
                 "partials/shared/notification.html",
-                {"type": "error", "message": "Password must be at least 6 characters"},
+                {"type": "error", "message": "Password must be between 6 and 72 characters"},
                 status_code=400,
             )
 
@@ -194,7 +196,9 @@ async def login_user(
 
 @router.post("/logout")
 async def logout(
-    request: Request, response: Response, db: AsyncSession = Depends(get_db)
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db)
 ) -> Dict[str, str]:
     auth_token = request.cookies.get("auth_token")
     if auth_token:
@@ -208,7 +212,8 @@ async def logout(
 
 
 async def get_current_user(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request, db:
+    AsyncSession = Depends(get_db)
 ) -> User:
     auth_token = request.cookies.get("auth_token")
     if not auth_token:
@@ -241,7 +246,8 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     try:
         return await get_current_user(request, db)
