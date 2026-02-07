@@ -97,7 +97,8 @@ class TestNotificationEditIntegration:
         response = test_client.get("/api/notifications/1/edit")
 
         # Clean up
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
         # Verify response
         assert response.status_code == 200
@@ -161,7 +162,8 @@ class TestNotificationEditIntegration:
         response = test_client.get("/api/notifications/2/edit")
 
         # Clean up
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
         # Verify response
         assert response.status_code == 200
@@ -216,7 +218,8 @@ class TestNotificationEditIntegration:
         response = test_client.get("/api/notifications/3/edit")
 
         # Clean up
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
         # Verify response
         assert response.status_code == 200
@@ -270,7 +273,8 @@ class TestNotificationEditIntegration:
         response = test_client.get("/api/notifications/999/edit")
 
         # Clean up
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
         # Should get 404
         assert response.status_code == 404
@@ -298,7 +302,8 @@ class TestNotificationEditIntegration:
         response = test_client.get("/api/notifications/1/edit")
 
         # Clean up
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
         # Verify response
         assert response.status_code == 200
@@ -353,7 +358,8 @@ class TestNotificationEditIntegration:
         response = test_client.get("/api/notifications/1/edit")
 
         # Clean up
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
         # Verify response
         assert response.status_code == 200

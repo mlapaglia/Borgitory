@@ -274,7 +274,8 @@ class TestManualRunAPScheduler:
                 test_schedule.id, test_schedule.name
             )
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     def test_manual_run_api_endpoint_scheduler_error(
         self,
@@ -301,7 +302,8 @@ class TestManualRunAPScheduler:
                 in response.text
             )
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_scheduler_service_job_execution_flow(
         self, scheduler_service: SchedulerService

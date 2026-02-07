@@ -29,7 +29,9 @@ async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]
 
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield test_user
-    app.dependency_overrides.clear()
+    # Don't clear auth override as it's managed by async_client fixture
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
 
 
 class TestTabsAPI:
@@ -133,7 +135,8 @@ class TestTabsAPI:
             assert 'value="smb"' not in content
         finally:
             # Clean up dependency override
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_get_cloud_sync_tab_empty_providers(
         self, async_client: AsyncClient, mock_current_user: Any
@@ -162,7 +165,8 @@ class TestTabsAPI:
             assert 'value="smb"' not in content
         finally:
             # Clean up dependency override
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_provider_fields_endpoint_uses_registry_for_submit_text(
         self, async_client: AsyncClient, mock_current_user: Any

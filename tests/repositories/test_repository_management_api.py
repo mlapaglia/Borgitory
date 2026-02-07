@@ -103,7 +103,8 @@ class TestRepositoryManagementAPI:
             assert "Repository is accessible" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_lock_status_endpoint_locked(
         self,
@@ -140,7 +141,8 @@ class TestRepositoryManagementAPI:
             assert "Repository is locked by another process" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_lock_status_endpoint_error(
         self,
@@ -177,7 +179,8 @@ class TestRepositoryManagementAPI:
             assert "Repository access failed: Connection timeout" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_break_lock_button_endpoint_locked(
         self,
@@ -215,7 +218,8 @@ class TestRepositoryManagementAPI:
             assert test_repository.name in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_break_lock_button_endpoint_unlocked(
         self,
@@ -253,7 +257,8 @@ class TestRepositoryManagementAPI:
             assert "<!-- Break Lock Button Template -->" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_break_lock_button_modal_endpoint(
         self,
@@ -291,7 +296,8 @@ class TestRepositoryManagementAPI:
             assert "hx-target" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_break_lock_endpoint_success(
         self,
@@ -325,7 +331,8 @@ class TestRepositoryManagementAPI:
             assert "Delete" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_break_lock_modal_endpoint_success(
         self,
@@ -364,7 +371,8 @@ class TestRepositoryManagementAPI:
             assert "bg-green-100" in html_content or "bg-green-800" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_borg_info_endpoint_success(
         self,
@@ -423,7 +431,8 @@ class TestRepositoryManagementAPI:
             assert "break-all" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_borg_info_endpoint_error(
         self,
@@ -460,7 +469,8 @@ class TestRepositoryManagementAPI:
             assert "text-red-600" in html_content or "text-red-400" in html_content
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_export_key_endpoint_success(
         self,
@@ -494,7 +504,8 @@ class TestRepositoryManagementAPI:
             assert response.text == "BORG_KEY 1234567890abcdef..."
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
 
     async def test_export_key_endpoint_failure(
         self,
@@ -527,4 +538,5 @@ class TestRepositoryManagementAPI:
             )
 
         finally:
-            app.dependency_overrides.clear()
+            from tests.conftest import clear_dependency_overrides_except_auth
+            clear_dependency_overrides_except_auth()
