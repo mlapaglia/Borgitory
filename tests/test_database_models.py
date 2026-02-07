@@ -11,6 +11,7 @@ from borgitory.models.database import (
     User,
     CloudSyncConfig,
     get_cipher_suite,
+    BCRYPT_MAX_PASSWORD_BYTES,
 )
 import borgitory.models.database
 
@@ -295,13 +296,32 @@ class TestUserModel:
         assert user.verify_password("not_empty") is False
 
     def test_very_long_password(self) -> None:
-        """Test password hashing with very long password."""
+        """Test password hashing at bcrypt's 72-byte limit (72 ASCII chars = 72 bytes)."""
         user = User()
         user.username = "testuser"
-        long_password = "a" * 1000  # 1000 character password
+        long_password = "a" * BCRYPT_MAX_PASSWORD_BYTES
 
         user.set_password(long_password)
         assert user.verify_password(long_password) is True
+
+    def test_password_over_72_bytes_raises(self) -> None:
+        """Test set_password raises ValueError when password exceeds 72 bytes."""
+        user = User()
+        user.username = "testuser"
+
+        with pytest.raises(
+            ValueError,
+            match=rf"exceeds bcrypt limit of {BCRYPT_MAX_PASSWORD_BYTES} bytes",
+        ):
+            user.set_password("a" * (BCRYPT_MAX_PASSWORD_BYTES + 1))
+
+    def test_verify_password_over_72_bytes_returns_false(self) -> None:
+        """Test verify_password returns False for input over 72 bytes."""
+        user = User()
+        user.username = "testuser"
+        user.set_password("valid_password")
+
+        assert user.verify_password("a" * (BCRYPT_MAX_PASSWORD_BYTES + 1)) is False
 
     def test_password_with_special_characters(self) -> None:
         """Test password with various special characters."""

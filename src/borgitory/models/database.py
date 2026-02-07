@@ -1,4 +1,5 @@
 import base64
+import bcrypt
 import hashlib
 import logging
 import uuid
@@ -19,7 +20,6 @@ from borgitory.models.enums import EncryptionType
 from typing import List, Any
 
 from cryptography.fernet import Fernet
-from passlib.context import CryptContext
 from sqlalchemy import (
     Integer,
     String,
@@ -60,6 +60,8 @@ class StringUuidType(Uuid[str]):
 
 logger = logging.getLogger(__name__)
 
+BCRYPT_MAX_PASSWORD_BYTES = 72
+
 
 engine = create_async_engine(
     ASYNC_DATABASE_URL, connect_args={"check_same_thread": False}
@@ -84,11 +86,6 @@ def get_cipher_suite() -> Fernet:
         )
         _cipher_suite = Fernet(fernet_key)
     return _cipher_suite
-
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 class Repository(Base):
     __tablename__ = "repositories"
@@ -284,12 +281,25 @@ class User(Base):
     )
 
     def set_password(self, password: str) -> None:
-        """Hash and store the password"""
-        self.password_hash = pwd_context.hash(password)
+        """Hash and store the password. Raises ValueError if password exceeds bcrypt's 72-byte limit."""
+        encoded = password.encode("utf-8")
+        if len(encoded) > BCRYPT_MAX_PASSWORD_BYTES:
+            raise ValueError(
+                f"Password exceeds bcrypt limit of {BCRYPT_MAX_PASSWORD_BYTES} bytes"
+            )
+        self.password_hash = bcrypt.hashpw(
+            encoded,
+            bcrypt.gensalt()).decode("utf-8")
 
     def verify_password(self, password: str) -> bool:
-        """Verify a password against the stored hash"""
-        return pwd_context.verify(password, self.password_hash)
+        """Verify a password against the stored hash. Returns False if password exceeds 72 bytes."""
+        encoded = password.encode("utf-8")
+        if len(encoded) > BCRYPT_MAX_PASSWORD_BYTES:
+            return False
+        return bcrypt.checkpw(
+            encoded,
+            self.password_hash.encode("utf-8"),
+        )
 
 
 class UserSession(Base):
