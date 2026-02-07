@@ -6,7 +6,7 @@ from datetime import timedelta
 from borgitory.utils.datetime_utils import now_utc
 from typing import Dict, Optional
 
-from borgitory.models.database import User, UserSession
+from borgitory.models.database import User, UserSession, BCRYPT_MAX_PASSWORD_BYTES
 from borgitory.dependencies import get_db
 from borgitory.dependencies import TemplatesDep
 from starlette.templating import _TemplateResponse
@@ -72,11 +72,18 @@ async def register_user(
                 status_code=400,
             )
 
-        if not password or len(password) < 6 or len(password) > 72:
+        if not password or len(password) < 6:
             return templates.TemplateResponse(
                 request,
                 "partials/shared/notification.html",
-                {"type": "error", "message": "Password must be between 6 and 72 characters"},
+                {"type": "error", "message": "Password must be at least 6 characters"},
+                status_code=400,
+            )
+        if len(password.encode("utf-8")) > BCRYPT_MAX_PASSWORD_BYTES:
+            return templates.TemplateResponse(
+                request,
+                "partials/shared/notification.html",
+                {"type": "error", "message": "Password must be at most 72 bytes (UTF-8)"},
                 status_code=400,
             )
 
@@ -212,8 +219,8 @@ async def logout(
 
 
 async def get_current_user(
-    request: Request, db:
-    AsyncSession = Depends(get_db)
+    request: Request,
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     auth_token = request.cookies.get("auth_token")
     if not auth_token:

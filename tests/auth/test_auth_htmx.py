@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from borgitory.models.database import User
+from borgitory.models.database import User, BCRYPT_MAX_PASSWORD_BYTES
 
 
 class TestAuthHTMX:
@@ -51,6 +51,20 @@ class TestAuthHTMX:
 
         # Check for error message
         assert "Username must be at least 3 characters" in response.text
+
+    async def test_register_htmx_password_over_72_bytes_rejected(
+        self, async_client_without_auth_or_user: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        """Test registration rejects password over 72 bytes (UTF-8)."""
+        long_password = "a" * (BCRYPT_MAX_PASSWORD_BYTES + 1)
+        response = await async_client_without_auth_or_user.post(
+            "/auth/register",
+            data={"username": "testuser", "password": long_password},
+            headers={"hx-request": "true"},
+        )
+
+        assert response.status_code == 400
+        assert "72 bytes" in response.text
 
     async def test_login_htmx_success(
         self, async_client_without_auth: AsyncClient, test_db: AsyncSession

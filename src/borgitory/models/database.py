@@ -60,6 +60,8 @@ class StringUuidType(Uuid[str]):
 
 logger = logging.getLogger(__name__)
 
+BCRYPT_MAX_PASSWORD_BYTES = 72
+
 
 engine = create_async_engine(
     ASYNC_DATABASE_URL, connect_args={"check_same_thread": False}
@@ -279,17 +281,25 @@ class User(Base):
     )
 
     def set_password(self, password: str) -> None:
-        """Hash and store the password"""
+        """Hash and store the password. Raises ValueError if password exceeds bcrypt's 72-byte limit."""
+        encoded = password.encode("utf-8")
+        if len(encoded) > BCRYPT_MAX_PASSWORD_BYTES:
+            raise ValueError(
+                f"Password exceeds bcrypt limit of {BCRYPT_MAX_PASSWORD_BYTES} bytes"
+            )
         self.password_hash = bcrypt.hashpw(
-            password.encode("utf-8"),
+            encoded,
             bcrypt.gensalt()).decode("utf-8")
 
     def verify_password(self, password: str) -> bool:
-        """Verify a password against the stored hash"""
+        """Verify a password against the stored hash. Returns False if password exceeds 72 bytes."""
+        encoded = password.encode("utf-8")
+        if len(encoded) > BCRYPT_MAX_PASSWORD_BYTES:
+            return False
         return bcrypt.checkpw(
-            password.encode("utf-8"),
+            encoded,
             self.password_hash.encode("utf-8"),
-    )
+        )
 
 
 class UserSession(Base):
