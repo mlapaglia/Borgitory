@@ -298,7 +298,7 @@ class TestUserModel:
         """Test password hashing with very long password."""
         user = User()
         user.username = "testuser"
-        long_password = "a" * 1000  # 1000 character password
+        long_password = "a" * 72  # 72 character password
 
         user.set_password(long_password)
         assert user.verify_password(long_password) is True

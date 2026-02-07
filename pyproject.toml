@@ -29,13 +29,12 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "alembic>=1.18.2",
     "apscheduler>=3.11.2",
-    "bcrypt>=4.3.0,<5.0.0",
+    "bcrypt>=5.0.0",
     "cron-descriptor>=2.0.6",
     "cryptography>=46.0.4",
     "docker>=7.1.0",
     "fastapi>=0.128.4",
     "jinja2>=3.1.6",
-    "passlib[bcrypt]>=1.7.4",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
     "python-multipart>=0.0.22",
@@ -54,14 +53,13 @@ dev = [
     "httpx>=0.28.1",
     "mypy>=1.19.1",
     "sqlalchemy[mypy]>=2.0.46",
-    "types-passlib>=1.7.7.20250602",
     "types-python-dateutil>=2.9.0.20260124",
     "types-aiofiles>=25.1.0.20251011",
     "debugpy>=1.8.20",
 ]
 
 [project.urls]
-Homepage = "https://github.com/mlapaglia/Borgitory"
+Homepage = "https://borgitory.com"
 Repository = "https://github.com/mlapaglia/Borgitory"
 Issues = "https://github.com/mlapaglia/Borgitory/issues"
 
@@ -232,7 +230,6 @@ module = [
     "cron_descriptor.*",
     "cryptography.*",
     "docker.*",
-    "passlib.*",
     "sqlalchemy.*",
     "sse_starlette.*",
 ]

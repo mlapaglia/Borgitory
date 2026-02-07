@@ -1,4 +1,5 @@
 import base64
+import bcrypt
 import hashlib
 import logging
 import uuid
@@ -19,7 +20,6 @@ from borgitory.models.enums import EncryptionType
 from typing import List, Any
 
 from cryptography.fernet import Fernet
-from passlib.context import CryptContext
 from sqlalchemy import (
     Integer,
     String,
@@ -84,11 +84,6 @@ def get_cipher_suite() -> Fernet:
         )
         _cipher_suite = Fernet(fernet_key)
     return _cipher_suite
-
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 class Repository(Base):
     __tablename__ = "repositories"
@@ -285,11 +280,16 @@ class User(Base):
 
     def set_password(self, password: str) -> None:
         """Hash and store the password"""
-        self.password_hash = pwd_context.hash(password)
+        self.password_hash = bcrypt.hashpw(
+            password.encode("utf-8"),
+            bcrypt.gensalt()).decode("utf-8")
 
     def verify_password(self, password: str) -> bool:
         """Verify a password against the stored hash"""
-        return pwd_context.verify(password, self.password_hash)
+        return bcrypt.checkpw(
+            password.encode("utf-8"),
+            self.password_hash.encode("utf-8"),
+    )
 
 
 class UserSession(Base):

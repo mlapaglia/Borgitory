@@ -32,7 +32,6 @@ updates:
       security:
         patterns:
           - "cryptography*"
-          - "passlib*"
           - "bcrypt*"
 
   # Docker dependencies
