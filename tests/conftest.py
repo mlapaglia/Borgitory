@@ -54,18 +54,6 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
 )
 
 
-def clear_dependency_overrides_except_auth() -> None:
-    """Clear all dependency overrides except the global auth override.
-    
-    Use this in test cleanup instead of app.dependency_overrides.clear()
-    to preserve the session-level authentication bypass.
-    """
-    auth_override = app.dependency_overrides.get(get_current_user)
-    app.dependency_overrides.clear()
-    if auth_override:
-        app.dependency_overrides[get_current_user] = auth_override
-
-
 @pytest.fixture(scope="session", autouse=True)
 def disable_auth_for_tests() -> Generator[None, None, None]:
     """Globally disable authentication for all tests.
@@ -135,10 +123,7 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
 
     # Close the engine to ensure all connections are closed
     await engine.dispose()
-    
-    # Only remove the get_db override, preserve auth override
-    if get_db in app.dependency_overrides:
-        del app.dependency_overrides[get_db]
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

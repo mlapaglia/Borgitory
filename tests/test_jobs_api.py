@@ -156,10 +156,7 @@ class TestJobsAPI:
             "templates": mock_templates,
         }
 
-        yield deps
-
-        from tests.conftest import clear_dependency_overrides_except_auth
-        clear_dependency_overrides_except_auth()
+        app.dependency_overrides.clear()
 
     # Test job creation endpoints
 

@@ -31,8 +31,7 @@ async def mock_current_user(test_db: AsyncSession) -> AsyncGenerator[User, None]
 
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield test_user
-    from tests.conftest import clear_dependency_overrides_except_auth
-    clear_dependency_overrides_except_auth()
+    app.dependency_overrides.clear()
 
 
 class TestRepositoryArchivesNavigation:
