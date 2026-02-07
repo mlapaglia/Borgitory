@@ -138,6 +138,8 @@ class TestJobsAPI:
         mock_templates: Mock,
     ) -> Generator[dict[str, Mock], None, None]:
         """Setup dependency overrides for testing."""
+        from tests.conftest import clear_dependency_overrides_except_auth
+        
         app.dependency_overrides[get_job_service] = lambda: mock_job_service
         app.dependency_overrides[get_job_stream_service] = (
             lambda: mock_job_stream_service
@@ -156,7 +158,7 @@ class TestJobsAPI:
             "templates": mock_templates,
         }
 
-        app.dependency_overrides.clear()
+        clear_dependency_overrides_except_auth()
 
     # Test job creation endpoints
 

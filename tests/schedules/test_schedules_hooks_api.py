@@ -67,7 +67,8 @@ class TestScheduleHooksAPI:
 
     def teardown_method(self) -> None:
         """Clean up dependency overrides after each test."""
-        app.dependency_overrides.clear()
+        from tests.conftest import clear_dependency_overrides_except_auth
+        clear_dependency_overrides_except_auth()
 
     # Test add-hook-field endpoint
     async def test_add_hook_field_pre_hook(
