@@ -11,10 +11,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
-from borgitory.models.database import User
 from borgitory.services.package_manager_service import PackageManagerService
 from borgitory.dependencies import get_templates, get_package_manager_service
-from borgitory.api.auth import get_current_user
 
 
 class TestPackageSelectionEndpoints:
@@ -23,17 +21,6 @@ class TestPackageSelectionEndpoints:
     @pytest.fixture(scope="function")
     async def setup_test_dependencies(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup dependency overrides for each test."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
         mock_package_service.install_packages = AsyncMock(
@@ -75,14 +62,13 @@ class TestPackageSelectionEndpoints:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "asdf",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }
@@ -280,17 +266,6 @@ class TestPackageRemovalEndpoints:
     @pytest.fixture(scope="function")
     async def setup_removal_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for removal tests."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
 
@@ -322,14 +297,13 @@ class TestPackageRemovalEndpoints:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "test_user",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }
@@ -393,17 +367,6 @@ class TestErrorHandling:
     @pytest.fixture(scope="function")
     async def setup_error_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for error handling tests."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
 
@@ -434,14 +397,13 @@ class TestErrorHandling:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "test_user",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }
@@ -477,17 +439,6 @@ class TestPackageSearchEndpoints:
     @pytest.fixture(scope="function")
     async def setup_search_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for search tests."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
 
@@ -545,14 +496,13 @@ class TestPackageSearchEndpoints:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "test_user",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }
@@ -661,17 +611,6 @@ class TestInstalledPackagesEndpoint:
     @pytest.fixture(scope="function")
     async def setup_installed_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for installed packages tests."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
 
@@ -740,14 +679,13 @@ class TestInstalledPackagesEndpoint:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "test_user",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }
@@ -811,17 +749,6 @@ class TestPackageRemovalEndpoint:
         self, test_db: AsyncSession
     ) -> Dict[str, Any]:
         """Setup for package removal tests."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
         mock_package_service.remove_packages = AsyncMock(
@@ -859,14 +786,13 @@ class TestPackageRemovalEndpoint:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "test_user",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }
@@ -977,17 +903,6 @@ class TestPackageInfoEndpoint:
     @pytest.fixture(scope="function")
     async def setup_info_test(self, test_db: AsyncSession) -> Dict[str, Any]:
         """Setup for package info tests."""
-        # Create mock current user
-        test_user = User()
-        test_user.username = "testuser"
-        test_user.set_password("testpass")
-        test_db.add(test_user)
-        await test_db.commit()
-        await test_db.refresh(test_user)
-
-        def override_get_current_user() -> User:
-            return test_user
-
         # Create mock package service
         mock_package_service = Mock(spec=PackageManagerService)
 
@@ -1033,14 +948,13 @@ class TestPackageInfoEndpoint:
             return mock_templates
 
         # Apply overrides
-        app.dependency_overrides[get_current_user] = override_get_current_user
         app.dependency_overrides[get_package_manager_service] = (
             override_get_package_service
         )
         app.dependency_overrides[get_templates] = override_get_templates
 
         return {
-            "user": test_user,
+            "user": "test_user",
             "package_service": mock_package_service,
             "templates": mock_templates,
         }

@@ -9,6 +9,8 @@ from borgitory.models.schemas import (
 from borgitory.models.database import RepositoryCheckConfig
 
 from borgitory.dependencies import TemplatesDep, RepositoryCheckConfigServiceDep, get_db
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 router = APIRouter()
 
@@ -20,6 +22,7 @@ async def create_repository_check_config(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Create a new repository check configuration"""
     success, created_config, error_msg = await service.create_config(
@@ -58,6 +61,7 @@ async def create_repository_check_config(
 async def get_repository_check_configs(
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> List[RepositoryCheckConfig]:
     """Get all repository check configurations"""
     return await service.get_all_configs(db)
@@ -69,6 +73,7 @@ async def get_repository_check_form(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get repository check form with all dropdowns populated"""
     form_data = await service.get_form_data(db)
@@ -85,6 +90,7 @@ async def get_policy_form(
     request: Request,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get policy creation form"""
     return templates.TemplateResponse(
@@ -100,6 +106,7 @@ async def get_repository_check_configs_html(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get repository check configurations as HTML"""
     try:
@@ -124,6 +131,7 @@ async def toggle_custom_options(
     request: Request,
     templates: TemplatesDep,
     check_config_id: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Toggle custom check options visibility based on policy selection"""
 
@@ -145,6 +153,7 @@ async def update_check_options(
     check_type: str = "full",
     max_duration: str = "",
     repair_mode: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Update check options based on check type selection"""
 
@@ -184,6 +193,7 @@ async def get_repository_check_config(
     config_id: int,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> RepositoryCheckConfig:
     """Get a specific repository check configuration"""
     config = await service.get_config_by_id(db, config_id)
@@ -199,6 +209,7 @@ async def get_repository_check_config_edit_form(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get edit form for a specific repository check configuration"""
     try:
@@ -226,6 +237,7 @@ async def update_repository_check_config(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Update a repository check configuration"""
     update_dict = update_data.model_dump(exclude_unset=True)
@@ -256,6 +268,7 @@ async def patch_repository_check_config(
     update_data: RepositoryCheckConfigUpdate,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> RepositoryCheckConfig:
     """Update a repository check configuration (PATCH method for backwards compatibility)"""
     update_dict = update_data.model_dump(exclude_unset=True)
@@ -284,6 +297,7 @@ async def enable_repository_check_config(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Enable a repository check configuration"""
     success, success_msg, error_msg = await service.enable_config(db, config_id)
@@ -312,6 +326,7 @@ async def disable_repository_check_config(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Disable a repository check configuration"""
     success, success_msg, error_msg = await service.disable_config(db, config_id)
@@ -340,6 +355,7 @@ async def delete_repository_check_config(
     templates: TemplatesDep,
     service: RepositoryCheckConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Delete a repository check configuration"""
     success, config_name, error_msg = await service.delete_config(db, config_id)

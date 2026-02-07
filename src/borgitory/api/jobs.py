@@ -19,6 +19,8 @@ from borgitory.dependencies import JobStreamServiceDep, JobRenderServiceDep
 from borgitory.dependencies import TemplatesDep
 from borgitory.dependencies import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -108,6 +110,7 @@ async def create_backup(
     job_svc: JobServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Start a backup job using JobService"""
 
@@ -135,6 +138,7 @@ async def create_prune_job(
     job_svc: JobServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Start an archive pruning job using JobService"""
 
@@ -162,6 +166,7 @@ async def create_check_job(
     job_svc: JobServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Start a repository check job and return job_id for tracking"""
 
@@ -185,6 +190,7 @@ async def create_check_job(
 @router.get("/stream")
 async def stream_all_jobs(
     stream_svc: JobStreamServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream real-time updates for all jobs via Server-Sent Events"""
     return await stream_svc.stream_all_jobs()
@@ -196,6 +202,7 @@ async def get_jobs_html(
     render_svc: JobRenderServiceDep,
     expand: str = "",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> str:
     """Get job history as HTML"""
 
@@ -207,6 +214,7 @@ async def get_jobs_html(
 def get_current_jobs_html(
     request: Request,
     render_svc: JobRenderServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get current running jobs as HTML"""
 
@@ -218,6 +226,7 @@ def get_current_jobs_html(
 @router.get("/current/stream")
 async def stream_current_jobs_html(
     render_svc: JobRenderServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream current running jobs as HTML via Server-Sent Events"""
 
@@ -235,7 +244,9 @@ async def stream_current_jobs_html(
 
 @router.get("/{job_id}/status", response_model=JobStatusResponse)
 async def get_job_status(
-    job_id: uuid.UUID, job_svc: JobServiceDep
+    job_id: uuid.UUID,
+    job_svc: JobServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> JobStatusResponse:
     """Get current job status and progress"""
     result = await job_svc.get_job_status(job_id)
@@ -261,6 +272,7 @@ async def get_job_status(
 async def stream_job_output(
     job_id: uuid.UUID,
     stream_svc: JobStreamServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream real-time job output via Server-Sent Events"""
     return await stream_svc.stream_job_output(job_id)
@@ -272,6 +284,7 @@ async def stop_job(
     request: Request,
     job_svc: JobServiceDep,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Stop a running job, killing current task and skipping remaining tasks"""
     result = await job_svc.stop_job(job_id)
@@ -308,6 +321,7 @@ async def toggle_job_details(
     templates: TemplatesDep,
     expanded: str = "false",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Toggle job details visibility and return refreshed job item"""
     # Toggle the expand_details state - if currently false, expand it
@@ -332,6 +346,7 @@ async def get_job_details_static(
     render_svc: JobRenderServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get static job details (used when job completes)"""
     template_job = await render_svc.get_job_for_template(job_id, db)
@@ -352,6 +367,7 @@ async def toggle_task_details(
     templates: TemplatesDep,
     expanded: str = "false",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Toggle task details visibility and return updated task item"""
     template_job = await render_svc.get_job_for_template(job_id, db)
@@ -388,7 +404,9 @@ async def toggle_task_details(
 
 
 @router.post("/{job_id}/copy-output", response_model=MessageResponse)
-async def copy_job_output() -> MessageResponse:
+async def copy_job_output(
+    current_user: User = Depends(get_current_user),
+) -> MessageResponse:
     """Copy job output to clipboard (returns success message)"""
     return MessageResponse(message="Output copied to clipboard")
 
@@ -398,12 +416,15 @@ async def stream_task_output(
     job_id: uuid.UUID,
     task_order: int,
     stream_svc: JobStreamServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """Stream real-time output for a specific task via Server-Sent Events"""
     return await stream_svc.stream_task_output(job_id, task_order)
 
 
 @router.post("/{job_id}/tasks/{task_order}/copy-output", response_model=MessageResponse)
-async def copy_task_output() -> MessageResponse:
+async def copy_task_output(
+    current_user: User = Depends(get_current_user),
+) -> MessageResponse:
     """Copy task output to clipboard (returns success message)"""
     return MessageResponse(message="Task output copied to clipboard")

@@ -12,20 +12,13 @@ class TestAuthRedirectFlow:
     """Test class for auth redirect flow debugging."""
 
     async def test_login_htmx_flow(
-        self, async_client: AsyncClient, test_db: AsyncSession
+        self, async_client_without_auth: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test the complete HTMX login flow with cookie authentication."""
-        # Create a test user
-        user = User()
-        user.username = "testuser"
-        user.set_password("testpassword")
-        test_db.add(user)
-        await test_db.commit()
-
         # Make login request (HTMX-style)
-        response = await async_client.post(
+        response = await async_client_without_auth.post(
             "/auth/login",
-            data={"username": "testuser", "password": "testpassword"},
+            data={"username": "test_user", "password": "test_password"},
             headers={
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
             },
@@ -42,8 +35,8 @@ class TestAuthRedirectFlow:
         assert auth_token is not None and len(auth_token) > 0
 
         # Now try to access the main page with the cookie
-        async_client.cookies.set("auth_token", auth_token)
-        response2 = await async_client.get(
+        async_client_without_auth.cookies.set("auth_token", auth_token)
+        response2 = await async_client_without_auth.get(
             "/",
             headers={
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -54,7 +47,7 @@ class TestAuthRedirectFlow:
         assert response2.status_code == 302
         assert response2.headers["location"] == "/repositories"
 
-        response3 = await async_client.get(
+        response3 = await async_client_without_auth.get(
             "/repositories",
             headers={
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"

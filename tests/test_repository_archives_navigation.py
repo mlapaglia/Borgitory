@@ -7,7 +7,7 @@ and ensures it properly navigates to the archives tab with preselected repositor
 
 import pytest
 from httpx import AsyncClient
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +38,7 @@ class TestRepositoryArchivesNavigation:
     """Test class for repository archives navigation functionality."""
 
     async def test_repository_list_contains_view_archives_button(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that repository list contains properly configured View Archives buttons."""
         # Create test repositories
@@ -73,7 +73,7 @@ class TestRepositoryArchivesNavigation:
         assert f'"preselect_repo": "{repo2.id}"' in content
 
     async def test_view_archives_button_navigation_flow(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test the complete navigation flow when clicking View Archives."""
         # Create test repository
@@ -99,7 +99,7 @@ class TestRepositoryArchivesNavigation:
         assert f"preselect_repo={repo.id}" in content
 
     async def test_archives_tab_selector_with_preselected_repository(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that the archives selector correctly handles preselected repository."""
         # Create test repositories
@@ -142,7 +142,7 @@ class TestRepositoryArchivesNavigation:
         assert 'hx-trigger="change, load"' in content
 
     async def test_archives_selector_without_preselection(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that archives selector works normally without preselection."""
         # Create test repository
@@ -172,7 +172,7 @@ class TestRepositoryArchivesNavigation:
         assert 'hx-trigger="change, load"' not in content
 
     async def test_view_archives_button_with_nonexistent_repository(
-        self, async_client: AsyncClient, mock_current_user: Any
+        self, async_client: AsyncClient
     ) -> None:
         """Test View Archives navigation with non-existent repository ID."""
         # Test archives tab with non-existent repository ID
@@ -196,7 +196,7 @@ class TestRepositoryArchivesNavigation:
         assert "Select a repository to view archives..." in content
 
     async def test_empty_repository_list_archives_buttons(
-        self, async_client: AsyncClient, mock_current_user: Any
+        self, async_client: AsyncClient
     ) -> None:
         """Test repository list when no repositories exist."""
         # Get repository list HTML with no repositories
@@ -209,7 +209,7 @@ class TestRepositoryArchivesNavigation:
         assert "View Archives" not in content
 
     async def test_archives_tab_oob_navigation_update(
-        self, async_client: AsyncClient, test_db: AsyncSession, mock_current_user: Any
+        self, async_client: AsyncClient, test_db: AsyncSession
     ) -> None:
         """Test that archives tab includes out-of-band navigation update."""
         # Create test repository

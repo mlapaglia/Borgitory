@@ -53,7 +53,7 @@ def override_dependency(
 
     Example:
         with override_dependency(get_borg_service, lambda: mock_borg_service) as client:
-            response = client.get("/api/repositories")
+            response = await async_client.get("/api/repositories")
             assert response.status_code == 200
     """
     original_overrides = app.dependency_overrides.copy()
@@ -82,7 +82,7 @@ def override_multiple_dependencies(
             get_borg_service: lambda: mock_borg_service,
         }
         with override_multiple_dependencies(overrides) as client:
-            response = client.get("/api/repositories")
+            response = await async_client.get("/api/repositories")
     """
     original_overrides = app.dependency_overrides.copy()
     app.dependency_overrides.update(overrides)
@@ -373,7 +373,7 @@ def create_test_overrides_for_hybrid_services() -> Dict[
         overrides = create_test_overrides_for_hybrid_services()
         with override_multiple_dependencies(overrides) as client:
             # All hybrid services are now mocked
-            response = client.get("/api/some-endpoint")
+            response = await async_client.get("/api/some-endpoint")
     """
     from borgitory.dependencies import (
         get_borg_service,

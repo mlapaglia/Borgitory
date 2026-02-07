@@ -7,6 +7,7 @@ import os
 from typing import Any, AsyncGenerator, Dict, Generator, Optional
 from unittest.mock import Mock
 
+from borgitory.api.auth import get_current_user
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -20,7 +21,7 @@ if not os.getenv("SECRET_KEY"):
 
 from borgitory.dependencies import get_db
 from borgitory.main import app
-from borgitory.models.database import Base, CloudSyncConfig
+from borgitory.models.database import Base, CloudSyncConfig, User
 
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401
@@ -51,7 +52,6 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
     pushover_only_notification_registry,
     discord_only_notification_registry,
 )
-
 
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[Any, None, None]:
@@ -128,12 +128,53 @@ def mock_rclone_service() -> Mock:
 
 @pytest_asyncio.fixture
 async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client with proper resource management."""
+    """Create an async test client with proper resource management and authentication."""
+    # Create a test user for authentication
+    test_user = User()
+    test_user.username = "test_user"
+    test_user.set_password("test_password")
+    test_db.add(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
+    
+    # Override get_current_user to return our test user
+    def override_get_current_user() -> User:
+        return test_user
+    
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        yield client
+    
+    # Clean up the override
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
+
+@pytest_asyncio.fixture
+async def async_client_without_auth(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client without authentication and with proper resource management."""
+    # Create a test user for authentication
+    test_user = User()
+    test_user.username = "test_user"
+    test_user.set_password("test_password")
+    test_db.add(test_user)
+    await test_db.commit()
+    await test_db.refresh(test_user)
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"
     ) as client:
         yield client
 
+@pytest_asyncio.fixture
+async def async_client_without_auth_or_user(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async test client without authentication and with proper resource management."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        yield client
 
 @pytest.fixture
 def sample_repository_data() -> Dict[str, str]:

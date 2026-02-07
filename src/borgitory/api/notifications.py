@@ -21,6 +21,8 @@ from borgitory.dependencies import (
     get_notification_service,
 )
 from borgitory.services.notifications.service import NotificationService
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -57,6 +59,7 @@ async def get_provider_fields(
     registry: NotificationProviderRegistryDep,
     provider: Optional[str] = None,
     mode: str = "create",
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get provider-specific form fields"""
     if not provider:
@@ -98,6 +101,7 @@ async def create_notification_config(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Create a new notification configuration using the provider system"""
     try:
@@ -158,6 +162,7 @@ async def get_notification_configs_html(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get notification configurations as formatted HTML"""
     try:
@@ -189,6 +194,7 @@ async def test_notification_config(
     config_service: NotificationConfigServiceDep,
     notification_service: NotificationService = Depends(get_notification_service),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Test a notification configuration using the provider system"""
     try:
@@ -234,6 +240,7 @@ async def enable_notification_config(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Enable a notification configuration"""
     try:
@@ -270,6 +277,7 @@ async def disable_notification_config(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Disable a notification configuration"""
     try:
@@ -306,6 +314,7 @@ async def get_notification_config_edit_form(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get edit form for a specific notification configuration"""
     try:
@@ -342,6 +351,7 @@ async def update_notification_config(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Update a notification configuration"""
     try:
@@ -410,6 +420,7 @@ async def get_notification_form(
     request: Request,
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get notification creation form with provider support"""
     try:
@@ -435,6 +446,7 @@ async def delete_notification_config(
     templates: TemplatesDep,
     config_service: NotificationConfigServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Delete a notification configuration"""
     try:

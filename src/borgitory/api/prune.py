@@ -21,6 +21,8 @@ from borgitory.dependencies import (
     get_browser_timezone_offset,
     get_db,
 )
+from borgitory.api.auth import get_current_user
+from borgitory.models.database import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ async def get_prune_form(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get manual prune form with repositories populated"""
     form_data = await service.get_form_data(db)
@@ -47,6 +50,7 @@ async def get_prune_form(
 async def get_policy_form(
     request: Request,
     templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get policy creation form"""
     return templates.TemplateResponse(
@@ -58,7 +62,10 @@ async def get_policy_form(
 
 @router.get("/strategy-fields", response_class=HTMLResponse)
 async def get_strategy_fields(
-    request: Request, templates: TemplatesDep, strategy: str = "simple"
+    request: Request,
+    templates: TemplatesDep,
+    strategy: str = "simple",
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get dynamic strategy fields based on selection"""
     return templates.TemplateResponse(
@@ -75,6 +82,7 @@ async def create_prune_config(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Create a new prune configuration"""
     result = await service.create_prune_config(db, prune_config)
@@ -102,6 +110,7 @@ async def get_prune_configs(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> str:
     """Get prune configurations as formatted HTML"""
     try:
@@ -127,6 +136,7 @@ async def enable_prune_config(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Enable a prune configuration"""
     result = await service.enable_prune_config(db, config_id)
@@ -155,6 +165,7 @@ async def disable_prune_config(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Disable a prune configuration"""
     result = await service.disable_prune_config(db, config_id)
@@ -183,6 +194,7 @@ async def get_prune_config_edit_form(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get edit form for a specific prune configuration"""
     config = await service.get_prune_config_by_id(db, config_id)
@@ -208,6 +220,7 @@ async def update_prune_config(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Update a prune configuration"""
     result = await service.update_prune_config(db, config_id, config_update)
@@ -236,6 +249,7 @@ async def delete_prune_config(
     templates: TemplatesDep,
     service: PruneServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Delete a prune configuration"""
     result = await service.delete_prune_config(db, config_id)

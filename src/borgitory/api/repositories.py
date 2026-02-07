@@ -77,7 +77,10 @@ async def create_repository(
 
 @router.get("/", response_model=List[RepositoryResponse])
 async def list_repositories(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> List[Repository]:
     result = await db.execute(select(Repository).offset(skip).limit(limit))
     repositories = result.scalars().all()
@@ -89,6 +92,7 @@ async def get_repositories_html(
     request: Request,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get repositories as HTML for frontend display"""
     try:
@@ -184,7 +188,10 @@ async def list_directories_autocomplete(
 
 @router.get("/import-form", response_class=HTMLResponse)
 async def get_import_form(
-    request: Request, templates: TemplatesDep, path_service: PathServiceDep
+    request: Request,
+    templates: TemplatesDep,
+    path_service: PathServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get the import repository form"""
     default_directories = await path_service.get_default_directories()
@@ -200,6 +207,7 @@ async def get_import_encryption_fields(
     request: Request,
     templates: TemplatesDep,
     encryption_type: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get the appropriate encryption fields based on encryption type selection."""
     return templates.TemplateResponse(
@@ -214,6 +222,7 @@ async def get_create_encryption_fields(
     request: Request,
     templates: TemplatesDep,
     encryption_type: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get the appropriate encryption fields based on encryption type selection for create form."""
     return templates.TemplateResponse(
@@ -228,6 +237,7 @@ async def get_passphrase_field(
     request: Request,
     templates: TemplatesDep,
     encryption_type: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get the passphrase field based on encryption type selection."""
     return templates.TemplateResponse(
@@ -239,7 +249,10 @@ async def get_passphrase_field(
 
 @router.get("/create-form", response_class=HTMLResponse)
 async def get_create_form(
-    request: Request, templates: TemplatesDep, path_service: PathServiceDep
+    request: Request,
+    templates: TemplatesDep,
+    path_service: PathServiceDep,
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get the create repository form"""
     default_directories = await path_service.get_default_directories()
@@ -257,6 +270,7 @@ async def get_edit_form(
     templates: TemplatesDep,
     path_service: PathServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get the edit repository form"""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -297,7 +311,9 @@ async def import_repository(
 
 @router.get("/{repo_id}", response_model=RepositorySchema)
 async def get_repository(
-    repo_id: int, db: AsyncSession = Depends(get_db)
+    repo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Repository:
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
     repository = result.scalar_one_or_none()
@@ -327,6 +343,7 @@ async def check_repository_lock_status(
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Check if a repository is currently locked."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -354,6 +371,7 @@ async def get_repository_details_modal(
     request: Request,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get the repository details modal."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -383,6 +401,7 @@ async def get_break_lock_button(
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get the break lock button if repository is locked."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -410,6 +429,7 @@ async def get_break_lock_button_modal(
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get the break lock button for modal if repository is locked."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -437,6 +457,7 @@ async def break_repository_lock(
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Break a repository lock and return updated repository list."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -465,6 +486,7 @@ async def break_repository_lock_modal(
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Break a repository lock from modal and return updated lock status."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -496,6 +518,7 @@ async def get_repository_borg_info(
     repo_svc: RepositoryServiceDep,
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Get detailed repository information from borg info command."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -517,6 +540,7 @@ async def export_repository_key(
     repo_id: int,
     repo_svc: RepositoryServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Response:
     """Export repository key as a downloadable file."""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -546,6 +570,7 @@ async def delete_repository(
     repo_svc: RepositoryServiceDep,
     delete_borg_repo: bool = False,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Delete a repository."""
     delete_request = DeleteRepositoryRequest(
@@ -565,6 +590,7 @@ async def list_archives(
     repo_id: int,
     repo_svc: RepositoryServiceDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """List repository archives."""
     result = await repo_svc.list_archives(repo_id, db)
@@ -578,6 +604,7 @@ async def get_archives_repository_selector(
     templates: TemplatesDep,
     db: AsyncSession = Depends(get_db),
     preselect_repo: str = "",
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get repository selector for archives with repositories populated"""
     result = await db.execute(select(Repository))
@@ -592,7 +619,9 @@ async def get_archives_repository_selector(
 
 @router.get("/archives/loading")
 async def get_archives_loading(
-    request: Request, templates: TemplatesDep
+    request: Request,
+    templates: TemplatesDep,
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get loading state for archives"""
     return templates.TemplateResponse(
@@ -602,7 +631,10 @@ async def get_archives_loading(
 
 @router.post("/archives/load-with-spinner")
 async def load_archives_with_spinner(
-    request: Request, templates: TemplatesDep, repository_id: str = Form("")
+    request: Request,
+    templates: TemplatesDep,
+    repository_id: str = Form(""),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual archives"""
     if not repository_id or repository_id == "":
@@ -630,6 +662,7 @@ async def get_archives_list(
     templates: TemplatesDep,
     repository_id: str = "",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Get archives list or empty state"""
     if not repository_id or repository_id == "":
@@ -738,6 +771,7 @@ async def load_archive_contents_with_spinner(
     templates: TemplatesDep,
     path: str = Form(""),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     """Show loading spinner then trigger loading actual directory contents"""
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
@@ -761,6 +795,7 @@ async def get_archive_contents(
     templates: TemplatesDep,
     path: str = "",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> _TemplateResponse:
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
     repository = result.scalar_one_or_none()
@@ -798,6 +833,7 @@ async def extract_file(
     file: str,
     archive_manager: ArchiveManagerDep,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     result = await db.execute(select(Repository).where(Repository.id == repo_id))
     repository = result.scalar_one_or_none()
