@@ -52,7 +52,8 @@ async def authenticated_client(
     ) as client:
         yield client
 
-    app.dependency_overrides.clear()
+    from tests.conftest import clear_dependency_overrides_except_auth
+    clear_dependency_overrides_except_auth()
 
 
 class TestRepositoriesAPI:
