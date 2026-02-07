@@ -114,8 +114,7 @@ class TestTabsAPI:
             assert 'value="smb"' not in content
         finally:
             # Clean up dependency override
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_get_cloud_sync_tab_empty_providers(
         self, async_client: AsyncClient
@@ -144,8 +143,7 @@ class TestTabsAPI:
             assert 'value="smb"' not in content
         finally:
             # Clean up dependency override
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_provider_fields_endpoint_uses_registry_for_submit_text(
         self, async_client: AsyncClient

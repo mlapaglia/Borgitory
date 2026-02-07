@@ -52,12 +52,7 @@ async def authenticated_client(
     ) as client:
         yield client
 
-    # Don't clear all overrides - that's handled by conftest cleanup
-    # Just remove the specific overrides we added
-    if get_current_user in app.dependency_overrides:
-        del app.dependency_overrides[get_current_user]
-    if get_repository_service in app.dependency_overrides:
-        del app.dependency_overrides[get_repository_service]
+    app.dependency_overrides.clear()
 
 
 class TestRepositoriesAPI:

@@ -59,7 +59,7 @@ class TestAuthHTMX:
         # Make HTMX request
         response = await async_client_without_auth.post(
             "/auth/login",
-            data={"username": "testuser", "password": "123456"},
+            data={"username": "test_user", "password": "test_password"},
             headers={"hx-request": "true"},
         )
 

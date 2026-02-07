@@ -221,8 +221,7 @@ class TestRepositoryStatsHTML:
                     assert "Repository not found" in exception_str
         finally:
             # Clean up dependency override
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     def test_loading_state_html_template_elements(self) -> None:
         """Test that loading template has correct HTMX elements"""

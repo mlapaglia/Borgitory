@@ -56,8 +56,7 @@ class TestJobStopAPISimple:
             assert "Job stopped successfully. 2 tasks skipped." in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_error_calls_service(
         self, async_client: AsyncClient, mock_job_service: Mock
@@ -89,8 +88,7 @@ class TestJobStopAPISimple:
             assert "Job not found" in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_invalid_status_error(
         self, async_client: AsyncClient, mock_job_service: Mock
@@ -119,8 +117,7 @@ class TestJobStopAPISimple:
             assert "INVALID_STATUS" in response.text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_endpoint_path_validation(
         self, async_client: AsyncClient, mock_job_service: Mock
@@ -150,8 +147,7 @@ class TestJobStopAPISimple:
             mock_job_service.stop_job.assert_called_once_with(job_id)
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_method_not_allowed(self, async_client: AsyncClient) -> None:
         """Test that only POST method is allowed for stop endpoint"""
@@ -198,8 +194,7 @@ class TestJobStopAPISimple:
             assert "Current running task was terminated" in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()
 
     async def test_stop_job_no_tasks_skipped(
         self, async_client: AsyncClient, mock_job_service: Mock
@@ -233,5 +228,4 @@ class TestJobStopAPISimple:
             assert "Job stopped successfully. 0 tasks skipped." in response_text
 
         finally:
-            from tests.conftest import clear_dependency_overrides_except_auth
-            clear_dependency_overrides_except_auth()
+            app.dependency_overrides.clear()

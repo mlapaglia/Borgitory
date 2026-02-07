@@ -74,8 +74,7 @@ class TestScheduleCreationAPI:
         }
 
         # Clean up overrides after test
-        from tests.conftest import clear_dependency_overrides_except_auth
-        clear_dependency_overrides_except_auth()
+        app.dependency_overrides.clear()
 
     async def test_create_schedule_valid_data(
         self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
