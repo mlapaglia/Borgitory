@@ -309,7 +309,10 @@ class TestUserModel:
         user = User()
         user.username = "testuser"
 
-        with pytest.raises(ValueError, match="exceeds bcrypt limit of 72 bytes"):
+        with pytest.raises(
+            ValueError,
+            match=rf"exceeds bcrypt limit of {BCRYPT_MAX_PASSWORD_BYTES} bytes",
+        ):
             user.set_password("a" * (BCRYPT_MAX_PASSWORD_BYTES + 1))
 
     def test_verify_password_over_72_bytes_returns_false(self) -> None:
