@@ -23,17 +23,6 @@ from borgitory.main import app
 from borgitory.models.database import Base, CloudSyncConfig, User
 from borgitory.api.auth import get_current_user
 
-# Set up global auth bypass for all tests at module level
-def _mock_current_user() -> User:
-    """Mock user for tests."""
-    user = User()
-    user.id = 1
-    user.username = "test_user"
-    return user
-
-# Apply the auth bypass immediately when conftest is imported
-app.dependency_overrides[get_current_user] = _mock_current_user
-
 # Import job fixtures to make them available to all tests - noqa prevents removal
 from tests.fixtures.job_fixtures import (  # noqa: F401
     mock_job_manager,
@@ -69,12 +58,33 @@ def clear_dependency_overrides_except_auth() -> None:
     """Clear all dependency overrides except the global auth override.
     
     Use this in test cleanup instead of app.dependency_overrides.clear()
-    to preserve the module-level authentication bypass.
+    to preserve the session-level authentication bypass.
     """
     auth_override = app.dependency_overrides.get(get_current_user)
     app.dependency_overrides.clear()
     if auth_override:
         app.dependency_overrides[get_current_user] = auth_override
+
+
+@pytest.fixture(scope="session", autouse=True)
+def disable_auth_for_tests() -> Generator[None, None, None]:
+    """Globally disable authentication for all tests.
+    
+    This fixture runs automatically for all tests. Auth tests that need to test
+    authentication specifically should use async_client_no_auth instead.
+    """
+    def mock_current_user() -> User:
+        user = User()
+        user.id = 1
+        user.username = "test_user"
+        return user
+    
+    app.dependency_overrides[get_current_user] = mock_current_user
+    
+    yield
+    
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
 
 
 @pytest.fixture(scope="session")
