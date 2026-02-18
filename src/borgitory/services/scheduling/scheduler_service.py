@@ -5,6 +5,7 @@ from borgitory.utils.datetime_utils import now_utc
 import traceback
 from typing import Dict, List, Union
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -38,7 +39,11 @@ async def execute_scheduled_backup(
 
     async with async_session_maker() as db:
         logger.info(f"SCHEDULER: Looking up schedule {schedule_id}")
-        result = await db.execute(select(Schedule).where(Schedule.id == schedule_id))
+        result = await db.execute(
+            select(Schedule)
+            .options(joinedload(Schedule.repository))
+            .where(Schedule.id == schedule_id)
+        )
         schedule = result.scalar_one_or_none()
         if not schedule:
             logger.error(f"SCHEDULER: Schedule {schedule_id} not found")
