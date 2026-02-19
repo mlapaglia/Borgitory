@@ -2,8 +2,6 @@
 Tests for manual schedule run functionality using APScheduler one-time jobs.
 """
 
-import pickle
-
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.base import MemoryJobStore
