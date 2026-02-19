@@ -9,11 +9,13 @@ from apscheduler.triggers.date import DateTrigger
 from httpx import AsyncClient
 import pytest
 import uuid
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
 from borgitory.models.database import Schedule, Repository
+from borgitory.models.enums import JobType
+from borgitory.models.job_results import JobCreationResult
 from borgitory.services.scheduling.schedule_service import ScheduleService
 from borgitory.services.scheduling.scheduler_service import (
     SchedulerService,
@@ -321,7 +323,7 @@ class TestManualRunAPScheduler:
             job = scheduler_service.scheduler.get_job(job_id)
             assert job is not None
 
-            assert len(job.args) == 2
+            assert len(job.args) == 1
             assert job.args[0] == schedule_id
             assert job.name == f"Manual run: {schedule_name}"
             assert job.max_instances == 1
@@ -411,7 +413,7 @@ class TestManualRunAPScheduler:
             assert job is not None
             assert job.name == f"Manual run: {schedule_name}"
             # args should be (schedule_id, job_service) - two arguments
-            assert len(job.args) == 2
+            assert len(job.args) == 1
             assert job.args[0] == schedule_id
 
             assert isinstance(job.trigger, DateTrigger)
@@ -434,3 +436,201 @@ class TestManualRunAPScheduler:
             "if it were from get_job_service() called directly, it would be a Depends object."
         )
         assert callable(job_manager.create_composite_job)
+
+
+class TestExecuteScheduledBackup:
+    """Tests for execute_scheduled_backup() behavior (DB lookup, last_run, job creation)."""
+
+    @pytest.fixture
+    def mock_schedule(self) -> Mock:
+        schedule = Mock(spec=Schedule)
+        schedule.id = 1
+        schedule.name = "Test Schedule"
+        schedule.repository_id = 10
+        schedule.source_path = "/data/backup"
+        schedule.cloud_sync_config_id = None
+        schedule.prune_config_id = 2
+        schedule.check_config_id = 3
+        schedule.notification_config_id = None
+        schedule.pre_job_hooks = None
+        schedule.post_job_hooks = None
+        schedule.patterns = None
+        schedule.last_run = None
+        return schedule
+
+    @pytest.fixture
+    def mock_repository(self) -> Mock:
+        repo = Mock()
+        repo.id = 10
+        repo.name = "test_repo"
+        return repo
+
+    def _make_mock_db_session(
+        self,
+        schedule_or_none: Mock | None,
+    ) -> Mock:
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = schedule_or_none
+        mock_db = Mock()
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.commit = AsyncMock()
+        mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_db.__aexit__ = AsyncMock(return_value=None)
+        return mock_db
+
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_backup_success(
+        self,
+        mock_schedule: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        mock_schedule.repository = mock_repository
+        mock_db = self._make_mock_db_session(mock_schedule)
+        job_id = uuid.uuid4()
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock(
+            return_value=JobCreationResult(job_id=job_id, status="started")
+        )
+        mock_scheduler = Mock()
+        mock_scheduler.job_service = mock_job_service
+
+        with (
+            patch(
+                "borgitory.dependencies.get_scheduler_service_singleton",
+                return_value=mock_scheduler,
+            ),
+            patch(
+                "borgitory.models.database.async_session_maker",
+            ) as mock_session_maker,
+            patch(
+                "borgitory.services.scheduling.scheduler_service.now_utc",
+            ) as mock_now_utc,
+        ):
+            from datetime import datetime, UTC
+
+            fixed_now = datetime.now(UTC)
+            mock_now_utc.return_value = fixed_now
+            mock_session_maker.return_value = mock_db
+
+            await execute_scheduled_backup(1)
+
+        assert mock_schedule.last_run == fixed_now
+        mock_db.commit.assert_called_once()
+        mock_job_service.create_backup_job.assert_called_once()
+        call_args = mock_job_service.create_backup_job.call_args
+        assert call_args.args[0] is mock_db
+        backup_request = call_args.args[1]
+        assert backup_request.repository_id == 10
+        assert backup_request.source_path == "/data/backup"
+        assert backup_request.prune_config_id == 2
+        assert backup_request.check_config_id == 3
+        assert call_args.args[2] == JobType.SCHEDULED_BACKUP
+
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_backup_schedule_not_found(self) -> None:
+        mock_db = self._make_mock_db_session(None)
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock()
+        mock_scheduler = Mock()
+        mock_scheduler.job_service = mock_job_service
+
+        with (
+            patch(
+                "borgitory.dependencies.get_scheduler_service_singleton",
+                return_value=mock_scheduler,
+            ),
+            patch(
+                "borgitory.models.database.async_session_maker",
+            ) as mock_session_maker,
+        ):
+            mock_session_maker.return_value = mock_db
+
+            await execute_scheduled_backup(999)
+
+        mock_job_service.create_backup_job.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_backup_repository_not_found(
+        self,
+        mock_schedule: Mock,
+    ) -> None:
+        mock_schedule.repository = None
+        mock_db = self._make_mock_db_session(mock_schedule)
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock()
+        mock_scheduler = Mock()
+        mock_scheduler.job_service = mock_job_service
+
+        with (
+            patch(
+                "borgitory.dependencies.get_scheduler_service_singleton",
+                return_value=mock_scheduler,
+            ),
+            patch(
+                "borgitory.models.database.async_session_maker",
+            ) as mock_session_maker,
+        ):
+            mock_session_maker.return_value = mock_db
+
+            await execute_scheduled_backup(1)
+
+        mock_job_service.create_backup_job.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_backup_create_job_returns_error(
+        self,
+        mock_schedule: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        mock_schedule.repository = mock_repository
+        mock_db = self._make_mock_db_session(mock_schedule)
+        mock_job_service = Mock()
+        error_result = Mock()
+        error_result.error = "Backup creation failed"
+        mock_job_service.create_backup_job = AsyncMock(return_value=error_result)
+        mock_scheduler = Mock()
+        mock_scheduler.job_service = mock_job_service
+
+        with (
+            patch(
+                "borgitory.dependencies.get_scheduler_service_singleton",
+                return_value=mock_scheduler,
+            ),
+            patch(
+                "borgitory.models.database.async_session_maker",
+            ) as mock_session_maker,
+        ):
+            mock_session_maker.return_value = mock_db
+
+            await execute_scheduled_backup(1)
+
+        mock_job_service.create_backup_job.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_backup_create_job_raises(
+        self,
+        mock_schedule: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        mock_schedule.repository = mock_repository
+        mock_db = self._make_mock_db_session(mock_schedule)
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock(
+            side_effect=RuntimeError("DB error")
+        )
+        mock_scheduler = Mock()
+        mock_scheduler.job_service = mock_job_service
+
+        with (
+            patch(
+                "borgitory.dependencies.get_scheduler_service_singleton",
+                return_value=mock_scheduler,
+            ),
+            patch(
+                "borgitory.models.database.async_session_maker",
+            ) as mock_session_maker,
+        ):
+            mock_session_maker.return_value = mock_db
+
+            with pytest.raises(RuntimeError, match="DB error"):
+                await execute_scheduled_backup(1)

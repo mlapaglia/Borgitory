@@ -25,17 +25,16 @@ from borgitory.protocols import JobManagerProtocol
 logger = logging.getLogger(__name__)
 
 
-async def execute_scheduled_backup(
-    schedule_id: int,
-    job_service: JobService,
-) -> None:
-    """Execute a scheduled backup using injected dependencies"""
+async def execute_scheduled_backup(schedule_id: int) -> None:
+    """Execute a scheduled backup. Resolves job_service at runtime to keep job args picklable."""
     logger.info(
         f"SCHEDULER: execute_scheduled_backup called for schedule_id: {schedule_id}"
     )
 
-    # Import here to avoid circular imports and pickling issues
+    from borgitory.dependencies import get_scheduler_service_singleton
     from borgitory.models.database import async_session_maker
+
+    job_service = get_scheduler_service_singleton().job_service
 
     async with async_session_maker() as db:
         logger.info(f"SCHEDULER: Looking up schedule {schedule_id}")
@@ -242,7 +241,7 @@ class SchedulerService:
             self.scheduler.add_job(
                 execute_scheduled_backup,
                 trigger,
-                args=[schedule_id, self.job_service],
+                args=[schedule_id],
                 id=job_id,
                 name=schedule_name,
                 max_instances=1,
@@ -323,7 +322,7 @@ class SchedulerService:
             self.scheduler.add_job(
                 execute_scheduled_backup,
                 DateTrigger(run_date=now_utc()),
-                args=[schedule_id, self.job_service],
+                args=[schedule_id],
                 id=job_id,
                 name=f"Manual run: {schedule_name}",
                 max_instances=1,
