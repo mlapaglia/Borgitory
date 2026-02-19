@@ -9,7 +9,7 @@ from apscheduler.triggers.date import DateTrigger
 from httpx import AsyncClient
 import pytest
 import uuid
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
@@ -19,7 +19,7 @@ from borgitory.services.scheduling.scheduler_service import (
     SchedulerService,
     execute_scheduled_backup,
 )
-from borgitory.dependencies import get_schedule_service
+from borgitory.dependencies import get_schedule_service, get_scheduler_service_singleton
 from borgitory.protocols.job_protocols import JobManagerProtocol
 
 def create_test_scheduler_service(
@@ -419,3 +419,26 @@ class TestManualRunAPScheduler:
 
         finally:
             await scheduler_service.stop()
+
+    def test_scheduler_singleton_injects_resolved_job_manager_not_depends(self) -> None:
+        """Singleton path must build JobService with resolved job_manager, not get_job_service().
+
+        If the singleton called get_job_service(), job_manager would be a Depends object
+        when called outside FastAPI, causing AttributeError on create_composite_job.
+        """
+        mock_job_manager = Mock(spec=JobManagerProtocol)
+        mock_job_manager.create_composite_job = AsyncMock(return_value="job-1")
+
+        get_scheduler_service_singleton.cache_clear()
+        try:
+            with patch(
+                "borgitory.dependencies.get_job_manager_singleton",
+                return_value=mock_job_manager,
+            ):
+                scheduler = get_scheduler_service_singleton()
+
+            assert scheduler.job_service.job_manager is mock_job_manager
+            assert hasattr(scheduler.job_service.job_manager, "create_composite_job")
+            assert callable(scheduler.job_service.job_manager.create_composite_job)
+        finally:
+            get_scheduler_service_singleton.cache_clear()
