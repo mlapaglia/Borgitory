@@ -836,9 +836,11 @@ def get_scheduler_service_singleton() -> SchedulerService:
     Returns:
         SchedulerService: Cached singleton instance
     """
-    # Resolve dependencies directly (not via FastAPI DI)
+    # Resolve dependencies directly (not via FastAPI DI).
+    # Do not call get_job_service() here: it uses Depends() and only resolves when
+    # invoked by FastAPI; called directly, job_manager would be a Depends object.
     job_manager = get_job_manager_singleton()
-    job_service = get_job_service()
+    job_service = JobService(job_manager)
     return SchedulerService(
         job_manager=job_manager,
         job_service=job_service,
