@@ -9,7 +9,7 @@ from apscheduler.triggers.date import DateTrigger
 from httpx import AsyncClient
 import pytest
 import uuid
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from borgitory.main import app
@@ -377,7 +377,7 @@ class TestManualRunAPScheduler:
             await scheduler_service.stop()
 
     async def test_scheduler_service_with_mock_dependencies(self) -> None:
-        """Test scheduler service with properly mocked dependencies (no patching)"""
+        """Test scheduler service with properly mocked dependencies"""
         # Create a mock job manager that tracks calls
         mock_job_manager = Mock(spec=JobManagerProtocol)
         test_job_id = uuid.uuid4()
@@ -426,19 +426,11 @@ class TestManualRunAPScheduler:
         If the singleton called get_job_service(), job_manager would be a Depends object
         when called outside FastAPI, causing AttributeError on create_composite_job.
         """
-        mock_job_manager = Mock(spec=JobManagerProtocol)
-        mock_job_manager.create_composite_job = AsyncMock(return_value="job-1")
+        scheduler = get_scheduler_service_singleton()
+        job_manager = scheduler.job_service.job_manager
 
-        get_scheduler_service_singleton.cache_clear()
-        try:
-            with patch(
-                "borgitory.dependencies.get_job_manager_singleton",
-                return_value=mock_job_manager,
-            ):
-                scheduler = get_scheduler_service_singleton()
-
-            assert scheduler.job_service.job_manager is mock_job_manager
-            assert hasattr(scheduler.job_service.job_manager, "create_composite_job")
-            assert callable(scheduler.job_service.job_manager.create_composite_job)
-        finally:
-            get_scheduler_service_singleton.cache_clear()
+        assert hasattr(job_manager, "create_composite_job"), (
+            "job_manager must be a resolved JobManager with create_composite_job; "
+            "if it were from get_job_service() called directly, it would be a Depends object."
+        )
+        assert callable(job_manager.create_composite_job)
