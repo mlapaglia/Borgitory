@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Tailwind",
+      "type": "shell",
+      "command": "python build_tailwind.py",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    }
+  ]
+}

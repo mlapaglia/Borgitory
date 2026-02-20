@@ -11,7 +11,7 @@ COPY src/borgitory/templates/ ./src/borgitory/templates/
 COPY src/borgitory/static/css/tailwind-input.css ./src/borgitory/static/css/
 ARG TARGETARCH
 RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "x64") && \
-    curl -sLO "https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.17/tailwindcss-linux-${ARCH}" && \
+    curl -sfLO "https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.17/tailwindcss-linux-${ARCH}" && \
     chmod +x tailwindcss-linux-${ARCH} && \
     ./tailwindcss-linux-${ARCH} \
       -i src/borgitory/static/css/tailwind-input.css \

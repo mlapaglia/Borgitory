@@ -148,7 +148,7 @@ def test_static_assets_accessible(app_runner: AppRunner) -> None:
 
     # Test common static asset paths
     static_paths = [
-        "/static/css/styles.css",
+        "/static/css/tailwind.css",
         "/static/js/app.js",
         "/static/favicon/favicon.ico",
     ]

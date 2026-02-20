@@ -4,7 +4,7 @@ Build script for Tailwind CSS using the standalone CLI.
 Downloads the platform-appropriate Tailwind CSS v3 standalone binary
 and compiles the CSS from template sources. No Node.js required.
 
-Usage:
+Usage (run from repository root):
     python build_tailwind.py            # One-shot build (minified)
     python build_tailwind.py --watch    # Watch mode for development
     python build_tailwind.py --clean    # Remove cached binary and output
@@ -15,6 +15,7 @@ import platform
 import stat
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 TAILWIND_VERSION = "3.4.17"
@@ -22,13 +23,16 @@ TAILWIND_RELEASE_URL = (
     f"https://github.com/tailwindlabs/tailwindcss/releases/download"
     f"/v{TAILWIND_VERSION}"
 )
+DOWNLOAD_TIMEOUT_SECONDS = 120
 
-CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".tailwindcss")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = _SCRIPT_DIR
+CACHE_DIR = os.path.join(REPO_ROOT, ".tailwindcss")
 INPUT_CSS = os.path.join(
-    "src", "borgitory", "static", "css", "tailwind-input.css"
+    REPO_ROOT, "src", "borgitory", "static", "css", "tailwind-input.css"
 )
 OUTPUT_CSS = os.path.join(
-    "src", "borgitory", "static", "css", "tailwind.css"
+    REPO_ROOT, "src", "borgitory", "static", "css", "tailwind.css"
 )
 
 
@@ -63,7 +67,14 @@ def download_binary() -> str:
 
     print(f"Downloading Tailwind CSS v{TAILWIND_VERSION} standalone CLI...")
     print(f"  {url}")
-    urllib.request.urlretrieve(url, binary_path)
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT_SECONDS) as resp:
+        if resp.status != 200:
+            raise urllib.error.HTTPError(
+                url, resp.status, resp.reason, resp.headers, None
+            )
+        with open(binary_path, "wb") as f:
+            f.write(resp.read())
 
     if not binary_path.endswith(".exe"):
         st = os.stat(binary_path)
@@ -94,7 +105,7 @@ def build(watch: bool = False):
         cmd.append("--minify")
 
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd)
+    result = subprocess.run(cmd, cwd=REPO_ROOT)
     return result.returncode
 
 
