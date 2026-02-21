@@ -37,6 +37,7 @@ class TestHookService:
                 "pre_hook_command": ["echo 'test'"],
                 "pre_hook_critical": ["true"],
                 "pre_hook_run_on_failure": ["false"],
+                "pre_hook_timeout": ["600"],
             }
         )
 
@@ -46,6 +47,7 @@ class TestHookService:
         hook = hooks[0]
         assert hook["name"] == "Test Hook"
         assert hook["command"] == "echo 'test'"
+        assert hook["timeout"] == 600
         assert hook["critical"] is True
         assert hook["run_on_job_failure"] is False
 
@@ -57,6 +59,7 @@ class TestHookService:
                 "post_hook_command": ["command1", "command2"],
                 "post_hook_critical": ["true", "false"],
                 "post_hook_run_on_failure": ["false", "true"],
+                "post_hook_timeout": ["120", "1800"],
             }
         )
 
@@ -67,12 +70,14 @@ class TestHookService:
         # First hook
         assert hooks[0]["name"] == "Hook 1"
         assert hooks[0]["command"] == "command1"
+        assert hooks[0]["timeout"] == 120
         assert hooks[0]["critical"] is True
         assert hooks[0]["run_on_job_failure"] is False
 
         # Second hook
         assert hooks[1]["name"] == "Hook 2"
         assert hooks[1]["command"] == "command2"
+        assert hooks[1]["timeout"] == 1800
         assert hooks[1]["critical"] is False
         assert hooks[1]["run_on_job_failure"] is True
 
@@ -94,6 +99,38 @@ class TestHookService:
         assert hooks[0]["command"] == "valid command"
         assert hooks[1]["name"] == ""
         assert hooks[1]["command"] == ""
+
+    def test_extract_hooks_from_form_timeout_defaults(self) -> None:
+        """Test that timeout defaults to 300 when not provided or invalid."""
+        form_data = MockFormData(
+            {
+                "pre_hook_name": ["Hook 1", "Hook 2", "Hook 3"],
+                "pre_hook_command": ["cmd1", "cmd2", "cmd3"],
+                "pre_hook_timeout": [],
+            }
+        )
+
+        hooks = HookService.extract_hooks_from_form(form_data, "pre")
+
+        assert len(hooks) == 3
+        assert hooks[0]["timeout"] == 300
+        assert hooks[1]["timeout"] == 300
+        assert hooks[2]["timeout"] == 300
+
+    def test_extract_hooks_from_form_timeout_zero(self) -> None:
+        """Test that timeout of 0 (no timeout) is preserved."""
+        form_data = MockFormData(
+            {
+                "pre_hook_name": ["Long Hook"],
+                "pre_hook_command": ["rclone sync ..."],
+                "pre_hook_timeout": ["0"],
+            }
+        )
+
+        hooks = HookService.extract_hooks_from_form(form_data, "pre")
+
+        assert len(hooks) == 1
+        assert hooks[0]["timeout"] == 0
 
     def test_extract_hooks_from_form_missing_checkboxes(self) -> None:
         """Test extracting hooks when checkboxes are missing (unchecked)."""
@@ -128,6 +165,7 @@ class TestHookService:
                 "pre_hook_command": ["command1", "command2"],
                 "pre_hook_critical": ["true", "false"],
                 "pre_hook_run_on_failure": ["false", "true"],
+                "pre_hook_timeout": ["600", "0"],
             }
         )
 
@@ -139,11 +177,13 @@ class TestHookService:
 
         assert hooks_data[0]["name"] == "Hook 1"
         assert hooks_data[0]["command"] == "command1"
+        assert hooks_data[0]["timeout"] == 600
         assert hooks_data[0]["critical"] is True
         assert hooks_data[0]["run_on_job_failure"] is False
 
         assert hooks_data[1]["name"] == "Hook 2"
         assert hooks_data[1]["command"] == "command2"
+        assert hooks_data[1]["timeout"] == 0
         assert hooks_data[1]["critical"] is False
         assert hooks_data[1]["run_on_job_failure"] is True
 
@@ -248,6 +288,7 @@ class TestHookService:
             "pre_hook_command": ["command1", "command2"],
             "pre_hook_critical": ["true", "false"],
             "pre_hook_run_on_failure": ["false", "true"],
+            "pre_hook_timeout": ["900", "0"],
         }
 
         result = HookService.convert_hook_fields_to_json_from_dict(form_data, "pre")
@@ -256,7 +297,9 @@ class TestHookService:
         hooks_data = json.loads(result)
         assert len(hooks_data) == 2
         assert hooks_data[0]["name"] == "Hook 1"
+        assert hooks_data[0]["timeout"] == 900
         assert hooks_data[1]["name"] == "Hook 2"
+        assert hooks_data[1]["timeout"] == 0
 
     def test_convert_hook_fields_to_json_from_dict_single_values(self) -> None:
         """Test converting hooks from form data with single values (not lists)."""
@@ -265,6 +308,7 @@ class TestHookService:
             "pre_hook_command": "echo single",
             "pre_hook_critical": "true",
             "pre_hook_run_on_failure": "false",
+            "pre_hook_timeout": "1800",
         }
 
         result = HookService.convert_hook_fields_to_json_from_dict(form_data, "pre")
@@ -273,6 +317,7 @@ class TestHookService:
         hooks_data = json.loads(result)
         assert len(hooks_data) == 1
         assert hooks_data[0]["name"] == "Single Hook"
+        assert hooks_data[0]["timeout"] == 1800
 
     def test_parse_hooks_from_json_empty(self) -> None:
         """Test parsing hooks from empty JSON."""
@@ -289,12 +334,14 @@ class TestHookService:
                 {
                     "name": "Hook 1",
                     "command": "echo test",
+                    "timeout": 600,
                     "critical": True,
                     "run_on_job_failure": False,
                 },
                 {
                     "name": "Hook 2",
                     "command": "echo test2",
+                    "timeout": 0,
                     "critical": False,
                     "run_on_job_failure": True,
                 },
@@ -306,11 +353,13 @@ class TestHookService:
         assert len(hooks) == 2
         assert hooks[0]["name"] == "Hook 1"
         assert hooks[0]["command"] == "echo test"
+        assert hooks[0]["timeout"] == 600
         assert hooks[0]["critical"] is True
         assert hooks[0]["run_on_job_failure"] is False
 
         assert hooks[1]["name"] == "Hook 2"
         assert hooks[1]["command"] == "echo test2"
+        assert hooks[1]["timeout"] == 0
         assert hooks[1]["critical"] is False
         assert hooks[1]["run_on_job_failure"] is True
 
@@ -329,7 +378,6 @@ class TestHookService:
                 {
                     "name": "Hook 1",
                     "command": "echo test",
-                    # Missing critical and run_on_job_failure
                 }
             ]
         )
@@ -339,6 +387,7 @@ class TestHookService:
         assert len(hooks) == 1
         assert hooks[0]["name"] == "Hook 1"
         assert hooks[0]["command"] == "echo test"
+        assert hooks[0]["timeout"] == 300  # Default
         assert hooks[0]["critical"] is False  # Default
         assert hooks[0]["run_on_job_failure"] is False  # Default
 

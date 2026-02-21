@@ -34,6 +34,7 @@ class HookService:
         hook_commands = form_data.getlist(f"{hook_type}_hook_command")
         hook_critical = form_data.getlist(f"{hook_type}_hook_critical")
         hook_run_on_failure = form_data.getlist(f"{hook_type}_hook_run_on_failure")
+        hook_timeouts = form_data.getlist(f"{hook_type}_hook_timeout")
 
         # Pair them up by position
         for i in range(min(len(hook_names), len(hook_commands))):
@@ -46,11 +47,21 @@ class HookService:
                 len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
             )
 
+            timeout = 300
+            if len(hook_timeouts) > i and hook_timeouts[i]:
+                try:
+                    timeout = int(hook_timeouts[i])
+                    if timeout < 0:
+                        timeout = 300
+                except (ValueError, TypeError):
+                    timeout = 300
+
             # Add all hooks, even if name or command is empty (for reordering)
             hooks.append(
                 {
                     "name": name,
                     "command": command,
+                    "timeout": timeout,
                     "critical": critical,
                     "run_on_job_failure": run_on_failure,
                 }
@@ -137,6 +148,7 @@ class HookService:
         hook_commands = form_data.get(f"{hook_type}_hook_command", [])
         hook_critical = form_data.get(f"{hook_type}_hook_critical", [])
         hook_run_on_failure = form_data.get(f"{hook_type}_hook_run_on_failure", [])
+        hook_timeouts = form_data.get(f"{hook_type}_hook_timeout", [])
 
         # Ensure they are lists (in case there's only one item)
         if not isinstance(hook_names, list):
@@ -147,6 +159,8 @@ class HookService:
             hook_critical = [hook_critical] if hook_critical else []
         if not isinstance(hook_run_on_failure, list):
             hook_run_on_failure = [hook_run_on_failure] if hook_run_on_failure else []
+        if not isinstance(hook_timeouts, list):
+            hook_timeouts = [hook_timeouts] if hook_timeouts else []
 
         # Pair them up by position
         for i in range(min(len(hook_names), len(hook_commands))):
@@ -159,12 +173,22 @@ class HookService:
                 len(hook_run_on_failure) > i and hook_run_on_failure[i] == "true"
             )
 
+            timeout = 300
+            if len(hook_timeouts) > i and hook_timeouts[i]:
+                try:
+                    timeout = int(hook_timeouts[i])
+                    if timeout < 0:
+                        timeout = 300
+                except (ValueError, TypeError):
+                    timeout = 300
+
             # Only add hooks that have both name and command
             if name and command:
                 hooks.append(
                     {
                         "name": name,
                         "command": command,
+                        "timeout": timeout,
                         "critical": critical,
                         "run_on_job_failure": run_on_failure,
                     }
@@ -198,6 +222,7 @@ class HookService:
                         {
                             "name": hook_data.get("name", ""),
                             "command": hook_data.get("command", ""),
+                            "timeout": int(hook_data.get("timeout", 300)),
                             "critical": bool(hook_data.get("critical", False)),
                             "run_on_job_failure": bool(
                                 hook_data.get("run_on_job_failure", False)
