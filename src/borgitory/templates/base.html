@@ -26,15 +26,10 @@
               href="/static/favicon/favicon-16x16.png">
         <link rel="icon" type="image/x-icon" href="/static/favicon/favicon.ico">
         <link rel="manifest" href="/static/favicon/site.webmanifest">
-        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-        <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
-        <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script>
-        tailwind.config = {
-            darkMode: 'class'
-        }
-        </script>
+        <script src="/static/vendor/htmx.min.js"></script>
+        <script src="/static/vendor/htmx-ext-sse.js"></script>
+        <script src="/static/vendor/htmx-ext-json-enc.js"></script>
+        <link rel="stylesheet" href="/static/css/tailwind.css">
         <script>
         function toggleDarkMode() {
             const html = document.documentElement;
@@ -78,7 +73,7 @@
             body.classList.remove('mobile-sidebar-open');
         }
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="/static/vendor/chart.min.js"></script>
         <link rel="stylesheet" href="/static/css/modern-components.css">
     </head>
     <body class="bg-gray-50 dark:bg-gray-900 min-h-screen">

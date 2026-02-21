@@ -236,3 +236,9 @@ local-cache/**
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Tailwind CSS build output
+src/borgitory/static/css/tailwind.css
+
+# Tailwind CLI binary cache
+.tailwindcss/

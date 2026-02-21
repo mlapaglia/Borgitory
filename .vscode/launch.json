@@ -34,7 +34,8 @@
             },
             "console": "integratedTerminal",
             "justMyCode": false,
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build Tailwind"
         }
     ]
 }
