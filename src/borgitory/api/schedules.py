@@ -23,6 +23,7 @@ from borgitory.services.scheduling.pattern_service import PatternService
 from borgitory.services.scheduling.hook_service import HookService
 from borgitory.api.auth import get_current_user
 from borgitory.models.database import User
+from borgitory.utils.source_paths import parse_source_paths, serialize_source_paths
 
 router = APIRouter()
 
@@ -242,7 +243,10 @@ async def get_schedule_edit_form(
             raise HTTPException(status_code=404, detail="Schedule not found")
 
         form_data = await config_service.get_schedule_form_data(db)
-        context = {**form_data, "schedule": schedule, "is_edit_mode": True}
+        source_paths = parse_source_paths(schedule.source_path) if schedule.source_path else [""]
+        if not source_paths:
+            source_paths = [""]
+        context = {**form_data, "schedule": schedule, "is_edit_mode": True, "source_paths": source_paths}
 
         return templates.TemplateResponse(
             request, "partials/schedules/edit_form.html", context
@@ -601,6 +605,50 @@ async def save_hooks(
 async def close_modal() -> HTMLResponse:
     """Close modal without saving."""
     return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)
+
+
+# Source Paths API endpoints
+@router.post("/source-paths/add-field", response_class=HTMLResponse)
+async def add_source_path_field(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Add a new source path field row via HTMX."""
+    form_data = await request.form()
+    current_paths = list(form_data.getlist("source_paths"))
+    current_paths.append("")
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/source_paths_container.html",
+        {"source_paths": current_paths},
+    )
+
+
+@router.post("/source-paths/remove-field", response_class=HTMLResponse)
+async def remove_source_path_field(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Remove a source path field row via HTMX."""
+    form_data = await request.form()
+    current_paths = list(form_data.getlist("source_paths"))
+
+    try:
+        remove_index = int(str(form_data.get("remove_index", "0")))
+        if 0 <= remove_index < len(current_paths):
+            current_paths.pop(remove_index)
+    except (ValueError, TypeError):
+        pass
+
+    if not current_paths:
+        current_paths = [""]
+
+    return templates.TemplateResponse(
+        request,
+        "partials/schedules/source_paths_container.html",
+        {"source_paths": current_paths},
+    )
 
 
 # Pattern API endpoints

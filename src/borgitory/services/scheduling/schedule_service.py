@@ -423,11 +423,19 @@ class ScheduleService:
                     return None
                 return str(value).strip()
 
+            source_paths = json_data.get("source_paths")
+            if isinstance(source_paths, list):
+                from borgitory.utils.source_paths import serialize_source_paths
+                filtered = [p for p in source_paths if isinstance(p, str) and p.strip()]
+                source_path_value = serialize_source_paths(filtered) if filtered else ""
+            else:
+                source_path_value = json_data.get("source_path", "")
+
             processed_data = {
                 "name": name,
                 "repository_id": repository_id,
                 "cron_expression": cron_expression,
-                "source_path": json_data.get("source_path", ""),
+                "source_path": source_path_value,
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "prune_config_id": safe_int(json_data.get("prune_config_id")),
                 "notification_config_id": safe_int(

@@ -1,0 +1,19 @@
+<!-- Source Paths Container -->
+<div class="space-y-2" id="source-paths-fields">
+    {% for path_value in source_paths %}
+        {% set index = loop.index0 %}
+        {% set show_remove = source_paths | length > 1 %}
+        {% include "partials/schedules/source_path_field.html" with context %}
+    {% endfor %}
+</div>
+<button type="button"
+        class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 font-medium flex items-center gap-1"
+        hx-post="/api/schedules/source-paths/add-field"
+        hx-include="closest form"
+        hx-target="#source-paths-container"
+        hx-swap="innerHTML">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+    </svg>
+    Add Source Path
+</button>

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Optional, Union, cast
+from typing import Dict, List, Optional, Union, cast
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
@@ -8,6 +8,7 @@ import json
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 from borgitory.models.enums import EncryptionType
+from borgitory.utils.source_paths import serialize_source_paths
 
 
 def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
@@ -314,6 +315,18 @@ class ScheduleCreate(ScheduleBase):
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
+        if isinstance(data, dict) and "source_paths" in data:
+            paths = data.get("source_paths")
+            if isinstance(paths, list):
+                filtered = [p for p in paths if isinstance(p, str) and p.strip()]
+                if filtered:
+                    data["source_path"] = serialize_source_paths(filtered)
+            data.pop("source_paths", None)
+        return data
+
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
     def validate_cloud_sync_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
@@ -397,6 +410,18 @@ class ScheduleUpdate(BaseModel):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
+        if isinstance(data, dict) and "source_paths" in data:
+            paths = data.get("source_paths")
+            if isinstance(paths, list):
+                filtered = [p for p in paths if isinstance(p, str) and p.strip()]
+                if filtered:
+                    data["source_path"] = serialize_source_paths(filtered)
+            data.pop("source_paths", None)
+        return data
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -486,7 +511,7 @@ class ScheduleUpdate(BaseModel):
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
     repository_id: int = Field(gt=0)
-    source_path: str = Field(default="/", pattern=ABSOLUTE_PATH_PATTERN)
+    source_path: str = Field(default="/")
     enabled: bool
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
@@ -606,8 +631,7 @@ class BackupRequest(BaseModel):
     repository_id: int = Field(gt=0)
     source_path: str = Field(
         default="/",
-        pattern=ABSOLUTE_PATH_PATTERN,
-        description="Absolute path to source directory",
+        description="Absolute path(s) to source directory, stored as JSON array string",
     )
     compression: CompressionType = CompressionType.ZSTD
     dry_run: bool = False
@@ -619,6 +643,18 @@ class BackupRequest(BaseModel):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
+        if isinstance(data, dict) and "source_paths" in data:
+            paths = data.get("source_paths")
+            if isinstance(paths, list):
+                filtered = [p for p in paths if isinstance(p, str) and p.strip()]
+                if filtered:
+                    data["source_path"] = serialize_source_paths(filtered)
+            data.pop("source_paths", None)
+        return data
 
     @field_validator("dry_run", mode="before")
     @classmethod
