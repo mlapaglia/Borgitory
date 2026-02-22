@@ -283,6 +283,7 @@ class SchedulerService:
                         schedule = result.scalar_one_or_none()
                         if schedule:
                             schedule.next_run = ensure_utc(job.next_run_time)
+                            await db.commit()
                             logger.info(
                                 f"Updated next run time for schedule {schedule_id}: {schedule.next_run}"
                             )

@@ -6,6 +6,7 @@ import pytest
 
 from borgitory.models.database import Schedule
 from borgitory.models.job_results import JobCreationResult
+from borgitory.utils.datetime_utils import now_utc
 from borgitory.services.scheduling.scheduler_service import (
     SchedulerService,
     execute_scheduled_backup,
@@ -30,7 +31,7 @@ class TestNextRunUpdatedAfterExecution:
         schedule.post_job_hooks = None
         schedule.patterns = None
         schedule.last_run = None
-        schedule.next_run = datetime(2025, 11, 3, 15, 0, 0, tzinfo=UTC)
+        schedule.next_run = now_utc() - timedelta(days=4)
         return schedule
 
     @pytest.fixture
@@ -71,7 +72,8 @@ class TestNextRunUpdatedAfterExecution:
             return_value=JobCreationResult(job_id=job_id, status="started")
         )
 
-        future_next_run = datetime(2025, 11, 8, 15, 0, 0, tzinfo=UTC)
+        fixed_now = now_utc()
+        future_next_run = fixed_now + timedelta(days=1)
         mock_apscheduler_job = Mock()
         mock_apscheduler_job.next_run_time = future_next_run
 
@@ -79,8 +81,6 @@ class TestNextRunUpdatedAfterExecution:
         mock_scheduler_svc.job_service = mock_job_service
         mock_scheduler_svc.scheduler = Mock()
         mock_scheduler_svc.scheduler.get_job.return_value = mock_apscheduler_job
-
-        fixed_now = datetime(2025, 11, 7, 14, 0, 0, tzinfo=UTC)
 
         with (
             patch(
@@ -184,10 +184,10 @@ class TestNextRunTimezoneNormalization:
         schedule_id = 1
         job_id = "backup_schedule_1"
 
-        # Simulate APScheduler returning a time in US Eastern (UTC-5)
         eastern = timezone(timedelta(hours=-5))
-        eastern_time = datetime(2025, 11, 7, 8, 0, 0, tzinfo=eastern)
-        expected_utc = datetime(2025, 11, 7, 13, 0, 0, tzinfo=UTC)
+        base_utc = now_utc().replace(microsecond=0) + timedelta(days=1)
+        eastern_time = base_utc.astimezone(eastern)
+        expected_utc = base_utc
 
         mock_job = Mock()
         mock_job.next_run_time = eastern_time
