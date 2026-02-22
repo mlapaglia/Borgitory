@@ -31,7 +31,7 @@ class TestParseSourcePaths:
         assert parse_source_paths('["/data", "", "  "]') == ["/data"]
 
     def test_invalid_json_starting_with_bracket(self):
-        assert parse_source_paths("[not json") == ["[not json"]
+        assert parse_source_paths("[not json") == []
 
     def test_json_array_with_non_string_elements(self):
         assert parse_source_paths('["/data", 123]') == ["/data"]
@@ -43,6 +43,20 @@ class TestParseSourcePaths:
         paths = '["/appdata/app1", "/appdata/app2", "/appdata/app3"]'
         result = parse_source_paths(paths)
         assert result == ["/appdata/app1", "/appdata/app2", "/appdata/app3"]
+
+    def test_relative_path_filtered_out(self):
+        assert parse_source_paths("relative/path") == []
+
+    def test_relative_paths_in_array_filtered_out(self):
+        result = parse_source_paths('["/valid", "relative", "/also-valid"]')
+        assert result == ["/valid", "/also-valid"]
+
+    def test_all_relative_paths_returns_empty(self):
+        assert parse_source_paths('["no-slash", "also-bad"]') == []
+
+    def test_relative_path_logs_warning(self, caplog):
+        parse_source_paths("relative")
+        assert "Skipping non-absolute source path" in caplog.text
 
 
 class TestSerializeSourcePaths:
