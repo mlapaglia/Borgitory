@@ -1,16 +1,3 @@
-"""
-Regression tests for schedule next_run staleness bugs.
-
-Bug 1: execute_scheduled_backup updates last_run but never updates next_run,
-        causing next_run to become stale and appear before last_run.
-
-Bug 2: _reload_schedules uses persist=False, so stale next_run values in the
-        database are never corrected on application restart.
-
-Bug 3: _update_next_run_time stores APScheduler's timezone-aware datetime
-        directly without normalizing to UTC, causing display mismatches.
-"""
-
 import uuid
 from datetime import datetime, UTC, timezone, timedelta
 from unittest.mock import Mock, AsyncMock, MagicMock, patch
@@ -193,13 +180,8 @@ class TestNextRunTimezoneNormalization:
 
     @pytest.mark.asyncio
     async def test_next_run_stored_as_utc(self) -> None:
-        """next_run must be stored as UTC regardless of APScheduler's timezone.
+        """next_run must be stored as UTC regardless of APScheduler's timezone."""
 
-        APScheduler's CronTrigger.from_crontab() uses the local timezone,
-        so job.next_run_time may be in a non-UTC timezone. Storing it directly
-        into a non-timezone-aware DB column causes display mismatches because
-        the display layer assumes naive datetimes are UTC.
-        """
         schedule_id = 1
         job_id = "backup_schedule_1"
 
