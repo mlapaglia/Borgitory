@@ -101,7 +101,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             )
 
             if isinstance(backup_result, JobCreationResult):
-                job_id = backup_result.job_id
+                job_id = str(backup_result.job_id)
                 logger.info(
                     f"SCHEDULER: Created scheduled backup job {job_id} via JobService"
                 )

@@ -5,7 +5,6 @@ from unittest.mock import Mock, AsyncMock, MagicMock, patch
 import pytest
 
 from borgitory.models.database import Schedule
-from borgitory.models.enums import JobType
 from borgitory.models.job_results import JobCreationResult
 from borgitory.services.scheduling.scheduler_service import (
     SchedulerService,
