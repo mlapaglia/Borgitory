@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 import uuid
-from borgitory.utils.datetime_utils import now_utc
+from borgitory.utils.datetime_utils import now_utc, ensure_utc
 import traceback
 from typing import Dict, List, Union
 from sqlalchemy import select
@@ -62,9 +62,17 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
 
         logger.info(f"SCHEDULER: Found repository '{repository.name}'")
 
-        # Update schedule last run
-        logger.info("SCHEDULER: Updating schedule last run time")
         schedule.last_run = now_utc()
+
+        scheduler_svc = get_scheduler_service_singleton()
+        job_id = f"backup_schedule_{schedule_id}"
+        apscheduler_job = scheduler_svc.scheduler.get_job(job_id)
+        if apscheduler_job and apscheduler_job.next_run_time:
+            schedule.next_run = ensure_utc(apscheduler_job.next_run_time)
+            logger.info(
+                f"SCHEDULER: Updated next_run for schedule {schedule_id}: {schedule.next_run}"
+            )
+
         await db.commit()
 
         try:
@@ -93,7 +101,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             )
 
             if isinstance(backup_result, JobCreationResult):
-                job_id = backup_result.job_id
+                job_id = str(backup_result.job_id)
                 logger.info(
                     f"SCHEDULER: Created scheduled backup job {job_id} via JobService"
                 )
@@ -194,12 +202,13 @@ class SchedulerService:
                 result = await db.execute(select(Schedule).where(Schedule.enabled))
                 schedules = result.scalars().all()
                 for schedule in schedules:
-                    await self._add_schedule_internal(
+                    job_id = await self._add_schedule_internal(
                         schedule.id,
                         schedule.name,
                         schedule.cron_expression,
                         persist=False,
                     )
+                    await self._update_next_run_time(schedule.id, job_id)
             except Exception as e:
                 logger.error(f"Error reloading schedules: {str(e)}")
 
@@ -273,9 +282,10 @@ class SchedulerService:
                         )
                         schedule = result.scalar_one_or_none()
                         if schedule:
-                            schedule.next_run = job.next_run_time
+                            schedule.next_run = ensure_utc(job.next_run_time)
+                            await db.commit()
                             logger.info(
-                                f"Updated next run time for schedule {schedule_id}: {job.next_run_time}"
+                                f"Updated next run time for schedule {schedule_id}: {schedule.next_run}"
                             )
                     except Exception as e:
                         logger.error(f"Failed to update next run time: {str(e)}")
