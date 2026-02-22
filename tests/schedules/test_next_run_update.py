@@ -161,10 +161,7 @@ class TestReloadSchedulesUpdatesNextRun:
             await self.scheduler_service._reload_schedules()
 
             mock_add.assert_called_once()
-            mock_update_next_run.assert_called_once_with(1, "backup_schedule_1"), (
-                "_update_next_run_time must be called during reload "
-                "to correct stale next_run values"
-            )
+            mock_update_next_run.assert_called_once_with(1, "backup_schedule_1")
 
 
 class TestNextRunTimezoneNormalization:
