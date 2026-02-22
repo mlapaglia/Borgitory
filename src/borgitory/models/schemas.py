@@ -92,6 +92,31 @@ def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
 ABSOLUTE_PATH_PATTERN = r"^/.*"
 
 
+def _validate_and_merge_source_paths(data: Dict[str, object]) -> Dict[str, object]:
+    """Shared validator for source_paths -> source_path conversion.
+
+    Filters blanks, enforces absolute paths, and serializes the result.
+    """
+    if not isinstance(data, dict) or "source_paths" not in data:
+        return data
+
+    paths = data.get("source_paths")
+    if isinstance(paths, str):
+        paths = [paths]
+    if isinstance(paths, list):
+        filtered = [p.strip() for p in paths if isinstance(p, str) and p.strip()]
+        non_absolute = [p for p in filtered if not p.startswith("/")]
+        if non_absolute:
+            raise ValueError(
+                f"All source paths must be absolute (start with /). "
+                f"Invalid: {', '.join(non_absolute)}"
+            )
+        if filtered:
+            data["source_path"] = serialize_source_paths(filtered)
+    data.pop("source_paths", None)
+    return data
+
+
 # Enums for type safety and validation
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -318,14 +343,7 @@ class ScheduleCreate(ScheduleBase):
     @model_validator(mode="before")
     @classmethod
     def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
-        if isinstance(data, dict) and "source_paths" in data:
-            paths = data.get("source_paths")
-            if isinstance(paths, list):
-                filtered = [p for p in paths if isinstance(p, str) and p.strip()]
-                if filtered:
-                    data["source_path"] = serialize_source_paths(filtered)
-            data.pop("source_paths", None)
-        return data
+        return _validate_and_merge_source_paths(data)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
@@ -414,14 +432,7 @@ class ScheduleUpdate(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
-        if isinstance(data, dict) and "source_paths" in data:
-            paths = data.get("source_paths")
-            if isinstance(paths, list):
-                filtered = [p for p in paths if isinstance(p, str) and p.strip()]
-                if filtered:
-                    data["source_path"] = serialize_source_paths(filtered)
-            data.pop("source_paths", None)
-        return data
+        return _validate_and_merge_source_paths(data)
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -647,14 +658,7 @@ class BackupRequest(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
-        if isinstance(data, dict) and "source_paths" in data:
-            paths = data.get("source_paths")
-            if isinstance(paths, list):
-                filtered = [p for p in paths if isinstance(p, str) and p.strip()]
-                if filtered:
-                    data["source_path"] = serialize_source_paths(filtered)
-            data.pop("source_paths", None)
-        return data
+        return _validate_and_merge_source_paths(data)
 
     @field_validator("dry_run", mode="before")
     @classmethod
