@@ -3,7 +3,7 @@
     {% for path_value in source_paths %}
         {% set index = loop.index0 %}
         {% set show_remove = source_paths | length > 1 %}
-        {% include "partials/schedules/source_path_field.html" with context %}
+        {% include "partials/shared/source_path_field.html" with context %}
     {% endfor %}
 </div>
 <button type="button"

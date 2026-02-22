@@ -608,7 +608,7 @@ async def close_modal() -> HTMLResponse:
 
 
 # Source Paths API endpoints
-def _extract_source_paths_from_request_data(data: dict) -> list[str]:
+def _extract_source_paths_from_request_data(data: Dict[str, Any]) -> list[str]:
     """Extract source_paths from JSON request data.
 
     json-enc sends multiple inputs with the same name as an array,
@@ -634,7 +634,7 @@ async def add_source_path_field(
 
     return templates.TemplateResponse(
         request,
-        "partials/schedules/source_paths_container.html",
+        "partials/shared/source_paths_container.html",
         {"source_paths": current_paths},
     )
 
@@ -660,7 +660,7 @@ async def remove_source_path_field(
 
     return templates.TemplateResponse(
         request,
-        "partials/schedules/source_paths_container.html",
+        "partials/shared/source_paths_container.html",
         {"source_paths": current_paths},
     )
 

@@ -162,7 +162,7 @@ class TestScheduleSourcePathsAPI:
 
         assert (
             captured[-1]["template"]
-            == "partials/schedules/source_paths_container.html"
+            == "partials/shared/source_paths_container.html"
         )
 
     # ── remove-field endpoint ───────────────────────────────────────────
@@ -343,5 +343,5 @@ class TestScheduleSourcePathsAPI:
 
         assert (
             captured[-1]["template"]
-            == "partials/schedules/source_paths_container.html"
+            == "partials/shared/source_paths_container.html"
         )
