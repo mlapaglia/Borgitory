@@ -52,7 +52,10 @@ class SimpleCommandRunner:
         Returns:
             CommandResult with execution details
         """
-        actual_timeout = float(timeout or self.timeout)
+        if timeout is None:
+            actual_timeout = float(self.timeout)
+        else:
+            actual_timeout = float(timeout)
 
         if self.log_commands:
             logger.info(f"Executing command: {' '.join(command[:3])}...")

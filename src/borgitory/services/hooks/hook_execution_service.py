@@ -223,14 +223,21 @@ class HookExecutionService:
 
             logger.debug(f"Executing hook '{hook.name}' with command: {command}")
 
-            # Execute with timeout
+            # Execute with timeout (0 means no timeout)
             try:
-                result = await asyncio.wait_for(
-                    self.command_runner.run_command(
-                        command=command, env=env, timeout=hook.timeout
-                    ),
-                    timeout=hook.timeout + 5,  # Add small buffer for cleanup
+                run_coro = self.command_runner.run_command(
+                    command=command,
+                    env=env,
+                    timeout=hook.timeout,
                 )
+
+                if hook.timeout > 0:
+                    result = await asyncio.wait_for(
+                        run_coro,
+                        timeout=hook.timeout + 5,
+                    )
+                else:
+                    result = await run_coro
 
                 execution_time = time.time() - start_time
                 success = result.success

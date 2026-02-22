@@ -31,8 +31,8 @@ class HookConfig:
             raise ValueError("Hook name cannot be empty")
         if not self.command.strip():
             raise ValueError("Hook command cannot be empty")
-        if self.timeout <= 0:
-            raise ValueError("Hook timeout must be positive")
+        if self.timeout < 0:
+            raise ValueError("Hook timeout must not be negative")
 
 
 class HookConfigParser:

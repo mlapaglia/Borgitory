@@ -47,6 +47,17 @@
                                               placeholder="e.g., echo 'Starting backup', /path/to/setup.sh"
                                               class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical">{{ hook.command }}</textarea>
                                 </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Timeout (seconds)
+                                    </label>
+                                    <input type="number"
+                                           name="pre_hook_timeout_{{ loop.index0 }}"
+                                           value="{{ hook.timeout if hook.timeout is defined else 300 }}"
+                                           min="0"
+                                           step="1"
+                                           class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                                </div>
                             </div>
                         </div>
                     {% endfor %}
@@ -80,6 +91,17 @@
                                           rows="2"
                                           placeholder="e.g., echo 'Starting backup', /path/to/setup.sh"
                                           class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Timeout (seconds)
+                                </label>
+                                <input type="number"
+                                       name="pre_hook_timeout_0"
+                                       value="300"
+                                       min="0"
+                                       step="1"
+                                       class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
                             </div>
                         </div>
                     </div>
@@ -136,6 +158,17 @@
                                               placeholder="e.g., echo 'Backup completed', /path/to/cleanup.sh"
                                               class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical">{{ hook.command }}</textarea>
                                 </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Timeout (seconds)
+                                    </label>
+                                    <input type="number"
+                                           name="post_hook_timeout_{{ loop.index0 }}"
+                                           value="{{ hook.timeout if hook.timeout is defined else 300 }}"
+                                           min="0"
+                                           step="1"
+                                           class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
+                                </div>
                             </div>
                         </div>
                     {% endfor %}
@@ -169,6 +202,17 @@
                                           rows="2"
                                           placeholder="e.g., echo 'Backup completed', /path/to/cleanup.sh"
                                           class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm resize-vertical"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Timeout (seconds)
+                                </label>
+                                <input type="number"
+                                       name="post_hook_timeout_0"
+                                       value="300"
+                                       min="0"
+                                       step="1"
+                                       class="input-modern w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 text-sm">
                             </div>
                         </div>
                     </div>

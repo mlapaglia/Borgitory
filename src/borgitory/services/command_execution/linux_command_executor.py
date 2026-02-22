@@ -40,10 +40,13 @@ class LinuxCommandExecutor(CommandExecutorProtocol):
     ) -> CommandResult:
         """Execute a command and return the result."""
         start_time = time.time()
-        actual_timeout = timeout or self.default_timeout
+        if timeout is None:
+            actual_timeout = self.default_timeout
+        else:
+            actual_timeout = timeout
 
         logger.debug(
-            f"Executing Linux command: {' '.join(command[:3])}... (timeout: {actual_timeout}s)"
+            f"Executing Linux command: {' '.join(command[:3])}... (timeout: {'none' if actual_timeout == 0 else f'{actual_timeout}s'})"
         )
 
         try:
@@ -57,10 +60,16 @@ class LinuxCommandExecutor(CommandExecutorProtocol):
             )
 
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    process.communicate(input_data.encode() if input_data else None),
-                    timeout=actual_timeout,
+                communicate_coro = process.communicate(
+                    input_data.encode() if input_data else None
                 )
+                if actual_timeout > 0:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        communicate_coro,
+                        timeout=actual_timeout,
+                    )
+                else:
+                    stdout_bytes, stderr_bytes = await communicate_coro
             except asyncio.TimeoutError:
                 process.kill()
                 await process.wait()

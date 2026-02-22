@@ -52,7 +52,7 @@ class TestHookConfig:
 
     def test_hook_config_validation_negative_timeout(self) -> None:
         """Test HookConfig validation fails with negative timeout."""
-        with pytest.raises(ValueError, match="Hook timeout must be positive"):
+        with pytest.raises(ValueError, match="Hook timeout must not be negative"):
             HookConfig(name="test", command="echo test", timeout=-1)
 
 
