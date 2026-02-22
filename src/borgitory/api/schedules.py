@@ -23,7 +23,7 @@ from borgitory.services.scheduling.pattern_service import PatternService
 from borgitory.services.scheduling.hook_service import HookService
 from borgitory.api.auth import get_current_user
 from borgitory.models.database import User
-from borgitory.utils.source_paths import parse_source_paths, serialize_source_paths
+from borgitory.utils.source_paths import parse_source_paths
 
 router = APIRouter()
 

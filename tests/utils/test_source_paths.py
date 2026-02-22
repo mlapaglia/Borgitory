@@ -1,7 +1,6 @@
 """Tests for source_paths utility functions."""
 
 import json
-import pytest
 from borgitory.utils.source_paths import parse_source_paths, serialize_source_paths
 
 
