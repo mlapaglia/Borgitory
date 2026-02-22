@@ -167,6 +167,7 @@ class TestHookExecutionService:
             "repository_id": "test-repo-id",
             "task_index": "2",
             "job_type": "scheduled",
+            "job_status": "running",
         }
         await service.execute_hooks([hook], "pre", uuid.uuid4(), context)
 
@@ -176,6 +177,7 @@ class TestHookExecutionService:
         assert env["BORGITORY_REPOSITORY_ID"] == "test-repo-id"
         assert env["BORGITORY_TASK_INDEX"] == "2"
         assert env["BORGITORY_JOB_TYPE"] == "scheduled"
+        assert env["BORGITORY_JOB_STATUS"] == "running"
 
     async def test_execute_failed_hook(self) -> None:
         """Test executing a failed hook."""

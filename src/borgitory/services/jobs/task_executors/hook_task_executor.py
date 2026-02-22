@@ -87,6 +87,7 @@ class HookTaskExecutor:
                     else "unknown",
                     "task_index": str(task_index),
                     "job_type": str(job.job_type),
+                    "job_status": job.status.value,
                 },
                 job_failed=job_has_failed,
             )
