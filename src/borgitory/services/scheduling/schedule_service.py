@@ -426,8 +426,18 @@ class ScheduleService:
             source_paths = json_data.get("source_paths")
             if isinstance(source_paths, list):
                 from borgitory.utils.source_paths import serialize_source_paths
-                filtered = [p for p in source_paths if isinstance(p, str) and p.strip()]
-                source_path_value = serialize_source_paths(filtered) if filtered else ""
+                filtered = [p.strip() for p in source_paths if isinstance(p, str) and p.strip()]
+                if not filtered:
+                    return False, {}, "At least one source path is required"
+                non_absolute = [p for p in filtered if not p.startswith("/")]
+                if non_absolute:
+                    return (
+                        False,
+                        {},
+                        f"All source paths must be absolute (start with /). "
+                        f"Invalid: {', '.join(non_absolute)}",
+                    )
+                source_path_value = serialize_source_paths(filtered)
             else:
                 source_path_value = json_data.get("source_path", "")
 

@@ -86,6 +86,42 @@ class TestScheduleCreateSourcePaths:
                 source_paths="no-slash",
             )
 
+    def test_direct_source_path_absolute_accepted(self) -> None:
+        s = ScheduleCreate(
+            name="test",
+            cron_expression="0 2 * * *",
+            repository_id=1,
+            source_path="/direct",
+        )
+        assert s.source_path == "/direct"
+
+    def test_direct_source_path_relative_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be absolute"):
+            ScheduleCreate(
+                name="test",
+                cron_expression="0 2 * * *",
+                repository_id=1,
+                source_path="relative",
+            )
+
+    def test_direct_source_path_json_array_relative_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be absolute"):
+            ScheduleCreate(
+                name="test",
+                cron_expression="0 2 * * *",
+                repository_id=1,
+                source_path='["/ok", "bad"]',
+            )
+
+    def test_direct_source_path_json_array_absolute_accepted(self) -> None:
+        s = ScheduleCreate(
+            name="test",
+            cron_expression="0 2 * * *",
+            repository_id=1,
+            source_path='["/a", "/b"]',
+        )
+        assert s.source_path == '["/a", "/b"]'
+
 
 class TestScheduleUpdateSourcePaths:
     def test_absolute_paths_accepted(self) -> None:
@@ -100,6 +136,14 @@ class TestScheduleUpdateSourcePaths:
     def test_no_source_paths_leaves_none(self) -> None:
         s = ScheduleUpdate(name="updated")
         assert s.source_path is None
+
+    def test_direct_source_path_relative_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be absolute"):
+            ScheduleUpdate(source_path="relative")
+
+    def test_direct_source_path_absolute_accepted(self) -> None:
+        s = ScheduleUpdate(source_path="/valid")
+        assert s.source_path == "/valid"
 
 
 class TestBackupRequestSourcePaths:
@@ -121,3 +165,15 @@ class TestBackupRequestSourcePaths:
     def test_no_source_paths_uses_default(self) -> None:
         r = BackupRequest(repository_id=1)
         assert r.source_path == "/"
+
+    def test_direct_source_path_relative_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be absolute"):
+            BackupRequest(repository_id=1, source_path="relative")
+
+    def test_direct_source_path_json_array_relative_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be absolute"):
+            BackupRequest(repository_id=1, source_path='["/ok", "nope"]')
+
+    def test_direct_source_path_absolute_accepted(self) -> None:
+        r = BackupRequest(repository_id=1, source_path="/explicit")
+        assert r.source_path == "/explicit"

@@ -276,6 +276,117 @@ class TestScheduleValidationService:
             assert is_valid is True
             assert processed_data["cloud_sync_config_id"] == expected_output
 
+    def test_validate_source_paths_valid(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """Test that valid absolute source_paths are accepted and serialized."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["/data", "/backup"],
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert error_msg is None
+        import json
+        assert json.loads(processed_data["source_path"]) == ["/data", "/backup"]
+
+    def test_validate_source_paths_empty_after_filtering(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """All-empty source_paths should be rejected."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["", "  "],
+        }
+
+        is_valid, _, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is False
+        assert error_msg == "At least one source path is required"
+
+    def test_validate_source_paths_relative_rejected(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """Relative paths should be rejected."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["relative/path"],
+        }
+
+        is_valid, _, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is False
+        assert "must be absolute" in str(error_msg)
+        assert "relative/path" in str(error_msg)
+
+    def test_validate_source_paths_mixed_rejected(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """A mix of absolute and relative paths should be rejected."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["/valid", "bad"],
+        }
+
+        is_valid, _, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is False
+        assert "bad" in str(error_msg)
+
+    def test_validate_source_paths_strips_whitespace(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["  /data  "],
+        }
+
+        is_valid, processed_data, _ = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        import json
+        assert json.loads(processed_data["source_path"]) == ["/data"]
+
+    def test_validate_source_path_string_fallback(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """When source_paths is absent, source_path string is used as-is."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_path": "/legacy",
+        }
+
+        is_valid, processed_data, _ = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert processed_data["source_path"] == "/legacy"
+
     def test_validate_cron_expression_valid(
         self, schedule_service: ScheduleService
     ) -> None:

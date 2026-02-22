@@ -117,6 +117,25 @@ def _validate_and_merge_source_paths(data: Dict[str, object]) -> Dict[str, objec
     return data
 
 
+def _validate_source_path_field(v: Optional[str]) -> Optional[str]:
+    """Validate that every path inside a source_path value is absolute.
+
+    Handles both legacy plain strings and JSON array strings.
+    """
+    if v is None or not v.strip():
+        return v
+    from borgitory.utils.source_paths import parse_source_paths
+
+    paths = parse_source_paths(v)
+    non_absolute = [p for p in paths if not p.startswith("/")]
+    if non_absolute:
+        raise ValueError(
+            f"All source paths must be absolute (start with /). "
+            f"Invalid: {', '.join(non_absolute)}"
+        )
+    return v
+
+
 # Enums for type safety and validation
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -345,6 +364,11 @@ class ScheduleCreate(ScheduleBase):
     def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
         return _validate_and_merge_source_paths(data)
 
+    @field_validator("source_path", mode="after")
+    @classmethod
+    def validate_source_path(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_source_path_field(v)
+
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
     def validate_cloud_sync_config_id(cls, v: Union[str, int, None]) -> Optional[int]:
@@ -433,6 +457,11 @@ class ScheduleUpdate(BaseModel):
     @classmethod
     def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
         return _validate_and_merge_source_paths(data)
+
+    @field_validator("source_path", mode="after")
+    @classmethod
+    def validate_source_path(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_source_path_field(v)
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -659,6 +688,11 @@ class BackupRequest(BaseModel):
     @classmethod
     def merge_source_paths(cls, data: Dict[str, object]) -> Dict[str, object]:
         return _validate_and_merge_source_paths(data)
+
+    @field_validator("source_path", mode="after")
+    @classmethod
+    def validate_source_path(cls, v: str) -> str:
+        return _validate_source_path_field(v) or v
 
     @field_validator("dry_run", mode="before")
     @classmethod
