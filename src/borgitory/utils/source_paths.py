@@ -7,12 +7,8 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 
-def parse_source_paths(source_path: str) -> List[str]:
-    """Parse a source_path value into a list of absolute paths.
-
-    Handles both legacy single-path strings and JSON array strings.
-    Non-absolute paths are filtered out with a warning.
-    """
+def _parse_raw(source_path: str) -> List[str]:
+    """Parse a source_path value into a list of path strings without filtering."""
     if not source_path or not source_path.strip():
         return []
 
@@ -21,24 +17,35 @@ def parse_source_paths(source_path: str) -> List[str]:
         try:
             parsed = json.loads(stripped)
             if isinstance(parsed, list):
-                raw = [p for p in parsed if isinstance(p, str) and p.strip()]
-                return _filter_absolute(raw)
-            return _filter_absolute([stripped])
+                return [p for p in parsed if isinstance(p, str) and p.strip()]
+            return [stripped]
         except (json.JSONDecodeError, ValueError):
-            return _filter_absolute([stripped])
+            return [stripped]
 
-    return _filter_absolute([stripped])
+    return [stripped]
 
 
-def _filter_absolute(paths: List[str]) -> List[str]:
-    """Return only absolute paths, logging a warning for any that are skipped."""
+def parse_source_paths(source_path: str) -> List[str]:
+    """Parse a source_path value into a list of absolute paths.
+
+    Handles both legacy single-path strings and JSON array strings.
+    Non-absolute paths are filtered out with a warning.
+    """
     result = []
-    for p in paths:
+    for p in _parse_raw(source_path):
         if p.startswith("/"):
             result.append(p)
         else:
             logger.warning("Skipping non-absolute source path: %s", p)
     return result
+
+
+def parse_source_paths_raw(source_path: str) -> List[str]:
+    """Parse a source_path value into a list of paths without absolute-path filtering.
+
+    Used by validators that need to inspect all paths before deciding how to report errors.
+    """
+    return _parse_raw(source_path)
 
 
 def serialize_source_paths(paths: List[str]) -> str:

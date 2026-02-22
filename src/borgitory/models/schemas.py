@@ -124,9 +124,9 @@ def _validate_source_path_field(v: Optional[str]) -> Optional[str]:
     """
     if v is None or not v.strip():
         return v
-    from borgitory.utils.source_paths import parse_source_paths
+    from borgitory.utils.source_paths import parse_source_paths_raw
 
-    paths = parse_source_paths(v)
+    paths = parse_source_paths_raw(v)
     non_absolute = [p for p in paths if not p.startswith("/")]
     if non_absolute:
         raise ValueError(
