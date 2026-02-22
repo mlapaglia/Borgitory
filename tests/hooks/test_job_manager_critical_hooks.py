@@ -338,3 +338,26 @@ class TestJobManagerHookExecution:
         assert context["repository_id"] == "42"
         assert context["task_index"] == "3"
         assert context["job_type"] == "scheduled"
+        assert context["job_status"] == "running"
+
+    async def test_execute_hook_task_context_reflects_job_status(self) -> None:
+        """Test that context job_status reflects the actual job status enum value."""
+        self.mock_hook_service.execute_hooks_mock.return_value = HookExecutionSummary(
+            results=[],
+            all_successful=True,
+            critical_failure=False,
+            failed_critical_hook_name=None,
+        )
+
+        hooks_json = '[{"name": "post hook", "command": "echo status"}]'
+        hook_task = self.create_hook_task("post", hooks_json)
+        job = self.create_test_job([hook_task])
+        job.status = JobStatusEnum.FAILED
+
+        await self.job_manager.hook_executor.execute_hook_task(
+            job, hook_task, 0, True
+        )
+
+        call_args = self.mock_hook_service.execute_hooks_mock.call_args
+        context = call_args.kwargs["context"]
+        assert context["job_status"] == "failed"
