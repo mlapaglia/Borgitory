@@ -112,6 +112,24 @@ class TestHookExecutionService:
         assert call_args[1]["command"] == ["/bin/sh", "-c", "ls -la"]
         assert call_args[1]["timeout"] == 60
 
+    async def test_execute_hook_with_zero_timeout(self) -> None:
+        """Test that timeout=0 is passed through to run_command (no timeout)."""
+        mock_runner = MockCommandRunner()
+        mock_runner._run_command_mock.return_value = CommandResult(
+            success=True, return_code=0, stdout="done", stderr="", duration=120.0
+        )
+
+        service = HookExecutionService(command_runner=mock_runner)
+        hook = HookConfig(name="Long Hook", command="rclone sync ...", timeout=0)
+
+        summary = await service.execute_hooks([hook], "post", uuid.uuid4())
+
+        assert len(summary.results) == 1
+        assert summary.results[0].success is True
+
+        call_args = mock_runner._run_command_mock.call_args
+        assert call_args[1]["timeout"] == 0
+
     async def test_execute_hook_with_environment_vars(self) -> None:
         """Test executing hook with environment variables."""
         mock_runner = MockCommandRunner()

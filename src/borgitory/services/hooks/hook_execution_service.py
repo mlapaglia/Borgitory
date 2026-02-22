@@ -228,7 +228,7 @@ class HookExecutionService:
                 run_coro = self.command_runner.run_command(
                     command=command,
                     env=env,
-                    timeout=hook.timeout if hook.timeout > 0 else None,
+                    timeout=hook.timeout,
                 )
 
                 if hook.timeout > 0:

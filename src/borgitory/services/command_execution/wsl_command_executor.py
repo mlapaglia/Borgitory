@@ -61,10 +61,13 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         # Build WSL command
         wsl_command = self._build_wsl_command(cmd_list, env, cwd)
 
-        actual_timeout = timeout or self.default_timeout
+        if timeout is None:
+            actual_timeout = self.default_timeout
+        else:
+            actual_timeout = timeout
 
         logger.info(
-            f"Executing WSL command: {' '.join(wsl_command[:3])}... (timeout: {actual_timeout}s)"
+            f"Executing WSL command: {' '.join(wsl_command[:3])}... (timeout: {'none' if actual_timeout == 0 else f'{actual_timeout}s'})"
         )
 
         try:
@@ -77,12 +80,16 @@ class WSLCommandExecutor(CommandExecutorProtocol):
             )
 
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    process.communicate(
-                        input=input_data.encode() if input_data else None
-                    ),
-                    timeout=actual_timeout,
+                communicate_coro = process.communicate(
+                    input=input_data.encode() if input_data else None
                 )
+                if actual_timeout > 0:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        communicate_coro,
+                        timeout=actual_timeout,
+                    )
+                else:
+                    stdout_bytes, stderr_bytes = await communicate_coro
             except asyncio.TimeoutError:
                 process.kill()
                 await process.wait()
