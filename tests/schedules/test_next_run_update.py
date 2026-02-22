@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, UTC, timezone, timedelta
+from datetime import UTC, timezone, timedelta
 from unittest.mock import Mock, AsyncMock, MagicMock, patch
 
 import pytest
