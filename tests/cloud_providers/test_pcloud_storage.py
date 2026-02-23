@@ -5,7 +5,6 @@ from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.services.cloud_providers.storage.pcloud_storage import (
     PcloudStorageConfig,
     PcloudStorage,
-    PcloudProvider,
 )
 from borgitory.services.cloud_providers.types import SyncEvent
 from borgitory.services.cloud_providers.registry import (
