@@ -170,13 +170,9 @@ class PcloudStorage(CloudStorage):
     def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
         hostname = config_dict.get("hostname", "api.pcloud.com")
         root_folder_id = config_dict.get("root_folder_id") or "default"
-        provider_details = f"""
-            <div><strong>Hostname:</strong> {hostname}</div>
-            <div><strong>Root folder ID:</strong> {root_folder_id}</div>
-        """.strip()
         return {
             "provider_name": "pCloud",
-            "provider_details": provider_details,
+            "provider_details": {"hostname": hostname, "root_folder_id": root_folder_id},
         }
 
     @classmethod

@@ -199,9 +199,11 @@ class TestPcloudStorage:
             {"hostname": "eapi.pcloud.com", "root_folder_id": "d0"}
         )
         assert details["provider_name"] == "pCloud"
-        provider_details = str(details["provider_details"])
-        assert "hostname" in provider_details and "eapi.pcloud.com" in provider_details
-        assert "d0" in provider_details
+        provider_details = details["provider_details"]
+        assert isinstance(provider_details, dict)
+        assert "hostname" in provider_details
+        assert provider_details.get("hostname") == "eapi.pcloud.com"
+        assert provider_details.get("root_folder_id") == "d0"
 
     def test_get_rclone_mapping(self) -> None:
         mapping = PcloudStorage.get_rclone_mapping()

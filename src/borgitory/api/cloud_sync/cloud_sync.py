@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from typing import Dict, List, Optional, Union, cast, Mapping
+from typing import Dict, List, Optional, Union, cast, Mapping, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -102,16 +102,24 @@ def _get_submit_button_text(
         return f"{action} Sync Location"
 
 
+def _provider_details_to_html(details: Union[str, Dict[str, Any]]) -> str:
+    if isinstance(details, str):
+        return details
+    return "\n".join(
+        f"<div><strong>{k.replace('_', ' ').title()}:</strong> {v}</div>"
+        for k, v in details.items()
+    )
+
+
 def _get_provider_display_details(
     registry: ProviderRegistryDep, provider: str, provider_config: Dict[str, object]
-) -> Dict[str, str]:
+) -> Dict[str, Union[str, Dict[str, Any]]]:
     """Get provider display details using registry and storage classes"""
     try:
         storage_class = registry.get_storage_class(provider)
         if storage_class:
             temp_storage = storage_class(None, None, None)
-            result = temp_storage.get_display_details(provider_config)
-            return cast(Dict[str, str], result)
+            return temp_storage.get_display_details(provider_config)
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 
@@ -280,7 +288,9 @@ async def get_cloud_sync_configs_html(
 
             processed_config = config.__dict__.copy()
             processed_config["provider_name"] = display_info["provider_name"]
-            processed_config["provider_details"] = display_info["provider_details"]
+            processed_config["provider_details"] = _provider_details_to_html(
+                display_info["provider_details"]
+            )
             processed_configs.append(type("Config", (), processed_config)())
 
         browser_tz_offset = get_browser_timezone_offset(request)
