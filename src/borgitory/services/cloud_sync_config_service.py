@@ -180,6 +180,8 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
         if config_update.provider is not None:
             config.provider = config_update.provider
         if config_update.path_prefix is not None:
+            if config_update.path_prefix == "" and config.path_prefix:
+                config_update.path_prefix = config.path_prefix
             config.path_prefix = config_update.path_prefix
         if config_update.enabled is not None:
             config.enabled = config_update.enabled
@@ -190,6 +192,18 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
                 if config_update.provider
                 else str(config.provider)
             )
+            sensitive_fields = _get_sensitive_fields_for_provider(provider)
+            existing_provider_config = json.loads(config.provider_config)
+            decrypted_existing = self._encryption_service.decrypt_sensitive_fields(
+                existing_provider_config, sensitive_fields
+            )
+            for key in list(config_update.provider_config):
+                val = config_update.provider_config.get(key)
+                if (
+                    (val is None or (isinstance(val, str) and not val.strip()))
+                    and key in decrypted_existing
+                ):
+                    config_update.provider_config[key] = decrypted_existing[key]
             try:
                 storage = self._storage_factory.create_storage(
                     provider, config_update.provider_config
