@@ -212,9 +212,9 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
                 # Merge: Start with existing config, then update with non-empty new values
                 merged_config = decrypted_existing.copy()
                 for key, value in config_update.provider_config.items():
-                    # Only update if value is not empty string
+                    # Only update if value is not empty string or None
                     # This allows users to keep existing values for sensitive fields
-                    if value != "":
+                    if value not in ("", None):
                         merged_config[key] = value
                 
                 final_config = merged_config

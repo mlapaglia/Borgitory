@@ -118,7 +118,7 @@
                 <input type="checkbox"
                        name="provider_config[hide_special_share]"
                        value="true"
-                       {% if config and config.hide_special_share is defined %}{% if config.hide_special_share %}checked{% endif %}{% else %}checked{% endif %}
+                       {% if (config and config.hide_special_share) or not config %}checked{% endif %}
                        class="checkbox-modern">
                 <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">
                     Hide Special Shares (print$, etc.)
@@ -128,7 +128,7 @@
                 <input type="checkbox"
                        name="provider_config[case_insensitive]"
                        value="true"
-                       {% if config and config.case_insensitive is defined %}{% if config.case_insensitive %}checked{% endif %}{% else %}checked{% endif %}
+                       {% if (config and config.case_insensitive) or not config %}checked{% endif %}
                        class="checkbox-modern">
                 <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">Case Insensitive</label>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
