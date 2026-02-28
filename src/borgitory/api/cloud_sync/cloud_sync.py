@@ -383,11 +383,13 @@ async def update_cloud_sync_config(
         return response
 
     except ValidationError as e:
-        error_msg = f"Validation error: {str(e)}"
+        # Use sanitized validation errors that exclude the original input values
+        error_details = e.errors(include_input=False)
+        error_msg = "Validation error while updating cloud sync configuration."
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/update_error.html",
-            {"error_message": error_msg},
+            {"error_message": error_msg, "error_details": error_details},
         )
     except HTTPException as e:
         return templates.TemplateResponse(

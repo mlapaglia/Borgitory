@@ -219,8 +219,8 @@ class SFTPStorage(CloudStorage):
             status = result.get("status")
             if status != "success":
                 logger.warning(
-                    f"SFTP connection test returned status '{status}': "
-                    f"{result.get('message', 'no details')}"
+                    "SFTP connection test failed with status '%s'.",
+                    status,
                 )
             return status == "success"
         except Exception as e:

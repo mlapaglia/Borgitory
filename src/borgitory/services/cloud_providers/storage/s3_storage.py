@@ -233,8 +233,7 @@ class S3Storage(CloudStorage):
             status = result.get("status")
             if status != "success":
                 logger.warning(
-                    f"S3 connection test returned status '{status}': "
-                    f"{result.get('message', 'no details')}"
+                    "S3 connection test returned status '%s'", status
                 )
             return status == "success"
         except Exception as e:
