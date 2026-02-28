@@ -15,8 +15,6 @@ import time
 from typing import Callable, Dict, Optional, List, AsyncGenerator, Union, cast
 from pydantic import Field, field_validator, model_validator
 
-logger = logging.getLogger(__name__)
-
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
@@ -24,6 +22,8 @@ from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
+
+logger = logging.getLogger(__name__)
 
 
 class SMBStorageConfig(CloudStorageConfig):
