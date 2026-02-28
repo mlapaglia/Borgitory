@@ -50,8 +50,8 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
     return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
-def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
-    """Get the appropriate template path for a provider and mode"""
+def _get_provider_template(provider: str) -> Optional[str]:
+    """Get the appropriate template path for a provider"""
     if not provider:
         return None
 
@@ -65,19 +65,6 @@ def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]
             f"src/borgitory/templates/partials/cloud_sync/providers/{provider}"
         )
     )
-
-    # For edit mode, prefer the _edit template if it exists
-    if mode == "edit":
-        edit_template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields_edit.html"
-        edit_full_path = f"src/borgitory/templates/{edit_template_path}"
-        edit_normalized = os.path.abspath(os.path.normpath(edit_full_path))
-
-        if (
-            os.path.commonpath([base_templates_dir, edit_normalized])
-            == base_templates_dir
-            and os.path.exists(edit_full_path)
-        ):
-            return edit_template_path
 
     template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields.html"
     full_path = f"src/borgitory/templates/{template_path}"
@@ -351,9 +338,7 @@ async def get_cloud_sync_edit_form(
         context = {
             "config": config_obj,
             "provider": decrypted_config["provider"],
-            "provider_template": _get_provider_template(
-                decrypted_config["provider"], mode="edit"
-            ),
+            "provider_template": _get_provider_template(decrypted_config["provider"]),
             "supported_providers": _get_supported_providers(registry),
             "is_edit_mode": True,
             "submit_text": _get_submit_button_text(
