@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  attestations: write
 
 env:
   REGISTRY: docker.io
@@ -71,6 +72,11 @@ jobs:
 
     - name: Build package
       run: python -m build
+
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+      with:
+        subject-path: dist/*
 
     - name: Publish to PyPI
       if: github.event.release.prerelease == false
@@ -215,6 +221,13 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract-version.outputs.version }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+
+      - name: Sign Docker image
+        run: |
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract-version.outputs.version }}
 
       - name: Update Docker Hub description
         if: always()

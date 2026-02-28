@@ -1,22 +1,22 @@
 repos:
 - repo: https://github.com/gitleaks/gitleaks
-  rev: v8.16.3
+  rev: 51ca0f89b915509f07f956144ce2c64994b80947 # v8.16.3
   hooks:
   - id: gitleaks
 - repo: https://github.com/jumanjihouse/pre-commit-hooks
-  rev: 3.0.0
+  rev: 38980559e3a605691d6579f96222c30778e5a69e # 3.0.0
   hooks:
   - id: shellcheck
 - repo: https://github.com/pre-commit/mirrors-eslint
-  rev: v8.38.0
+  rev: 8ddcbd412c0b348841f0f82c837702f432539652 # v8.38.0
   hooks:
   - id: eslint
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.4.0
+  rev: f71fa2c1f9cf5cb705f73dffe4b21f7c61470ba9 # v4.4.0
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
 - repo: https://github.com/pylint-dev/pylint
-  rev: v2.17.2
+  rev: de0147e92586be56cdee9711dd3d3a7a7e1c9ef2 # v2.17.2
   hooks:
   - id: pylint
