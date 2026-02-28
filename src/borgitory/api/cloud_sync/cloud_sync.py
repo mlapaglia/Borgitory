@@ -50,7 +50,7 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
     return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
-def _get_provider_template(provider: str) -> Optional[str]:
+def _get_provider_template(provider: str, mode: str = "create") -> Optional[str]:
     """Get the appropriate template path for a provider and mode"""
     if not provider:
         return None
@@ -65,6 +65,19 @@ def _get_provider_template(provider: str) -> Optional[str]:
             f"src/borgitory/templates/partials/cloud_sync/providers/{provider}"
         )
     )
+
+    # For edit mode, prefer the _edit template if it exists
+    if mode == "edit":
+        edit_template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields_edit.html"
+        edit_full_path = f"src/borgitory/templates/{edit_template_path}"
+        edit_normalized = os.path.abspath(os.path.normpath(edit_full_path))
+
+        if (
+            os.path.commonpath([base_templates_dir, edit_normalized])
+            == base_templates_dir
+            and os.path.exists(edit_full_path)
+        ):
+            return edit_template_path
 
     template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields.html"
     full_path = f"src/borgitory/templates/{template_path}"
@@ -234,22 +247,20 @@ async def create_cloud_sync_config(
             request,
             "partials/cloud_sync/create_error.html",
             {"error_message": error_msg},
-            status_code=422,
         )
     except HTTPException as e:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/create_error.html",
             {"error_message": str(e.detail)},
-            status_code=e.status_code,
         )
     except Exception as e:
         error_msg = f"Failed to create cloud sync configuration: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/create_error.html",
             {"error_message": error_msg},
-            status_code=500,
         )
 
 
@@ -340,7 +351,9 @@ async def get_cloud_sync_edit_form(
         context = {
             "config": config_obj,
             "provider": decrypted_config["provider"],
-            "provider_template": _get_provider_template(decrypted_config["provider"]),
+            "provider_template": _get_provider_template(
+                decrypted_config["provider"], mode="edit"
+            ),
             "supported_providers": _get_supported_providers(registry),
             "is_edit_mode": True,
             "submit_text": _get_submit_button_text(
@@ -384,21 +397,27 @@ async def update_cloud_sync_config(
         response.headers["HX-Trigger"] = "cloudSyncUpdate"
         return response
 
+    except ValidationError as e:
+        error_msg = f"Validation error: {str(e)}"
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/update_error.html",
+            {"error_message": error_msg},
+        )
     except HTTPException as e:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/update_error.html",
             {"error_message": str(e.detail)},
-            status_code=e.status_code,
         )
     except Exception as e:
         error_msg = f"Failed to update cloud sync configuration: {str(e)}"
+        logger.error(error_msg, exc_info=True)
 
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/update_error.html",
             {"error_message": error_msg},
-            status_code=500,
         )
 
 

@@ -6,6 +6,7 @@ from business logic and easy testability.
 """
 
 import asyncio
+import logging
 import os
 import re
 import subprocess
@@ -13,6 +14,8 @@ from typing import Callable, Dict, Optional, List, AsyncGenerator, Union, cast
 from pydantic import Field, field_validator, model_validator
 from contextlib import asynccontextmanager, AsyncExitStack
 from typing import AsyncIterator
+
+logger = logging.getLogger(__name__)
 
 from borgitory.models.database import Repository
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
@@ -213,8 +216,15 @@ class SFTPStorage(CloudStorage):
                 password=self._config.password,
                 private_key=self._config.private_key,
             )
-            return result.get("status") == "success"
-        except Exception:
+            status = result.get("status")
+            if status != "success":
+                logger.warning(
+                    f"SFTP connection test returned status '{status}': "
+                    f"{result.get('message', 'no details')}"
+                )
+            return status == "success"
+        except Exception as e:
+            logger.error(f"SFTP connection test failed with exception: {e}", exc_info=True)
             return False
 
     def get_connection_info(self) -> ConnectionInfo:

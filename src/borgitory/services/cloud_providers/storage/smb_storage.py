@@ -6,6 +6,7 @@ from business logic and easy testability.
 """
 
 import asyncio
+import logging
 import os
 import re
 import subprocess
@@ -13,6 +14,8 @@ import tempfile
 import time
 from typing import Callable, Dict, Optional, List, AsyncGenerator, Union, cast
 from pydantic import Field, field_validator, model_validator
+
+logger = logging.getLogger(__name__)
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.file_protocols import FileServiceProtocol
@@ -257,8 +260,15 @@ class SMBStorage(CloudStorage):
                 case_insensitive=self._config.case_insensitive,
                 kerberos_ccache=self._config.kerberos_ccache,
             )
-            return result.get("status") == "success"
-        except Exception:
+            status = result.get("status")
+            if status != "success":
+                logger.warning(
+                    f"SMB connection test returned status '{status}': "
+                    f"{result.get('message', 'no details')}"
+                )
+            return status == "success"
+        except Exception as e:
+            logger.error(f"SMB connection test failed with exception: {e}", exc_info=True)
             return False
 
     def get_connection_info(self) -> ConnectionInfo:

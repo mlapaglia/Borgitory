@@ -99,8 +99,9 @@ class TestCloudSyncAPIHTMX:
 
         response = await async_client.post("/api/cloud-sync/", data=form_data)
 
-        # Schema validation should return 422
-        assert response.status_code == 422
+        # Returns 200 so HTMX can swap the error notification HTML into the DOM
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
     async def test_create_config_service_error_html(
         self, async_client: AsyncClient
@@ -134,7 +135,8 @@ class TestCloudSyncAPIHTMX:
 
             response = await async_client.post("/api/cloud-sync/", data=form_data)
 
-            assert response.status_code == 400
+            # Returns 200 so HTMX can swap the error notification HTML into the DOM
+            assert response.status_code == 200
             assert "text/html" in response.headers["content-type"]
 
     async def test_get_configs_html_empty(self, async_client: AsyncClient) -> None:

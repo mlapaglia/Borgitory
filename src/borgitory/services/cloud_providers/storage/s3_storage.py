@@ -6,10 +6,13 @@ from business logic and easy testability.
 """
 
 import asyncio
+import logging
 import re
 from enum import Enum
 from typing import AsyncGenerator, Callable, Dict, List, Optional, Union, cast
 from pydantic import Field, field_validator, model_validator
+
+logger = logging.getLogger(__name__)
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.file_protocols import FileServiceProtocol
@@ -227,8 +230,15 @@ class S3Storage(CloudStorage):
                 region=self._config.region,
                 endpoint_url=self._config.endpoint_url,
             )
-            return result.get("status") == "success"
-        except Exception:
+            status = result.get("status")
+            if status != "success":
+                logger.warning(
+                    f"S3 connection test returned status '{status}': "
+                    f"{result.get('message', 'no details')}"
+                )
+            return status == "success"
+        except Exception as e:
+            logger.error(f"S3 connection test failed with exception: {e}", exc_info=True)
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
