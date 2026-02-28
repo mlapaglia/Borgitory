@@ -22,14 +22,15 @@ jobs:
     name: Scorecard analysis
     runs-on: ubuntu-latest
     # `publish_results: true` only works when run from the default branch. conditional can be removed if disabled.
-    if: github.event.repository.default_branch == github.ref_name || github.event_name == 'pull_request'
+    if: github.event.repository.default_branch == github.ref_name
     permissions:
       # Needed to upload the results to code-scanning dashboard.
       security-events: write
       # Needed to publish results and get a badge (see publish_results below).
       id-token: write
-      # Uncomment the permissions below if installing in a private repository.
-      # contents: read
+      # Required for actions/checkout and other steps needing repo read access.
+      contents: read
+      # Uncomment the permission below if additional Actions-level read access is required (e.g., in some private repo setups).
       # actions: read
 
     steps:
@@ -73,6 +74,6 @@ jobs:
       # Upload the results to GitHub's code scanning dashboard (optional).
       # Commenting out will disable upload of results to your repo's Code Scanning dashboard
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@b611370bb5703a7efb587f9d136a52ea24c5c38c # v3.27.8
         with:
           sarif_file: results.sarif
