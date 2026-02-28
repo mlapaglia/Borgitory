@@ -7,16 +7,14 @@ repos:
   rev: 38980559e3a605691d6579f96222c30778e5a69e # 3.0.0
   hooks:
   - id: shellcheck
-- repo: https://github.com/pre-commit/mirrors-eslint
-  rev: 8ddcbd412c0b348841f0f82c837702f432539652 # v8.38.0
-  hooks:
-  - id: eslint
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: f71fa2c1f9cf5cb705f73dffe4b21f7c61470ba9 # v4.4.0
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
-- repo: https://github.com/pylint-dev/pylint
-  rev: de0147e92586be56cdee9711dd3d3a7a7e1c9ef2 # v2.17.2
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: 0470f7c8a653e950f7cc5a653204ceb3fde4c02a # v0.15.0
   hooks:
-  - id: pylint
+  - id: ruff
+    args: [--fix]
+  - id: ruff-format
