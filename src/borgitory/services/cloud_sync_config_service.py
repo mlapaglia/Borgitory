@@ -177,41 +177,51 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
 
         if config_update.name is not None:
             config.name = config_update.name
-        if config_update.provider is not None:
-            config.provider = config_update.provider
         if config_update.path_prefix is not None:
             config.path_prefix = config_update.path_prefix
         if config_update.enabled is not None:
             config.enabled = config_update.enabled
 
         if config_update.provider_config is not None:
-            provider = (
+            # Determine if provider is being changed
+            old_provider = str(config.provider)
+            new_provider = (
                 config_update.provider
                 if config_update.provider
-                else str(config.provider)
+                else old_provider
             )
             
-            # Load existing config and merge with updates
-            # This ensures that empty values in updates don't overwrite existing values
-            existing_config = json.loads(str(config.provider_config))
-            sensitive_fields = _get_sensitive_fields_for_provider(provider)
-            
-            # Decrypt existing config to get current values
-            decrypted_existing = self._encryption_service.decrypt_sensitive_fields(
-                existing_config, sensitive_fields
-            )
-            
-            # Merge: Start with existing config, then update with non-empty new values
-            merged_config = decrypted_existing.copy()
-            for key, value in config_update.provider_config.items():
-                # Only update if value is not empty string
-                # This allows users to keep existing values for sensitive fields
-                if value != "":
-                    merged_config[key] = value
+            # If provider is being changed, we can't merge with existing config
+            # because the field structures are completely different
+            if new_provider != old_provider:
+                if config_update.provider is not None:
+                    config.provider = config_update.provider
+                # Use new config as-is without merging
+                final_config = config_update.provider_config
+            else:
+                # Same provider: Load existing config and merge with updates
+                # This ensures that empty values in updates don't overwrite existing values
+                existing_config = json.loads(str(config.provider_config))
+                sensitive_fields = _get_sensitive_fields_for_provider(old_provider)
+                
+                # Decrypt existing config to get current values
+                decrypted_existing = self._encryption_service.decrypt_sensitive_fields(
+                    existing_config, sensitive_fields
+                )
+                
+                # Merge: Start with existing config, then update with non-empty new values
+                merged_config = decrypted_existing.copy()
+                for key, value in config_update.provider_config.items():
+                    # Only update if value is not empty string
+                    # This allows users to keep existing values for sensitive fields
+                    if value != "":
+                        merged_config[key] = value
+                
+                final_config = merged_config
             
             try:
                 storage = self._storage_factory.create_storage(
-                    provider, merged_config
+                    new_provider, final_config
                 )
             except Exception as e:
                 raise HTTPException(
@@ -220,10 +230,16 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
 
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-                merged_config, sensitive_fields
+                final_config, sensitive_fields
             )
 
             config.provider_config = json.dumps(encrypted_config)
+        elif config_update.provider is not None:
+            # Provider changed but no provider_config provided - this is an error
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot change provider without providing new provider configuration"
+            )
 
         config.updated_at = now_utc()
         await db.commit()
