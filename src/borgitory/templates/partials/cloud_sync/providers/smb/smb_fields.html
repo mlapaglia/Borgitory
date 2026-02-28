@@ -6,6 +6,7 @@
         </label>
         <input type="text"
                name="provider_config[host]"
+               {% if config %}value="{{ config.host or '' }}"{% endif %}
                placeholder="server.example.com"
                class="input-modern mt-1">
     </div>
@@ -15,6 +16,7 @@
         </label>
         <input type="text"
                name="provider_config[share_name]"
+               {% if config %}value="{{ config.share_name or '' }}"{% endif %}
                placeholder="backup-share"
                class="input-modern mt-1">
     </div>
@@ -24,7 +26,7 @@
         </label>
         <input type="text"
                name="provider_config[user]"
-               value="guest"
+               value="{{ config.user if config else 'guest' }}"
                placeholder="guest"
                class="input-modern mt-1">
     </div>
@@ -34,13 +36,14 @@
         </label>
         <input type="password"
                name="provider_config[pass]"
+               {% if config %}value="{{ config.pass or '' }}" placeholder="Current value will be used if left empty"{% endif %}
                class="input-modern mt-1">
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Port</label>
         <input type="number"
                name="provider_config[port]"
-               value="445"
+               value="{{ config.port if config else 445 }}"
                placeholder="445"
                min="1"
                max="65535"
@@ -52,7 +55,7 @@
         </label>
         <input type="text"
                name="provider_config[domain]"
-               value="WORKGROUP"
+               value="{{ config.domain if config else 'WORKGROUP' }}"
                placeholder="WORKGROUP"
                class="input-modern mt-1">
     </div>
@@ -68,6 +71,7 @@
                 </label>
                 <input type="text"
                        name="provider_config[spn]"
+                       {% if config %}value="{{ config.spn or '' }}"{% endif %}
                        placeholder="cifs/remotehost:1020"
                        class="input-modern mt-1">
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -78,6 +82,7 @@
                 <input type="checkbox"
                        name="provider_config[use_kerberos]"
                        value="true"
+                       {% if config and config.use_kerberos %}checked{% endif %}
                        class="checkbox-modern">
                 <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">
                     Use Kerberos Authentication
@@ -89,6 +94,7 @@
                 </label>
                 <input type="text"
                        name="provider_config[kerberos_ccache]"
+                       {% if config %}value="{{ config.kerberos_ccache or '' }}"{% endif %}
                        placeholder="/path/to/ccache or FILE:/path/to/ccache"
                        class="input-modern mt-1">
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -101,7 +107,7 @@
                 </label>
                 <input type="text"
                        name="provider_config[idle_timeout]"
-                       value="1m0s"
+                       value="{{ config.idle_timeout if config else '1m0s' }}"
                        placeholder="1m0s"
                        class="input-modern mt-1">
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -112,7 +118,7 @@
                 <input type="checkbox"
                        name="provider_config[hide_special_share]"
                        value="true"
-                       checked
+                       {% if config and config.hide_special_share is defined %}{% if config.hide_special_share %}checked{% endif %}{% else %}checked{% endif %}
                        class="checkbox-modern">
                 <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">
                     Hide Special Shares (print$, etc.)
@@ -122,7 +128,7 @@
                 <input type="checkbox"
                        name="provider_config[case_insensitive]"
                        value="true"
-                       checked
+                       {% if config and config.case_insensitive is defined %}{% if config.case_insensitive %}checked{% endif %}{% else %}checked{% endif %}
                        class="checkbox-modern">
                 <label class="ml-2 text-sm text-gray-900 dark:text-gray-100">Case Insensitive</label>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -137,6 +143,7 @@
         </label>
         <input type="text"
                name="path_prefix"
+               {% if config %}value="{{ config.path_prefix or '' }}"{% endif %}
                placeholder="backups/borgitory"
                class="input-modern mt-1">
     </div>
