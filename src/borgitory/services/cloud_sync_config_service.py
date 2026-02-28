@@ -190,9 +190,28 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
                 if config_update.provider
                 else str(config.provider)
             )
+            
+            # Load existing config and merge with updates
+            # This ensures that empty values in updates don't overwrite existing values
+            existing_config = json.loads(str(config.provider_config))
+            sensitive_fields = _get_sensitive_fields_for_provider(provider)
+            
+            # Decrypt existing config to get current values
+            decrypted_existing = self._encryption_service.decrypt_sensitive_fields(
+                existing_config, sensitive_fields
+            )
+            
+            # Merge: Start with existing config, then update with non-empty new values
+            merged_config = decrypted_existing.copy()
+            for key, value in config_update.provider_config.items():
+                # Only update if value is not empty string
+                # This allows users to keep existing values for sensitive fields
+                if value != "":
+                    merged_config[key] = value
+            
             try:
                 storage = self._storage_factory.create_storage(
-                    provider, config_update.provider_config
+                    provider, merged_config
                 )
             except Exception as e:
                 raise HTTPException(
@@ -201,7 +220,7 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
 
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = self._encryption_service.encrypt_sensitive_fields(
-                config_update.provider_config, sensitive_fields
+                merged_config, sensitive_fields
             )
 
             config.provider_config = json.dumps(encrypted_config)
