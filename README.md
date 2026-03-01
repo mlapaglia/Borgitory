@@ -1,5 +1,6 @@
 
 # Borgitory
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/12059/baseline)](https://www.bestpractices.dev/projects/12059)
 [![codecov](https://codecov.io/gh/mlapaglia/Borgitory/graph/badge.svg?token=3XFFTWSKTB)](https://codecov.io/gh/mlapaglia/Borgitory)
 [![build](https://img.shields.io/github/actions/workflow/status/mlapaglia/borgitory/build.yml?logo=github)](https://github.com/mlapaglia/Borgitory/actions/workflows/release.yml)
 [![sponsors](https://img.shields.io/github/sponsors/mlapaglia?logo=githubsponsors)](https://github.com/sponsors/mlapaglia)

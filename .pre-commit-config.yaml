@@ -1,0 +1,20 @@
+repos:
+- repo: https://github.com/gitleaks/gitleaks
+  rev: 51ca0f89b915509f07f956144ce2c64994b80947 # v8.16.3
+  hooks:
+  - id: gitleaks
+- repo: https://github.com/jumanjihouse/pre-commit-hooks
+  rev: 38980559e3a605691d6579f96222c30778e5a69e # 3.0.0
+  hooks:
+  - id: shellcheck
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: f71fa2c1f9cf5cb705f73dffe4b21f7c61470ba9 # v4.4.0
+  hooks:
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: 0470f7c8a653e950f7cc5a653204ceb3fde4c02a # v0.15.0
+  hooks:
+  - id: ruff
+    args: [--fix]
+  - id: ruff-format
