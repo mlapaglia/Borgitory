@@ -256,12 +256,12 @@ class S3Storage(CloudStorage):
             )
             status = result.get("status")
             if status != "success":
-                logger.warning(
-                    "S3 connection test returned status '%s'", status
-                )
+                logger.warning("S3 connection test returned status '%s'", status)
             return status == "success"
         except Exception as e:
-            logger.error(f"S3 connection test failed with exception: {e}", exc_info=True)
+            logger.error(
+                f"S3 connection test failed with exception: {e}", exc_info=True
+            )
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
@@ -482,7 +482,11 @@ class S3Storage(CloudStorage):
 
             yield cast(
                 ProgressData,
-                {"type": "started", "command": " ".join(safe_parts), "pid": process.pid},
+                {
+                    "type": "started",
+                    "command": " ".join(safe_parts),
+                    "pid": process.pid,
+                },
             )
 
             async def read_stream(
@@ -650,7 +654,6 @@ class S3Storage(CloudStorage):
 
         except Exception as e:
             return {"status": "failed", "message": f"Write test failed: {str(e)}"}
-
 
 
 @register_provider(

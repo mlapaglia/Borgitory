@@ -119,7 +119,10 @@ def _get_provider_display_details(
         storage_class = registry.get_storage_class(provider)
         if storage_class:
             temp_storage = storage_class(None, None, None)
-            return cast(Dict[str, Union[str, Dict[str, Any]]], temp_storage.get_display_details(provider_config))
+            return cast(
+                Dict[str, Union[str, Dict[str, Any]]],
+                temp_storage.get_display_details(provider_config),
+            )
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 
@@ -277,7 +280,7 @@ async def get_cloud_sync_configs_html(
         for config in configs_raw:
             try:
                 provider_config = json.loads(config.provider_config)
-            except (json.JSONDecodeError, AttributeError):
+            except json.JSONDecodeError, AttributeError:
                 provider_config = {}
 
             display_info = _get_provider_display_details(

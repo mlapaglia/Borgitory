@@ -9,7 +9,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 10
     reviewers:
-      - "@me"
+      - "mlapaglia"
     commit-message:
       prefix: "deps"
       prefix-development: "deps-dev"
@@ -47,7 +47,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "@me"
+      - "mlapaglia"
     ignore:
       - dependency-name: "*"
         update-types:
@@ -55,6 +55,28 @@ updates:
     commit-message:
       prefix: "docker"
       include: "scope"
+
+  # Pre-commit hooks
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "mlapaglia"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
+    commit-message:
+      prefix: "pre-commit"
+      include: "scope"
+    groups:
+      pre-commit-hooks:
+        patterns:
+          - "*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -65,7 +87,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "@me"
+      - "mlapaglia"
     ignore:
       - dependency-name: "*"
         update-types:

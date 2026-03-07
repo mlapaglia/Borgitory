@@ -224,7 +224,9 @@ class SFTPStorage(CloudStorage):
                 )
             return status == "success"
         except Exception as e:
-            logger.error(f"SFTP connection test failed with exception: {e}", exc_info=True)
+            logger.error(
+                f"SFTP connection test failed with exception: {e}", exc_info=True
+            )
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
@@ -580,7 +582,6 @@ class SFTPStorage(CloudStorage):
                     os.unlink(key_file_path)
                 except OSError:
                     pass
-
 
 
 @register_provider(

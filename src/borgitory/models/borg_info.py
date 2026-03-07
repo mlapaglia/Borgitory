@@ -122,7 +122,7 @@ class BorgArchive:
         """Convert start timestamp to datetime object."""
         try:
             return datetime.fromisoformat(self.start.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
+        except ValueError, AttributeError:
             return None
 
     @property
@@ -130,7 +130,7 @@ class BorgArchive:
         """Convert end timestamp to datetime object."""
         try:
             return datetime.fromisoformat(self.end.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
+        except ValueError, AttributeError:
             return None
 
 

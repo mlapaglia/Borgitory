@@ -516,7 +516,7 @@ def get_browser_timezone_offset(request: Request) -> Optional[int]:
     if tz_cookie:
         try:
             return int(tz_cookie)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
     return None
 
@@ -575,7 +575,7 @@ def get_templates() -> TimezoneAwareJinja2Templates:
 
         try:
             return json.loads(json_str) if json_str else []
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             return []
 
     def to_json_filter(obj: Any) -> str:

@@ -153,7 +153,7 @@ class RetentionFieldHandler:
                     int_value = int(value) if isinstance(value, (str, int)) else None
                     if int_value is not None and int_value > 0:
                         args.extend([RETENTION_FIELD_MAPPING[field], str(int_value)])
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     continue
 
         return args
@@ -283,7 +283,7 @@ class RetentionFieldHandler:
             if value is not None:
                 try:
                     result[key] = int(value) if value else None
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     result[key] = None
             else:
                 result[key] = None

@@ -1,6 +1,6 @@
 repos:
 - repo: https://github.com/gitleaks/gitleaks
-  rev: 51ca0f89b915509f07f956144ce2c64994b80947 # v8.16.3
+  rev: 6eaad039603a4de39fddd1cf5f727391efe9974e # v8.30.0
   hooks:
   - id: gitleaks
 - repo: https://github.com/jumanjihouse/pre-commit-hooks
@@ -8,13 +8,25 @@ repos:
   hooks:
   - id: shellcheck
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: f71fa2c1f9cf5cb705f73dffe4b21f7c61470ba9 # v4.4.0
+  rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: 0470f7c8a653e950f7cc5a653204ceb3fde4c02a # v0.15.0
+  rev: b969e2851312ca2b24bbec879ba4954341d1bd12 # v0.15.5
   hooks:
   - id: ruff
     args: [--fix]
   - id: ruff-format
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: a66e98df7b4aeeb3724184b332785976d062b92e # v1.19.1
+  hooks:
+  - id: mypy
+    files: '(src)/.*\.py$'
+    additional_dependencies: [types-requests, pydantic, sqlalchemy, aiofiles, aiohttp, alembic, apscheduler, bcrypt, cron_descriptor, cryptography, docker, sqlalchemy, sse_starlette, fastapi, jinja2]
+    args: [--config-file=./pyproject.toml]
+- repo: https://github.com/djlint/djLint
+  rev: 9112cb64851c95a7802358af285d21ad8b7f6437 # v1.36.4
+  hooks:
+  - id: djlint-reformat-django
+  - id: djlint-django

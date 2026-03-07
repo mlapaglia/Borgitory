@@ -400,7 +400,7 @@ class ScheduleService:
 
             try:
                 repository_id = int(repository_id)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return False, {}, "Invalid repository ID"
 
             # Validate name
@@ -414,7 +414,7 @@ class ScheduleService:
                     return None
                 try:
                     return int(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     return None
 
             # Process hooks and patterns (they come as JSON strings)

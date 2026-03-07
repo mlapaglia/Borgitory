@@ -268,7 +268,9 @@ class SMBStorage(CloudStorage):
                 )
             return status == "success"
         except Exception as e:
-            logger.error(f"SMB connection test failed with exception: {e}", exc_info=True)
+            logger.error(
+                f"SMB connection test failed with exception: {e}", exc_info=True
+            )
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
@@ -710,7 +712,6 @@ class SMBStorage(CloudStorage):
                     os.unlink(temp_file)
                 except OSError:
                     pass
-
 
 
 @register_provider(
