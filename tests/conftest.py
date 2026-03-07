@@ -2,9 +2,8 @@
 Shared test configuration and fixtures available to all test types.
 """
 
-import asyncio
 import os
-from typing import Any, AsyncGenerator, Dict, Generator
+from typing import AsyncGenerator, Dict, Generator
 from unittest.mock import Mock
 
 import pytest
@@ -45,17 +44,6 @@ from tests.fixtures.registry_fixtures import (  # noqa: F401
     pushover_only_notification_registry,
     discord_only_notification_registry,
 )
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[Any, None, None]:
-    """Create an instance of the default event loop for test session."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture

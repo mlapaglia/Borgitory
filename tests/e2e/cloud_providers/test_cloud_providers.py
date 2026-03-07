@@ -53,7 +53,6 @@ def test_provider_fields_load_on_select(
     expect(provider_select).to_be_visible(timeout=10000)
 
     provider_select.select_option(provider_value)
-    page.wait_for_load_state("networkidle")
     wait_for_htmx(page)
 
     fields_container = page.locator(fields_id)
@@ -92,12 +91,10 @@ def test_switching_providers_replaces_fields(authenticated_page: Page) -> None:
     expect(provider_select).to_be_visible(timeout=10000)
 
     provider_select.select_option("s3")
-    page.wait_for_load_state("networkidle")
     wait_for_htmx(page)
     expect(page.locator("#s3-fields")).to_be_visible(timeout=10000)
 
     provider_select.select_option("sftp")
-    page.wait_for_load_state("networkidle")
     wait_for_htmx(page)
     expect(page.locator("#sftp-fields")).to_be_visible(timeout=10000)
 
@@ -113,7 +110,6 @@ def test_provider_fields_include_submit_button(authenticated_page: Page) -> None
     expect(provider_select).to_be_visible(timeout=10000)
 
     provider_select.select_option("s3")
-    page.wait_for_load_state("networkidle")
     wait_for_htmx(page)
 
     submit_btn = page.locator("#submit-button")

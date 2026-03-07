@@ -59,7 +59,6 @@ def test_initial_page_loads_repositories(authenticated_page: Page) -> None:
     main_content = page.locator("#main-content")
     expect(main_content).not_to_be_empty()
 
-    # The repositories nav button should have the 'active' class
     repo_nav = page.locator("#nav-repositories")
     expect(repo_nav).to_be_visible()
 
