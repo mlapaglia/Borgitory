@@ -10,9 +10,7 @@
                   placeholder="{% if config %}Leave empty to keep current token{% else %}{'access_token':'...','token_type':'bearer','expiry':'...'}{% endif %}">{% if config and not config.token %}{% endif %}</textarea>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {% if config %}
-            Leave empty to keep the current token. Otherwise get a new token via <code>rclone config</code> → pcloud → OAuth, then <code>rclone config show remote</code>.
-            {% else %}
-            Get the token by running <code>rclone config</code>, choose pcloud, complete OAuth in the browser, then run <code>rclone config show remote</code> and copy the token value.
+            Leave empty to keep the current token.
             {% endif %}
         </p>
     </div>
@@ -35,7 +33,7 @@
                placeholder="d0"
                class="input-modern mt-1">
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Leave blank for account root. Use <code>rclone lsf --dirs-only -Fip --csv remote:</code> to find folder IDs.
+            Leave blank for account root.
         </p>
     </div>
     <div>
