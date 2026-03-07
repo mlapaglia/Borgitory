@@ -2,13 +2,19 @@
 """
 Simple script to run ruff linting, formatting, mypy type checking, and djLint HTML formatting.
 Usage:
-  python lint.py check    - Check for linting issues
-  python lint.py fix      - Fix auto-fixable linting issues
-  python lint.py format   - Format code with ruff
-  python lint.py mypy     - Run mypy type checking
-  python lint.py html     - Lint HTML templates with djLint
-  python lint.py html-fix - Format HTML templates with djLint
-  python lint.py all      - Run all checks and formatting
+  python lint.py <command> [files...]
+
+Commands:
+  check    - Check for linting issues
+  fix      - Fix auto-fixable linting issues
+  format   - Format code with ruff
+  mypy     - Run mypy type checking
+  html     - Lint HTML templates with djLint
+  html-fix - Format HTML templates with djLint
+  all      - Run all checks and formatting
+
+If files are provided, only those files are acted on.
+If no files are provided, runs on the entire project.
 """
 
 from typing import List, Optional, Dict
@@ -18,7 +24,6 @@ import os
 
 
 def run_command(cmd: List[str], env: Optional[Dict[str, str]] = None) -> int:
-    """Run a command and return the exit code."""
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, env=env)
     return result.returncode
@@ -30,44 +35,52 @@ def main() -> None:
         sys.exit(1)
 
     command = sys.argv[1]
+    files = sys.argv[2:]
+    py_files = [f for f in files if f.endswith(".py")]
+    html_files = [f for f in files if f.endswith((".html", ".htm"))]
 
     if command == "check":
-        exit_code = run_command(["ruff", "check"])
+        exit_code = run_command(["ruff", "check"] + py_files)
     elif command == "fix":
-        exit_code = run_command(["ruff", "check", "--fix"])
+        exit_code = run_command(["ruff", "check", "--fix"] + py_files)
     elif command == "format":
-        exit_code = run_command(["ruff", "format"])
+        exit_code = run_command(["ruff", "format"] + py_files)
     elif command == "mypy":
         python_exe = sys.executable
-        exit_code = run_command([python_exe, "-m", "mypy", "src/borgitory"])
+        targets = py_files if py_files else ["src/borgitory"]
+        exit_code = run_command([python_exe, "-m", "mypy"] + targets)
     elif command == "html":
-        exit_code = run_command(["djlint", "src/borgitory/templates"])
+        targets = html_files if html_files else ["src/borgitory/templates"]
+        exit_code = run_command(["djlint"] + targets)
     elif command == "html-fix":
-        exit_code = run_command(["djlint", "src/borgitory/templates", "--reformat"])
+        targets = html_files if html_files else ["src/borgitory/templates"]
+        exit_code = run_command(["djlint"] + targets + ["--reformat"])
     elif command == "all":
-        # Run all checks and formatting
-        print("Running ruff check...")
-        exit_code = run_command(["ruff", "check", "--fix"])
-        if exit_code == 0:
+        exit_code = 0
+
+        if not files or py_files:
+            print("Running ruff check...")
+            exit_code = run_command(["ruff", "check", "--fix"] + py_files)
+
+        if exit_code == 0 and (not files or py_files):
             print("Running ruff format...")
-            exit_code = run_command(["ruff", "format"])
-        if exit_code == 0:
+            exit_code = run_command(["ruff", "format"] + py_files)
+
+        if exit_code == 0 and (not files or py_files):
             print("Running mypy type checking...")
             env = os.environ.copy()
             env["PYTHONPATH"] = "src"
             python_exe = sys.executable
+            targets = py_files if py_files else ["src/borgitory"]
             exit_code = run_command(
-                [
-                    python_exe,
-                    "-m",
-                    "mypy",
-                    "src/borgitory",
-                ],
+                [python_exe, "-m", "mypy"] + targets,
                 env=env,
             )
-        if exit_code == 0:
+
+        if exit_code == 0 and (not files or html_files):
             print("Running djLint HTML formatting...")
-            exit_code = run_command(["djlint", "src/borgitory/templates", "--reformat"])
+            targets = html_files if html_files else ["src/borgitory/templates"]
+            exit_code = run_command(["djlint"] + targets + ["--reformat"])
     else:
         print(f"Unknown command: {command}")
         print(__doc__)
