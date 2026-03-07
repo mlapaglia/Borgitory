@@ -19,14 +19,12 @@ class AppRunner:
         db_filename: Optional[str] = None,
     ):
         self.data_dir = data_dir
-        # Use a different port for each test to avoid conflicts
         if port is None:
             import random
 
             port = random.randint(8001, 8999)
         self.port = port
 
-        # Use unique database filename if not provided
         if db_filename is None:
             import uuid
 
@@ -36,9 +34,13 @@ class AppRunner:
         self.process: Optional[subprocess.Popen[bytes]] = None
         self.base_url = f"http://localhost:{port}"
 
+        self._stdout_path = os.path.join(data_dir, "stdout.log")
+        self._stderr_path = os.path.join(data_dir, "stderr.log")
+        self._stdout_file: Optional[object] = None
+        self._stderr_file: Optional[object] = None
+
     def start(self, timeout: int = 30) -> bool:
         """Start the application and wait for it to be ready."""
-        # Set up environment
         env = os.environ.copy()
 
         secret_key = f"test-secret-key-{uuid.uuid4().hex}"
@@ -50,24 +52,25 @@ class AppRunner:
             }
         )
 
-        # Start the application using the CLI
+        # Write to log files instead of pipes to avoid buffer deadlocks
+        # on Windows where pipe buffers are small (~4-8 KB).
+        self._stdout_file = open(self._stdout_path, "w")
+        self._stderr_file = open(self._stderr_path, "w")
+
         self.process = subprocess.Popen(
             ["borgitory", "serve", "--host", "0.0.0.0", "--port", str(self.port)],
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=self._stdout_file,
+            stderr=self._stderr_file,
             cwd=os.getcwd(),
         )
 
-        # Wait for app to be ready
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self.is_ready():
                 return True
 
-            # Check if process crashed
             if self.process.poll() is not None:
-                # Process died, get logs and fail immediately
                 stdout, stderr = self.get_logs()
                 print("Process crashed during startup!")
                 print(f"Exit code: {self.process.poll()}")
@@ -77,7 +80,6 @@ class AppRunner:
 
             time.sleep(0.5)
 
-        # If we get here, startup timed out
         print(f"App startup timed out after {timeout} seconds")
         if self.process and self.process.poll() is None:
             print("Process is still running but not responding to health checks")
@@ -90,13 +92,8 @@ class AppRunner:
     def is_ready(self) -> bool:
         """Check if the application is ready to receive requests."""
         try:
-            # Try to connect to the debug endpoint (doesn't require auth)
             response = requests.get(f"{self.base_url}/api/debug/info", timeout=2)
-            return response.status_code in [
-                200,
-                401,
-                403,
-            ]  # Any response means app is running
+            return response.status_code in [200, 401, 403]
         except (requests.ConnectionError, requests.Timeout):
             return False
 
@@ -104,12 +101,10 @@ class AppRunner:
         """Stop the application process."""
         if self.process:
             try:
-                # Try graceful shutdown first
                 self.process.terminate()
                 try:
                     self.process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    # Force kill if graceful shutdown fails
                     self.process.kill()
                     self.process.wait()
             except Exception:
@@ -117,27 +112,35 @@ class AppRunner:
             finally:
                 self.process = None
 
-    def get_logs(self) -> tuple[str, str]:
-        """Get stdout and stderr logs from the process."""
-        if self.process:
+        for f in (self._stdout_file, self._stderr_file):
             try:
-                # If process has finished, get all logs
-                if self.process.poll() is not None:
-                    stdout, stderr = self.process.communicate()
-                    return stdout.decode(), stderr.decode()
+                if f and not getattr(f, "closed", True):
+                    f.close()  # type: ignore[union-attr]
+            except Exception:
+                pass
+        self._stdout_file = None
+        self._stderr_file = None
+
+    def get_logs(self) -> tuple[str, str]:
+        """Read logs from the on-disk files (safe to call while process is running)."""
+        stdout = ""
+        stderr = ""
+        for path, name in [(self._stdout_path, "stdout"), (self._stderr_path, "stderr")]:
+            try:
+                with open(path, "r") as f:
+                    content = f.read()
+                if name == "stdout":
+                    stdout = content
                 else:
-                    # Process is still running, terminate it to get logs
-                    self.process.terminate()
-                    try:
-                        stdout, stderr = self.process.communicate(timeout=5)
-                        return stdout.decode(), stderr.decode()
-                    except subprocess.TimeoutExpired:
-                        self.process.kill()
-                        stdout, stderr = self.process.communicate()
-                        return stdout.decode(), stderr.decode()
+                    stderr = content
+            except FileNotFoundError:
+                pass
             except Exception as e:
-                return f"Error reading logs: {e}", ""
-        return "", ""
+                if name == "stdout":
+                    stdout = f"Error reading {name}: {e}"
+                else:
+                    stderr = f"Error reading {name}: {e}"
+        return stdout, stderr
 
 
 @pytest.fixture

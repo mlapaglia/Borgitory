@@ -51,6 +51,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
+    "pytest-playwright>=0.7.0",
     "httpx>=0.28.1",
     "mypy>=1.19.1",
     "sqlalchemy[mypy]>=2.0.46",
@@ -151,6 +152,11 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
+# By default: skip e2e tests and don't load the playwright plugin (it
+# conflicts with pytest-asyncio's event loop).
+# Run E2E separately: pytest tests/e2e/ -o "addopts=" --browser chromium
+addopts = "-p no:playwright -m 'not e2e'"
+
 # asyncio plugin configuration
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -158,6 +164,7 @@ asyncio_default_fixture_loop_scope = "function"
 # Custom markers
 markers = [
     "integration: marks tests as integration tests (may require external dependencies)",
+    "e2e: marks tests as end-to-end browser tests (requires playwright)",
 ]
 
 [tool.coverage.run]
