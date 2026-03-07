@@ -6,6 +6,7 @@ from business logic and easy testability.
 """
 
 import asyncio
+import logging
 import os
 import re
 import subprocess
@@ -22,6 +23,8 @@ from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
+
+logger = logging.getLogger(__name__)
 
 
 class SFTPStorageConfig(CloudStorageConfig):
@@ -213,8 +216,15 @@ class SFTPStorage(CloudStorage):
                 password=self._config.password,
                 private_key=self._config.private_key,
             )
-            return result.get("status") == "success"
-        except Exception:
+            status = result.get("status")
+            if status != "success":
+                logger.warning(
+                    "SFTP connection test failed with status '%s'.",
+                    status,
+                )
+            return status == "success"
+        except Exception as e:
+            logger.error(f"SFTP connection test failed with exception: {e}", exc_info=True)
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
