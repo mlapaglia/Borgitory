@@ -7,7 +7,7 @@ Uses rclone's pcloud backend (OAuth token + hostname). Paths are remote:path
 
 import asyncio
 import json
-from typing import AsyncGenerator, Callable, Dict, List, Optional, Union, cast
+from typing import AsyncGenerator, Callable, Dict, List, Optional, cast
 from pydantic import Field, field_validator
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
@@ -100,7 +100,6 @@ class PcloudStorage(CloudStorage):
             )
 
         try:
-            final_status = None
             async for progress in self.sync_repository_to_pcloud(
                 repository_path=repository_path,
                 token=self._config.token,
@@ -108,9 +107,11 @@ class PcloudStorage(CloudStorage):
                 root_folder_id=self._config.root_folder_id,
                 path_prefix=remote_path,
             ):
-                if progress.get("type") == "completed":
-                    final_status = progress.get("status")
-                elif progress_callback and progress.get("type") == "log":
+                if not progress_callback:
+                    continue
+
+                progress_type = progress.get("type")
+                if progress_type == "progress":
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
@@ -118,9 +119,34 @@ class PcloudStorage(CloudStorage):
                             progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
-
-            if final_status == "failed":
-                raise Exception("pCloud sync failed with non-zero exit code")
+                elif progress_type == "log":
+                    progress_callback(
+                        SyncEvent(
+                            type=SyncEventType.LOG,
+                            message=str(progress.get("message", "")),
+                        )
+                    )
+                elif progress_type == "error":
+                    error_msg = str(progress.get("message", "Unknown error"))
+                    progress_callback(
+                        SyncEvent(
+                            type=SyncEventType.ERROR,
+                            message=error_msg,
+                            error=error_msg,
+                        )
+                    )
+                    raise Exception(error_msg)
+                elif progress_type == "completed":
+                    if progress.get("status") != "success":
+                        error_msg = f"pCloud sync failed with return code {progress.get('return_code')}"
+                        progress_callback(
+                            SyncEvent(
+                                type=SyncEventType.ERROR,
+                                message=error_msg,
+                                error=error_msg,
+                            )
+                        )
+                        raise Exception(error_msg)
 
             if progress_callback:
                 progress_callback(
@@ -150,10 +176,14 @@ class PcloudStorage(CloudStorage):
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
-        token = self._config.token
-        if len(token) > 12:
-            masked = f"{token[:4]}***{token[-4:]}"
-        else:
+        try:
+            token_data = json.loads(self._config.token)
+            masked = {
+                "token_type": token_data.get("token_type", "unknown"),
+                "expiry": token_data.get("expiry", "unknown"),
+                "access_token": "***",
+            }
+        except (json.JSONDecodeError, TypeError):
             masked = "***"
         return ConnectionInfo(
             provider="pcloud",
@@ -316,41 +346,6 @@ class PcloudStorage(CloudStorage):
                 "message": str(e),
             }
 
-    def parse_rclone_progress(
-        self, line: str
-    ) -> Optional[Dict[str, Union[str, int, float]]]:
-        if "Transferred:" in line:
-            try:
-                parts = line.split()
-                if len(parts) >= 6:
-                    transferred = parts[1]
-                    total = parts[4].rstrip(",")
-                    percentage = parts[5].rstrip("%,")
-                    speed = parts[6] if len(parts) > 6 else "0"
-                    return {
-                        "transferred": transferred,
-                        "total": total,
-                        "percentage": float(percentage)
-                        if percentage.replace(".", "").isdigit()
-                        else 0,
-                        "speed": speed,
-                    }
-            except (IndexError, ValueError):
-                pass
-        if "ETA" in line:
-            try:
-                eta_part = line.split("ETA")[-1].strip()
-                return {"eta": eta_part}
-            except (ValueError, KeyError):
-                pass
-        return None
-
-    async def _merge_async_generators(
-        self, *async_generators: AsyncGenerator[ProgressData, None]
-    ) -> AsyncGenerator[ProgressData, None]:
-        for gen in async_generators:
-            async for item in gen:
-                yield item
 
 
 @register_provider(

@@ -1,3 +1,5 @@
+import importlib
+
 import pytest
 from unittest.mock import AsyncMock
 
@@ -8,6 +10,7 @@ from borgitory.services.cloud_providers.storage.pcloud_storage import (
 )
 from borgitory.services.cloud_providers.types import SyncEvent
 from borgitory.services.cloud_providers.registry import (
+    clear_registry,
     get_supported_providers,
     get_provider_info,
 )
@@ -217,15 +220,18 @@ class TestPcloudStorage:
 class TestPcloudRegistry:
     """Test pCloud provider registration"""
 
-    def test_pcloud_in_supported_providers(self) -> None:
-        from borgitory.services.cloud_providers.storage import PcloudProvider  # noqa: F401
+    @pytest.fixture(autouse=True)
+    def fresh_registry(self) -> None:
+        clear_registry()
+        import borgitory.services.cloud_providers.storage.pcloud_storage
 
+        importlib.reload(borgitory.services.cloud_providers.storage.pcloud_storage)
+
+    def test_pcloud_in_supported_providers(self) -> None:
         providers = get_supported_providers()
         assert "pcloud" in providers
 
     def test_pcloud_provider_info(self) -> None:
-        from borgitory.services.cloud_providers.storage import PcloudProvider  # noqa: F401
-
         info = get_provider_info("pcloud")
         assert info is not None
         assert info.name == "pcloud"

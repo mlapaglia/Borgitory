@@ -5,10 +5,12 @@ This module defines the abstract interface that all cloud storage providers
 must implement, ensuring consistency across different providers.
 """
 
+import asyncio
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Optional
+from typing import AsyncGenerator, Callable, Dict, Optional, Union
 from pydantic import BaseModel, ConfigDict
 
+from borgitory.services.rclone_types import ProgressData
 from ..types import SyncEvent, ConnectionInfo
 
 
@@ -40,58 +42,78 @@ class CloudStorage(ABC):
         remote_path: str,
         progress_callback: Optional[Callable[[SyncEvent], None]] = None,
     ) -> None:
-        """
-        Upload a repository to cloud storage.
-
-        Args:
-            repository_path: Local path to the repository
-            remote_path: Remote path where repository should be stored
-            progress_callback: Optional callback for progress events
-
-        Raises:
-            Exception: If upload fails
-        """
         pass
 
     @abstractmethod
     async def test_connection(self) -> bool:
-        """
-        Test connection to the cloud storage.
-
-        Returns:
-            True if connection successful, False otherwise
-        """
         pass
 
     @abstractmethod
     def get_connection_info(self) -> ConnectionInfo:
-        """
-        Get sanitized connection information for logging/display.
-
-        Returns:
-            ConnectionInfo with non-sensitive details
-        """
         pass
 
     @abstractmethod
     def get_sensitive_fields(self) -> list[str]:
-        """
-        Get list of field names that contain sensitive data.
-
-        Returns:
-            List of sensitive field names for encryption
-        """
         pass
 
     @abstractmethod
     def get_display_details(self, config_dict: Dict[str, object]) -> Dict[str, object]:
-        """
-        Get provider-specific display details for the UI.
-
-        Args:
-            config_dict: Provider configuration as dictionary
-
-        Returns:
-            Dictionary with 'provider_name' and 'provider_details' (HTML string)
-        """
         pass
+
+    async def _merge_async_generators(
+        self, *async_generators: AsyncGenerator[ProgressData, None]
+    ) -> AsyncGenerator[ProgressData, None]:
+        """Concurrently merge multiple async generators using an asyncio.Queue."""
+        queue: asyncio.Queue[tuple[bool, ProgressData | None]] = asyncio.Queue()
+
+        async def producer(gen: AsyncGenerator[ProgressData, None]) -> None:
+            async for item in gen:
+                await queue.put((False, item))
+            await queue.put((True, None))
+
+        tasks = [asyncio.create_task(producer(g)) for g in async_generators]
+        finished = 0
+        try:
+            while finished < len(tasks):
+                is_sentinel, item = await queue.get()
+                if is_sentinel:
+                    finished += 1
+                else:
+                    yield item  # type: ignore[misc]
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    def parse_rclone_progress(
+        self, line: str
+    ) -> Optional[Dict[str, Union[str, int, float]]]:
+        if "Transferred:" in line:
+            try:
+                parts = line.split()
+                if len(parts) >= 6:
+                    transferred = parts[1]
+                    total = parts[4].rstrip(",")
+                    percentage = parts[5].rstrip("%,")
+                    speed = parts[6] if len(parts) > 6 else "0"
+
+                    return {
+                        "transferred": transferred,
+                        "total": total,
+                        "percentage": float(percentage)
+                        if percentage.replace(".", "").isdigit()
+                        else 0,
+                        "speed": speed,
+                    }
+            except (IndexError, ValueError):
+                pass
+
+        if "ETA" in line:
+            try:
+                eta_part = line.split("ETA")[-1].strip()
+                return {"eta": eta_part}
+            except (ValueError, KeyError):
+                pass
+
+        return None
