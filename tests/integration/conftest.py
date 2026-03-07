@@ -11,6 +11,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, Engine
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 
 from borgitory.api.auth import get_current_user
@@ -84,7 +85,7 @@ def test_env_vars(temp_data_dir: str) -> Generator[dict[str, str], None, None]:
 
 
 @pytest_asyncio.fixture
-async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+async def async_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client with proper resource management and authentication."""
     test_user = User()
     test_user.username = "test_user"
@@ -109,7 +110,7 @@ async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
 
 @pytest_asyncio.fixture
 async def async_client_without_auth(
-    test_db: Session,
+    test_db: AsyncSession,
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication."""
     test_user = User()
@@ -127,7 +128,7 @@ async def async_client_without_auth(
 
 @pytest_asyncio.fixture
 async def async_client_without_auth_or_user(
-    test_db: Session,
+    test_db: AsyncSession,
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication and without creating a user."""
     async with AsyncClient(

@@ -244,6 +244,12 @@ module = [
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_decorators = false
+disallow_any_unimported = false
+warn_return_any = false
+
 [tool.djlint]
 profile = "jinja"
 indent = 4
