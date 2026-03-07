@@ -10,13 +10,11 @@ from typing import Any, AsyncGenerator, Dict, Generator, Optional
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, Engine
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker, Session
 
 from borgitory.api.auth import get_current_user
 from borgitory.main import app
-from borgitory.models.database import Base, CloudSyncConfig, User
+from borgitory.models.database import CloudSyncConfig, User
 
 
 @pytest.fixture
@@ -37,24 +35,6 @@ def temp_db_path(temp_data_dir: str) -> Generator[str, None, None]:
     db_filename = f"test_borgitory_{uuid.uuid4().hex}.db"
     db_path = os.path.join(temp_data_dir, db_filename)
     yield db_path
-
-
-@pytest.fixture
-def test_db_engine(temp_db_path: str) -> Generator[Engine, None, None]:
-    """Create a test database engine."""
-    engine = create_engine(f"sqlite:///{temp_db_path}", echo=False)
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture
-def test_db_session(test_db_engine: Engine) -> Generator[Session, None, None]:
-    """Create a test database session."""
-    Base.metadata.create_all(bind=test_db_engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 @pytest.fixture
