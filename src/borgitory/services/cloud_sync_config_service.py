@@ -200,9 +200,8 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
             for key in list(config_update.provider_config):
                 val = config_update.provider_config.get(key)
                 if (
-                    (val is None or (isinstance(val, str) and not val.strip()))
-                    and key in decrypted_existing
-                ):
+                    val is None or (isinstance(val, str) and not val.strip())
+                ) and key in decrypted_existing:
                     config_update.provider_config[key] = decrypted_existing[key]
             try:
                 storage = self._storage_factory.create_storage(

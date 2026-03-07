@@ -12,22 +12,11 @@ repos:
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: b969e2851312ca2b24bbec879ba4954341d1bd12 # v0.15.5
-  hooks:
-  - id: ruff
-    args: [--fix]
-  - id: ruff-format
 - repo: local
   hooks:
-  - id: mypy
-    name: mypy
-    entry: mypy
+  - id: lint
+    name: lint
+    entry: python lint.py all
     language: system
-    files: '(src)/.*\.py$'
+    types: [python]
     pass_filenames: false
-- repo: https://github.com/djlint/djLint
-  rev: 9112cb64851c95a7802358af285d21ad8b7f6437 # v1.36.4
-  hooks:
-  - id: djlint-reformat-django
-  - id: djlint-django

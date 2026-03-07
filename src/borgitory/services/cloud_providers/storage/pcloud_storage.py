@@ -22,7 +22,9 @@ from ..registry import register_provider, RcloneMethodMapping
 class PcloudStorageConfig(CloudStorageConfig):
     """Configuration for pCloud storage"""
 
-    token: str = Field(..., min_length=1, description="OAuth token JSON blob from rclone config")
+    token: str = Field(
+        ..., min_length=1, description="OAuth token JSON blob from rclone config"
+    )
     hostname: str = Field(
         default="api.pcloud.com",
         min_length=1,
@@ -184,7 +186,7 @@ class PcloudStorage(CloudStorage):
                 "expiry": token_data.get("expiry", "unknown"),
                 "access_token": "***",
             }
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             pass
         return ConnectionInfo(
             provider="pcloud",
@@ -203,7 +205,10 @@ class PcloudStorage(CloudStorage):
         root_folder_id = config_dict.get("root_folder_id") or "default"
         return {
             "provider_name": "pCloud",
-            "provider_details": {"hostname": hostname, "root_folder_id": root_folder_id},
+            "provider_details": {
+                "hostname": hostname,
+                "root_folder_id": root_folder_id,
+            },
         }
 
     @classmethod
@@ -249,9 +254,7 @@ class PcloudStorage(CloudStorage):
             "1s",
             "--verbose",
         ]
-        command.extend(
-            self._build_pcloud_flags(token, hostname, root_folder_id)
-        )
+        command.extend(self._build_pcloud_flags(token, hostname, root_folder_id))
 
         try:
             process = await self._command_executor.create_subprocess(
@@ -260,9 +263,7 @@ class PcloudStorage(CloudStorage):
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            safe_cmd = " ".join(
-                c if c != token else "***" for c in command
-            )
+            safe_cmd = " ".join(c if c != token else "***" for c in command)
             yield cast(
                 ProgressData,
                 {"type": "started", "command": safe_cmd, "pid": process.pid},
@@ -280,9 +281,7 @@ class PcloudStorage(CloudStorage):
                     decoded_line = line.decode("utf-8").strip()
                     progress_data = self.parse_rclone_progress(decoded_line)
                     if progress_data:
-                        yield cast(
-                            ProgressData, {"type": "progress", **progress_data}
-                        )
+                        yield cast(ProgressData, {"type": "progress", **progress_data})
                     else:
                         yield cast(
                             ProgressData,
@@ -319,9 +318,7 @@ class PcloudStorage(CloudStorage):
         root_folder_id: Optional[str] = None,
     ) -> ConnectionTestResult:
         command = ["rclone", "lsd", ":pcloud:", "--max-depth", "1", "--verbose"]
-        command.extend(
-            self._build_pcloud_flags(token, hostname, root_folder_id)
-        )
+        command.extend(self._build_pcloud_flags(token, hostname, root_folder_id))
 
         try:
             result = await self._command_executor.execute_command(
@@ -346,7 +343,6 @@ class PcloudStorage(CloudStorage):
                 "status": "error",
                 "message": str(e),
             }
-
 
 
 @register_provider(

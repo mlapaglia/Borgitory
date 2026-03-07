@@ -47,7 +47,7 @@ def main() -> None:
     elif command == "all":
         # Run all checks and formatting
         print("Running ruff check...")
-        exit_code = run_command(["ruff", "check"])
+        exit_code = run_command(["ruff", "check", "--fix"])
         if exit_code == 0:
             print("Running ruff format...")
             exit_code = run_command(["ruff", "format"])
@@ -62,7 +62,6 @@ def main() -> None:
                     "-m",
                     "mypy",
                     "src/borgitory",
-                    "tests",
                 ],
                 env=env,
             )

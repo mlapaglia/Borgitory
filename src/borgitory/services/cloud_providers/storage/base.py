@@ -106,14 +106,14 @@ class CloudStorage(ABC):
                         else 0,
                         "speed": speed,
                     }
-            except (IndexError, ValueError):
+            except IndexError, ValueError:
                 pass
 
         if "ETA" in line:
             try:
                 eta_part = line.split("ETA")[-1].strip()
                 return {"eta": eta_part}
-            except (ValueError, KeyError):
+            except ValueError, KeyError:
                 pass
 
         return None

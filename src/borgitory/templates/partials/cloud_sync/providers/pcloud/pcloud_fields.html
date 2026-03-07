@@ -9,9 +9,7 @@
                   class="input-modern mt-1"
                   placeholder="{% if config %}Leave empty to keep current token{% else %}{'access_token':'...','token_type':'bearer','expiry':'...'}{% endif %}">{% if config and not config.token %}{% endif %}</textarea>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {% if config %}
-            Leave empty to keep the current token.
-            {% endif %}
+            {% if config %}Leave empty to keep the current token.{% endif %}
         </p>
     </div>
     <div>
@@ -19,8 +17,14 @@
             Hostname
         </label>
         <select name="provider_config[hostname]" class="select-modern mt-1">
-            <option value="api.pcloud.com" {% if config and (config.hostname or 'api.pcloud.com') == 'api.pcloud.com' %}selected{% endif %}>api.pcloud.com (US)</option>
-            <option value="eapi.pcloud.com" {% if config and config.hostname == 'eapi.pcloud.com' %}selected{% endif %}>eapi.pcloud.com (EU)</option>
+            <option value="api.pcloud.com"
+                    {% if config and (config.hostname or 'api.pcloud.com') == 'api.pcloud.com' %}selected{% endif %}>
+                api.pcloud.com (US)
+            </option>
+            <option value="eapi.pcloud.com"
+                    {% if config and config.hostname == 'eapi.pcloud.com' %}selected{% endif %}>
+                eapi.pcloud.com (EU)
+            </option>
         </select>
     </div>
     <div>
