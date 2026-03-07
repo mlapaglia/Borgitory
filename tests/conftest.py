@@ -3,7 +3,7 @@ Shared test configuration and fixtures available to all test types.
 """
 
 import os
-from typing import AsyncGenerator, Dict, Generator
+from typing import AsyncGenerator, Dict
 from unittest.mock import Mock
 
 import pytest
