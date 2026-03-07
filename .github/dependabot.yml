@@ -14,6 +14,10 @@ updates:
       prefix: "deps"
       prefix-development: "deps-dev"
       include: "scope"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     groups:
       fastapi-ecosystem:
         patterns:
@@ -44,6 +48,10 @@ updates:
     open-pull-requests-limit: 5
     reviewers:
       - "@me"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     commit-message:
       prefix: "docker"
       include: "scope"
@@ -58,6 +66,14 @@ updates:
     open-pull-requests-limit: 5
     reviewers:
       - "@me"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
     commit-message:
       prefix: "ci"
       include: "scope"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

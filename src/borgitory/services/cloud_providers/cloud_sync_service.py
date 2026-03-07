@@ -408,9 +408,6 @@ class CloudSyncService:
                 encrypted_config, sensitive_fields
             )
 
-            if db_config.path_prefix:
-                decrypted_config["path_prefix"] = db_config.path_prefix
-
             if output_callback:
                 output_callback(
                     f"Syncing to {db_config.name} ({db_config.provider.upper()})"

@@ -51,7 +51,7 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
 
 
 def _get_provider_template(provider: str) -> Optional[str]:
-    """Get the appropriate template path for a provider and mode"""
+    """Get the appropriate template path for a provider"""
     if not provider:
         return None
 
@@ -242,22 +242,20 @@ async def create_cloud_sync_config(
             request,
             "partials/cloud_sync/create_error.html",
             {"error_message": error_msg},
-            status_code=422,
         )
     except HTTPException as e:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/create_error.html",
             {"error_message": str(e.detail)},
-            status_code=e.status_code,
         )
     except Exception as e:
         error_msg = f"Failed to create cloud sync configuration: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/create_error.html",
             {"error_message": error_msg},
-            status_code=500,
         )
 
 
@@ -394,21 +392,29 @@ async def update_cloud_sync_config(
         response.headers["HX-Trigger"] = "cloudSyncUpdate"
         return response
 
+    except ValidationError as e:
+        # Use sanitized validation errors that exclude the original input values
+        error_details = e.errors(include_input=False)
+        error_msg = "Validation error while updating cloud sync configuration."
+        return templates.TemplateResponse(
+            request,
+            "partials/cloud_sync/update_error.html",
+            {"error_message": error_msg, "error_details": error_details},
+        )
     except HTTPException as e:
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/update_error.html",
             {"error_message": str(e.detail)},
-            status_code=e.status_code,
         )
     except Exception as e:
         error_msg = f"Failed to update cloud sync configuration: {str(e)}"
+        logger.error(error_msg, exc_info=True)
 
         return templates.TemplateResponse(
             request,
             "partials/cloud_sync/update_error.html",
             {"error_message": error_msg},
-            status_code=500,
         )
 
 

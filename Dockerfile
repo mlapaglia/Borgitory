@@ -2,7 +2,7 @@ ARG BORGBACKUP_VERSION=1.4.0-5
 ARG RCLONE_VERSION=1.60.1+dfsg-4
 ARG FUSE3_VERSION=3.17.2-3
 ARG PYFUSE3_VERSION=3.4.0-3+b3
-FROM python:3.14.3-slim-trixie AS tailwind-builder
+FROM python:3.14.3-slim-trixie@sha256:6a27522252aef8432841f224d9baaa6e9fce07b07584154fa0b9a96603af7456 AS tailwind-builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
@@ -18,7 +18,7 @@ RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "x64") && \
       -o src/borgitory/static/css/tailwind.css \
       --minify
 
-FROM python:3.14.3-slim-trixie AS builder
+FROM python:3.14.3-slim-trixie@sha256:6a27522252aef8432841f224d9baaa6e9fce07b07584154fa0b9a96603af7456 AS builder
 
 WORKDIR /app
 
@@ -37,7 +37,7 @@ RUN pip install --upgrade pip && \
 
 COPY src/ ./src/
 
-FROM python:3.14.3-slim-trixie AS test
+FROM python:3.14.3-slim-trixie@sha256:6a27522252aef8432841f224d9baaa6e9fce07b07584154fa0b9a96603af7456 AS test
 
 ARG BORGBACKUP_VERSION
 ARG RCLONE_VERSION
@@ -67,7 +67,7 @@ COPY lint.py ./
 
 CMD ["pytest"]
 
-FROM python:3.14.3-slim-trixie
+FROM python:3.14.3-slim-trixie@sha256:6a27522252aef8432841f224d9baaa6e9fce07b07584154fa0b9a96603af7456
 
 ARG BORGBACKUP_VERSION
 ARG RCLONE_VERSION

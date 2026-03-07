@@ -6,6 +6,7 @@ from business logic and easy testability.
 """
 
 import asyncio
+import logging
 import re
 from enum import Enum
 from typing import AsyncGenerator, Callable, Dict, List, Optional, Union, cast
@@ -19,6 +20,8 @@ from borgitory.utils.datetime_utils import now_utc
 from .base import CloudStorage, CloudStorageConfig
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
+
+logger = logging.getLogger(__name__)
 
 
 class S3Provider(str, Enum):
@@ -227,8 +230,14 @@ class S3Storage(CloudStorage):
                 region=self._config.region,
                 endpoint_url=self._config.endpoint_url,
             )
-            return result.get("status") == "success"
-        except Exception:
+            status = result.get("status")
+            if status != "success":
+                logger.warning(
+                    "S3 connection test returned status '%s'", status
+                )
+            return status == "success"
+        except Exception as e:
+            logger.error(f"S3 connection test failed with exception: {e}", exc_info=True)
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
