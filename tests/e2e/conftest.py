@@ -5,12 +5,19 @@ import shutil
 from typing import Generator
 
 import pytest
-from playwright.sync_api import Page, BrowserContext
+from playwright.sync_api import Page, BrowserContext, expect
 
 from tests.integration.test_app_startup import AppRunner
 
 E2E_USERNAME = "e2e_admin"
 E2E_PASSWORD = "e2e_password_123"
+
+HTMX_BUSY_SELECTOR = ".htmx-request, .htmx-settling, .htmx-swapping, .htmx-added"
+
+
+def wait_for_htmx(page: Page, timeout: int = 10000) -> None:
+    """Wait until HTMX has no in-flight requests or pending swaps."""
+    expect(page.locator(HTMX_BUSY_SELECTOR)).to_have_count(0, timeout=timeout)
 
 
 @pytest.fixture(scope="session")

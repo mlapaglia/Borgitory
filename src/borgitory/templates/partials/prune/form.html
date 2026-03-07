@@ -15,7 +15,7 @@
                class="input-modern mt-1">
     </div>
     {% if config %}
-        {% set retention_config = <djlint.settings.Config object at 0x00000253CF9CAF90> %}
+        {% set retention_config = config %}
     {% endif %}
     {% include "partials/prune/retention_fields.html" %}
     <input type="hidden"
