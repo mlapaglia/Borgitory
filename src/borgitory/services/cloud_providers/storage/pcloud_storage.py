@@ -176,6 +176,7 @@ class PcloudStorage(CloudStorage):
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
+        masked: object = "***"
         try:
             token_data = json.loads(self._config.token)
             masked = {
@@ -184,7 +185,7 @@ class PcloudStorage(CloudStorage):
                 "access_token": "***",
             }
         except (json.JSONDecodeError, TypeError):
-            masked = "***"
+            pass
         return ConnectionInfo(
             provider="pcloud",
             details={

@@ -119,7 +119,7 @@ def _get_provider_display_details(
         storage_class = registry.get_storage_class(provider)
         if storage_class:
             temp_storage = storage_class(None, None, None)
-            return temp_storage.get_display_details(provider_config)
+            return cast(Dict[str, Union[str, Dict[str, Any]]], temp_storage.get_display_details(provider_config))
     except Exception as e:
         logger.warning(f"Error getting display details for provider '{provider}': {e}")
 
