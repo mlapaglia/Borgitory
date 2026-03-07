@@ -269,7 +269,7 @@ async def get_cloud_sync_configs_html(
         for config in configs_raw:
             try:
                 provider_config = json.loads(config.provider_config)
-            except (json.JSONDecodeError, AttributeError):
+            except json.JSONDecodeError, AttributeError:
                 provider_config = {}
 
             display_info = _get_provider_display_details(

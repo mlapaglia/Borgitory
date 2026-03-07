@@ -649,7 +649,7 @@ async def load_archives_with_spinner(
             "partials/archives/loading_with_trigger.html",
             {"repository_id": repo_id},
         )
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return templates.TemplateResponse(
             request, "partials/archives/empty_state.html", {}
         )
@@ -704,7 +704,7 @@ async def get_archives_list(
                                 formatted_time = format_datetime_for_display(dt)
                             else:
                                 formatted_time = archive_time
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             pass
 
                     size_info = ""
@@ -747,7 +747,7 @@ async def get_archives_list(
 
     except HTTPException:
         raise
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return templates.TemplateResponse(
             request, "partials/archives/empty_state.html", {}
         )

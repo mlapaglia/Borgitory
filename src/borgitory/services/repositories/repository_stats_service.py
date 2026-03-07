@@ -489,7 +489,7 @@ class RepositoryStatsService:
                                     ):  # Reasonable extension length
                                         ext_count[ext] = ext_count.get(ext, 0) + 1
                                         ext_size[ext] = ext_size.get(ext, 0) + size
-                            except (ValueError, IndexError):
+                            except ValueError, IndexError:
                                 continue
 
                     # Add to timeline

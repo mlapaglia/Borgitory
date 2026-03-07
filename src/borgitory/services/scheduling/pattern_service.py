@@ -242,7 +242,7 @@ class PatternService:
                         )
                     )
             return patterns
-        except (json.JSONDecodeError, ValueError, TypeError):
+        except json.JSONDecodeError, ValueError, TypeError:
             return []
 
     @staticmethod
@@ -318,5 +318,5 @@ class PatternService:
         try:
             patterns_data = json.loads(patterns_json)
             return len(patterns_data) if isinstance(patterns_data, list) else 0
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             return 0

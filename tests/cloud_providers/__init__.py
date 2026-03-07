@@ -1,1 +1,0 @@
-# Cloud provider tests

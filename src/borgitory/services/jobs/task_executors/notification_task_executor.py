@@ -132,7 +132,7 @@ class NotificationTaskExecutor:
                 if priority_param is not None:
                     try:
                         priority_value = int(str(priority_param))
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         pass
 
                 try:

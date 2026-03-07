@@ -32,7 +32,7 @@ def wsl_available() -> bool:
     try:
         result = subprocess.run(["wsl", "--status"], capture_output=True, timeout=5)
         return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+    except FileNotFoundError, subprocess.TimeoutExpired, Exception:
         return False
 
 

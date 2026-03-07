@@ -20,8 +20,7 @@ import urllib.request
 
 TAILWIND_VERSION = "3.4.17"
 TAILWIND_RELEASE_URL = (
-    f"https://github.com/tailwindlabs/tailwindcss/releases/download"
-    f"/v{TAILWIND_VERSION}"
+    f"https://github.com/tailwindlabs/tailwindcss/releases/download/v{TAILWIND_VERSION}"
 )
 DOWNLOAD_TIMEOUT_SECONDS = 120
 

@@ -121,7 +121,7 @@ class NotificationProviderFactory:
             # Get type hints for additional validation
             try:
                 type_hints = get_type_hints(provider_class.__init__)
-            except (NameError, AttributeError):
+            except NameError, AttributeError:
                 # Some providers might not have complete type hints
                 type_hints = {}
 

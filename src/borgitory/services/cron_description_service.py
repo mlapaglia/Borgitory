@@ -61,5 +61,5 @@ class CronDescriptionService:
             else:
                 return cron_expression
 
-        except (ValueError, KeyError, AttributeError):
+        except ValueError, KeyError, AttributeError:
             return trigger_str
