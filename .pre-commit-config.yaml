@@ -18,13 +18,14 @@ repos:
   - id: ruff
     args: [--fix]
   - id: ruff-format
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: a66e98df7b4aeeb3724184b332785976d062b92e # v1.19.1
+- repo: local
   hooks:
   - id: mypy
+    name: mypy
+    entry: mypy
+    language: system
     files: '(src)/.*\.py$'
-    additional_dependencies: [types-requests, pydantic, sqlalchemy, aiofiles, aiohttp, alembic, apscheduler, bcrypt, cron_descriptor, cryptography, docker, sqlalchemy, sse_starlette, fastapi, jinja2]
-    args: [--config-file=./pyproject.toml]
+    pass_filenames: false
 - repo: https://github.com/djlint/djLint
   rev: 9112cb64851c95a7802358af285d21ad8b7f6437 # v1.36.4
   hooks:
