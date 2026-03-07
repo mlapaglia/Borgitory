@@ -84,8 +84,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -121,8 +121,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -158,8 +158,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -195,8 +195,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -233,8 +233,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -271,8 +271,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -305,8 +305,8 @@ class TestRepositoryManagementAPI:
             return_value={"success": True, "message": "Lock successfully removed"}
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -346,8 +346,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -391,8 +391,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -441,8 +441,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -478,8 +478,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:
@@ -511,8 +511,8 @@ class TestRepositoryManagementAPI:
             }
         )
 
-        app.dependency_overrides[get_repository_service] = (
-            lambda: mock_repository_service
+        app.dependency_overrides[get_repository_service] = lambda: (
+            mock_repository_service
         )
 
         try:

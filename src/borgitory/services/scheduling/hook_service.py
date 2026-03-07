@@ -53,7 +53,7 @@ class HookService:
                     timeout = int(hook_timeouts[i])
                     if timeout < 0:
                         timeout = 300
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     timeout = 300
 
             # Add all hooks, even if name or command is empty (for reordering)
@@ -179,7 +179,7 @@ class HookService:
                     timeout = int(hook_timeouts[i])
                     if timeout < 0:
                         timeout = 300
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     timeout = 300
 
             # Only add hooks that have both name and command
@@ -230,7 +230,7 @@ class HookService:
                         }
                     )
             return hooks
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             return []
 
     @staticmethod
@@ -250,7 +250,7 @@ class HookService:
         try:
             hooks_data = json.loads(hooks_json)
             return len(hooks_data) if isinstance(hooks_data, list) else 0
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             return 0
 
     @staticmethod

@@ -12,6 +12,7 @@ from borgitory.dependencies import get_notification_config_service
 from borgitory.main import app
 from borgitory.services.notifications.config_service import NotificationConfigService
 
+
 @pytest.fixture
 def mock_notification_configs() -> Dict[int, Dict[str, Any]]:
     """Mock notification configurations for testing"""
@@ -242,7 +243,9 @@ class TestNotificationEditIntegration:
         assert "Telegram Bot Token" not in html_content
         assert "Chat ID" not in html_content
 
-    async def test_edit_form_handles_missing_config(self, async_client: AsyncClient) -> None:
+    async def test_edit_form_handles_missing_config(
+        self, async_client: AsyncClient
+    ) -> None:
         """Test that edit form handles missing configuration gracefully"""
         # Setup mock service to raise HTTPException
         mock_service = Mock(spec=NotificationConfigService)

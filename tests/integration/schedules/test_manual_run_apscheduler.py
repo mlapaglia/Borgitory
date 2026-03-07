@@ -24,6 +24,7 @@ from borgitory.services.scheduling.scheduler_service import (
 from borgitory.dependencies import get_schedule_service, get_scheduler_service_singleton
 from borgitory.protocols.job_protocols import JobManagerProtocol
 
+
 def create_test_scheduler_service(
     job_manager: Mock, job_service_factory: Mock
 ) -> SchedulerService:
@@ -252,7 +253,7 @@ class TestManualRunAPScheduler:
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
         test_db: AsyncSession,
-        async_client: AsyncClient
+        async_client: AsyncClient,
     ) -> None:
         """Test the API endpoint for manual run with APScheduler approach"""
         # Setup dependency override
@@ -281,7 +282,7 @@ class TestManualRunAPScheduler:
         test_schedule: Schedule,
         mock_scheduler_service: AsyncMock,
         test_db: AsyncSession,
-        async_client: AsyncClient
+        async_client: AsyncClient,
     ) -> None:
         """Test the API endpoint with scheduler service error"""
         # Setup dependency override

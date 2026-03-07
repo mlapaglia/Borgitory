@@ -354,9 +354,7 @@ class TestJobManagerHookExecution:
         job = self.create_test_job([hook_task])
         job.status = JobStatusEnum.FAILED
 
-        await self.job_manager.hook_executor.execute_hook_task(
-            job, hook_task, 0, True
-        )
+        await self.job_manager.hook_executor.execute_hook_task(job, hook_task, 0, True)
 
         call_args = self.mock_hook_service.execute_hooks_mock.call_args
         context = call_args.kwargs["context"]

@@ -81,6 +81,6 @@ class MigrationService:
                 else:
                     return "alembic.ini"
 
-        except (ImportError, AttributeError, TypeError, OSError):
+        except ImportError, AttributeError, TypeError, OSError:
             # Fallback for older Python versions or if resources not available
             return "alembic.ini"

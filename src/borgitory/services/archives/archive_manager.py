@@ -364,7 +364,7 @@ class ArchiveManager:
                 # Parse size from default JSON output
                 try:
                     size = int(data.get("size", 0))
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     size = 0
 
                 # Parse mtime from default JSON output

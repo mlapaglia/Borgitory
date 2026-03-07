@@ -4,7 +4,6 @@ Integration testing of SSE endpoints requires specialized tools due to streaming
 """
 
 
-
 class TestJobsAPISSEEndpoint:
     """Test SSE endpoint registration and basic functionality"""
 

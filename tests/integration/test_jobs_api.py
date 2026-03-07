@@ -139,11 +139,11 @@ class TestJobsAPI:
     ) -> Generator[dict[str, Mock], None, None]:
         """Setup dependency overrides for testing."""
         app.dependency_overrides[get_job_service] = lambda: mock_job_service
-        app.dependency_overrides[get_job_stream_service] = (
-            lambda: mock_job_stream_service
+        app.dependency_overrides[get_job_stream_service] = lambda: (
+            mock_job_stream_service
         )
-        app.dependency_overrides[get_job_render_service] = (
-            lambda: mock_job_render_service
+        app.dependency_overrides[get_job_render_service] = lambda: (
+            mock_job_render_service
         )
         app.dependency_overrides[get_job_manager_dependency] = lambda: mock_job_manager
         app.dependency_overrides[get_templates] = lambda: mock_templates

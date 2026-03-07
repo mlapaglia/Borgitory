@@ -14,8 +14,8 @@ class TestPathPrefix:
     def mock_path_service(self) -> Mock:
         """Create mock path service."""
         mock = Mock()
-        mock.normalize_path.side_effect = (
-            lambda x: x
+        mock.normalize_path.side_effect = lambda x: (
+            x
         )  # Return input unchanged for simplicity
         return mock
 

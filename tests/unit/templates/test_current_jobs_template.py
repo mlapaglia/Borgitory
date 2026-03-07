@@ -20,7 +20,10 @@ class TestCurrentJobsTemplate:
     def jinja_env(self) -> Environment:
         """Create Jinja2 environment with template directory"""
         template_dir = (
-            Path(__file__).parent.parent.parent.parent / "src" / "borgitory" / "templates"
+            Path(__file__).parent.parent.parent.parent
+            / "src"
+            / "borgitory"
+            / "templates"
         )
         env = Environment(loader=FileSystemLoader(str(template_dir)))
         # Register the custom datetime filter

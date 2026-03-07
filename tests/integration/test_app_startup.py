@@ -94,7 +94,7 @@ class AppRunner:
         try:
             response = requests.get(f"{self.base_url}/api/debug/info", timeout=2)
             return response.status_code in [200, 401, 403]
-        except (requests.ConnectionError, requests.Timeout):
+        except requests.ConnectionError, requests.Timeout:
             return False
 
     def stop(self) -> None:
@@ -125,7 +125,10 @@ class AppRunner:
         """Read logs from the on-disk files (safe to call while process is running)."""
         stdout = ""
         stderr = ""
-        for path, name in [(self._stdout_path, "stdout"), (self._stderr_path, "stderr")]:
+        for path, name in [
+            (self._stdout_path, "stdout"),
+            (self._stderr_path, "stderr"),
+        ]:
             try:
                 with open(path, "r") as f:
                     content = f.read()

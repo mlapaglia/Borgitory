@@ -8,36 +8,29 @@ from httpx import AsyncClient
 from borgitory.main import app
 from borgitory.dependencies import get_provider_registry
 
+
 class TestTabsAPI:
     """Test class for tabs API endpoints."""
 
-    async def test_get_repositories_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_repositories_tab(self, async_client: AsyncClient) -> None:
         """Test getting repositories tab content."""
         response = await async_client.get("/api/tabs/repositories")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_backups_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_backups_tab(self, async_client: AsyncClient) -> None:
         """Test getting backups tab content."""
         response = await async_client.get("/api/tabs/backups")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_schedules_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_schedules_tab(self, async_client: AsyncClient) -> None:
         """Test getting schedules tab content."""
         response = await async_client.get("/api/tabs/schedules")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_cloud_sync_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_cloud_sync_tab(self, async_client: AsyncClient) -> None:
         """Test getting cloud sync tab content."""
         response = await async_client.get("/api/tabs/cloud-sync")
         assert response.status_code == 200
@@ -184,9 +177,7 @@ class TestTabsAPI:
         content = response.text
         assert "Add Sync Location" in content  # Should fallback to generic text
 
-    async def test_get_archives_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_archives_tab(self, async_client: AsyncClient) -> None:
         """Test getting archives tab content."""
         response = await async_client.get("/api/tabs/archives")
         assert response.status_code == 200
@@ -204,63 +195,51 @@ class TestTabsAPI:
         content = response.text
         assert "preselect_repo=123" in content
 
-    async def test_get_statistics_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_statistics_tab(self, async_client: AsyncClient) -> None:
         """Test getting statistics tab content."""
         response = await async_client.get("/api/tabs/statistics")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_jobs_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_jobs_tab(self, async_client: AsyncClient) -> None:
         """Test getting jobs tab content."""
         response = await async_client.get("/api/tabs/jobs")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_notifications_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_notifications_tab(self, async_client: AsyncClient) -> None:
         """Test getting notifications tab content."""
         response = await async_client.get("/api/tabs/notifications")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_prune_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_prune_tab(self, async_client: AsyncClient) -> None:
         """Test getting prune tab content."""
         response = await async_client.get("/api/tabs/prune")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_repository_check_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_repository_check_tab(self, async_client: AsyncClient) -> None:
         """Test getting repository check tab content."""
         response = await async_client.get("/api/tabs/repository-check")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_get_debug_tab(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_get_debug_tab(self, async_client: AsyncClient) -> None:
         """Test getting debug tab content."""
         response = await async_client.get("/api/tabs/debug")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
-    async def test_tabs_require_authentication(self, async_client_without_auth: AsyncClient) -> None:
+    async def test_tabs_require_authentication(
+        self, async_client_without_auth: AsyncClient
+    ) -> None:
         """Test that tabs endpoints require authentication."""
         # Without mocking auth, this should fail
         response = await async_client_without_auth.get("/api/tabs/repositories")
         assert response.status_code == 401
 
-    async def test_all_tabs_return_html(
-        self, async_client: AsyncClient
-    ) -> None:
+    async def test_all_tabs_return_html(self, async_client: AsyncClient) -> None:
         """Test that all tab endpoints return HTML content."""
         endpoints = [
             "/api/tabs/repositories",

@@ -108,7 +108,9 @@ async def async_client(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture
-async def async_client_without_auth(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+async def async_client_without_auth(
+    test_db: Session,
+) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication."""
     test_user = User()
     test_user.username = "test_user"
@@ -124,7 +126,9 @@ async def async_client_without_auth(test_db: Session) -> AsyncGenerator[AsyncCli
 
 
 @pytest_asyncio.fixture
-async def async_client_without_auth_or_user(test_db: Session) -> AsyncGenerator[AsyncClient, None]:
+async def async_client_without_auth_or_user(
+    test_db: Session,
+) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client without authentication and without creating a user."""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://testserver"

@@ -268,7 +268,9 @@ class SMBStorage(CloudStorage):
                 )
             return status == "success"
         except Exception as e:
-            logger.error(f"SMB connection test failed with exception: {e}", exc_info=True)
+            logger.error(
+                f"SMB connection test failed with exception: {e}", exc_info=True
+            )
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
@@ -736,14 +738,14 @@ class SMBStorage(CloudStorage):
                         else 0,
                         "speed": speed,
                     }
-            except (IndexError, ValueError):
+            except IndexError, ValueError:
                 pass
 
         if "ETA" in line:
             try:
                 eta_part = line.split("ETA")[-1].strip()
                 return {"eta": eta_part}
-            except (ValueError, KeyError):
+            except ValueError, KeyError:
                 pass
 
         return None

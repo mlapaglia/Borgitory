@@ -53,8 +53,8 @@ class TestScheduleHooksAPI:
 
         # Override dependencies
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
-        app.dependency_overrides[get_configuration_service] = (
-            lambda: configuration_service
+        app.dependency_overrides[get_configuration_service] = lambda: (
+            configuration_service
         )
         app.dependency_overrides[get_templates] = lambda: mock_templates
 

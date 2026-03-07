@@ -143,7 +143,7 @@ class JobEventBroadcaster(JobEventBroadcasterProtocol):
                 del self._client_queue_metadata[queue]
 
             return True
-        except (ValueError, KeyError):
+        except ValueError, KeyError:
             return False
 
     async def stream_events_for_client(

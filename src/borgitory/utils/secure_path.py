@@ -66,7 +66,7 @@ async def _is_borg_repository(
 
             return config.has_section("repository")
 
-        except (configparser.Error, UnicodeDecodeError, PermissionError):
+        except configparser.Error, UnicodeDecodeError, PermissionError:
             return False
 
     except Exception:
@@ -95,7 +95,7 @@ async def _is_borg_cache(
 
             return config.has_section("cache")
 
-        except (configparser.Error, UnicodeDecodeError, PermissionError):
+        except configparser.Error, UnicodeDecodeError, PermissionError:
             return False
 
     except Exception:

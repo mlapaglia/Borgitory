@@ -253,7 +253,7 @@ class TestJobStreamService:
                 try:
                     data = json.loads(event.split("data: ", 1)[1].strip())
                     parsed_events.append(("data", data))
-                except (json.JSONDecodeError, IndexError):
+                except json.JSONDecodeError, IndexError:
                     pass
             elif "event: " in event and "data: " in event:
                 # Proper SSE event format
@@ -311,7 +311,7 @@ class TestJobStreamService:
                 # Limit the number of events to prevent hanging
                 if len(events) >= 5:
                     break
-        except (StopAsyncIteration, RuntimeError):
+        except StopAsyncIteration, RuntimeError:
             pass
 
         # Should have initial state and error event

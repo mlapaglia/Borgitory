@@ -199,9 +199,7 @@ class TestNextRunTimezoneNormalization:
         mock_db.__aexit__ = AsyncMock(return_value=None)
 
         with (
-            patch.object(
-                self.scheduler_service.scheduler, "get_job"
-            ) as mock_get_job,
+            patch.object(self.scheduler_service.scheduler, "get_job") as mock_get_job,
             patch(
                 "borgitory.models.database.async_session_maker"
             ) as mock_session_maker,

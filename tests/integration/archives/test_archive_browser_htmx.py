@@ -11,6 +11,7 @@ from borgitory.models.database import Repository
 from borgitory.dependencies import get_borg_service
 from borgitory.services.borg_service import BorgService
 
+
 class TestArchiveBrowserHTMX:
     """Test class for archive browser HTMX functionality."""
 

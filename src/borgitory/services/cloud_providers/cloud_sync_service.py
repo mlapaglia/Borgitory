@@ -159,7 +159,7 @@ class StorageFactory:
             # Get type hints for additional validation
             try:
                 type_hints = get_type_hints(storage_class.__init__)  # type: ignore[misc]
-            except (NameError, AttributeError):
+            except NameError, AttributeError:
                 # Some storage providers might not have complete type hints
                 type_hints = {}
 

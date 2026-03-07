@@ -44,11 +44,11 @@ class TestSchedulesAPI:
 
         # Override dependencies
         app.dependency_overrides[get_schedule_service] = lambda: schedule_service
-        app.dependency_overrides[get_configuration_service] = (
-            lambda: configuration_service
+        app.dependency_overrides[get_configuration_service] = lambda: (
+            configuration_service
         )
-        app.dependency_overrides[get_scheduler_service_dependency] = (
-            lambda: mock_scheduler_service
+        app.dependency_overrides[get_scheduler_service_dependency] = lambda: (
+            mock_scheduler_service
         )
 
         yield {

@@ -85,12 +85,11 @@ class TestRepositoryStatsHTML:
         mock_stats_service = Mock(spec=RepositoryStatsService)
         mock_stats_service.get_repository_statistics.side_effect = mock_get_stats
 
-        app.dependency_overrides[get_repository_stats_service] = (
-            lambda: mock_stats_service
+        app.dependency_overrides[get_repository_stats_service] = lambda: (
+            mock_stats_service
         )
 
         try:
-
             # Make request to HTML stats endpoint
             response = await async_client.get(
                 f"/api/repositories/{mock_repository.id}/stats/html"
@@ -151,8 +150,8 @@ class TestRepositoryStatsHTML:
         mock_stats_service = Mock(spec=RepositoryStatsService)
         mock_stats_service.get_repository_statistics.side_effect = mock_get_stats_error
 
-        app.dependency_overrides[get_repository_stats_service] = (
-            lambda: mock_stats_service
+        app.dependency_overrides[get_repository_stats_service] = lambda: (
+            mock_stats_service
         )
 
         try:
@@ -178,7 +177,9 @@ class TestRepositoryStatsHTML:
             if get_repository_stats_service in app.dependency_overrides:
                 del app.dependency_overrides[get_repository_stats_service]
 
-    async def test_stats_html_repository_not_found(self, async_client:  AsyncClient, mock_db: AsyncSession) -> None:
+    async def test_stats_html_repository_not_found(
+        self, async_client: AsyncClient, mock_db: AsyncSession
+    ) -> None:
         """Test handling of non-existent repository"""
 
         # Override database dependency
