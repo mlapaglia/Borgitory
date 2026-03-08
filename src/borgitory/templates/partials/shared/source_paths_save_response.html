@@ -3,7 +3,7 @@
 <div id="modal-container" hx-swap-oob="innerHTML"></div>
 <!-- Update parent form hidden field via OOB swap -->
 <input type="hidden"
-       name="source_path"
+       name="source_paths"
        id="source-paths-data"
        value="{{ source_paths_json if source_paths_json else '[]' }}"
        hx-swap-oob="true">

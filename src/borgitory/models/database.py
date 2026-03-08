@@ -232,7 +232,7 @@ class Schedule(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     cron_expression: Mapped[str] = mapped_column(String, nullable=False)
-    source_path: Mapped[str] = mapped_column(String, nullable=False, default="/data")
+    source_paths: Mapped[str] = mapped_column(String, nullable=False, default="[]")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

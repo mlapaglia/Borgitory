@@ -22,7 +22,7 @@ class TestNextRunUpdatedAfterExecution:
         schedule.id = 1
         schedule.name = "Test Schedule"
         schedule.repository_id = 10
-        schedule.source_path = "/data/backup"
+        schedule.source_paths = '["/data/backup"]'
         schedule.cloud_sync_config_id = None
         schedule.prune_config_id = None
         schedule.check_config_id = None

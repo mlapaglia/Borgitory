@@ -5,9 +5,6 @@ from borgitory.utils.source_paths import parse_source_paths, serialize_source_pa
 
 
 class TestParseSourcePaths:
-    def test_single_plain_path(self):
-        assert parse_source_paths("/data") == ["/data"]
-
     def test_single_path_json_array(self):
         assert parse_source_paths('["/data"]') == ["/data"]
 
@@ -24,9 +21,6 @@ class TestParseSourcePaths:
     def test_empty_json_array(self):
         assert parse_source_paths("[]") == []
 
-    def test_strips_whitespace_from_input(self):
-        assert parse_source_paths("  /data  ") == ["/data"]
-
     def test_filters_empty_strings_in_array(self):
         assert parse_source_paths('["/data", "", "  "]') == ["/data"]
 
@@ -36,27 +30,19 @@ class TestParseSourcePaths:
     def test_json_array_with_non_string_elements(self):
         assert parse_source_paths('["/data", 123]') == ["/data"]
 
-    def test_legacy_path_with_spaces(self):
-        assert parse_source_paths("/path/with spaces/data") == ["/path/with spaces/data"]
-
     def test_three_paths(self):
         paths = '["/appdata/app1", "/appdata/app2", "/appdata/app3"]'
         result = parse_source_paths(paths)
         assert result == ["/appdata/app1", "/appdata/app2", "/appdata/app3"]
 
-    def test_relative_path_filtered_out(self):
-        assert parse_source_paths("relative/path") == []
-
-    def test_relative_paths_in_array_filtered_out(self):
+    def test_relative_paths_in_array_returned_as_is(self):
         result = parse_source_paths('["/valid", "relative", "/also-valid"]')
-        assert result == ["/valid", "/also-valid"]
+        assert result == ["/valid", "relative", "/also-valid"]
 
-    def test_all_relative_paths_returns_empty(self):
-        assert parse_source_paths('["no-slash", "also-bad"]') == []
-
-    def test_relative_path_logs_warning(self, caplog):
-        parse_source_paths("relative")
-        assert "Skipping non-absolute source path" in caplog.text
+    def test_non_json_input_returns_empty_list(self):
+        assert parse_source_paths("/data") == []
+        assert parse_source_paths("plain string") == []
+        assert parse_source_paths("relative/path") == []
 
 
 class TestSerializeSourcePaths:

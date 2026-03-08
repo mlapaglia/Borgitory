@@ -79,7 +79,7 @@ class TestScheduleSourcePathsAPI:
 
         response = await async_client.post(
             "/api/schedules/source-paths/source-paths-modal",
-            json={"source_path": '["/data", "/backup"]'},
+            json={"source_paths": '["/data", "/backup"]'},
         )
 
         assert response.status_code == 200
@@ -94,28 +94,28 @@ class TestScheduleSourcePathsAPI:
 
         response = await async_client.post(
             "/api/schedules/source-paths/source-paths-modal",
-            json={"source_path": "[]"},
+            json={"source_paths": "[]"},
         )
 
         assert response.status_code == 200
         ctx = captured[-1]["context"]
         assert ctx["source_paths"] == [""]
 
-    async def test_modal_opens_with_legacy_single_path(
+    async def test_modal_opens_with_single_path_json_array(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
 
         response = await async_client.post(
             "/api/schedules/source-paths/source-paths-modal",
-            json={"source_path": "/data"},
+            json={"source_paths": '["/data"]'},
         )
 
         assert response.status_code == 200
         ctx = captured[-1]["context"]
         assert ctx["source_paths"] == ["/data"]
 
-    async def test_modal_opens_with_missing_source_path(
+    async def test_modal_opens_with_missing_source_paths(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
@@ -158,7 +158,7 @@ class TestScheduleSourcePathsAPI:
 
         response = await async_client.post(
             "/api/schedules/source-paths/save-source-paths",
-            json={"source_paths": "/data"},
+            json={"source_paths": ["/data"]},
         )
 
         assert response.status_code == 200

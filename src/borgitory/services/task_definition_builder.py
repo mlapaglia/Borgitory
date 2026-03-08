@@ -38,7 +38,7 @@ class TaskDefinitionBuilder:
     def build_backup_task(
         self,
         repository_name: str,
-        source_path: str = "/data",
+        source_paths: str = "[]",
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
@@ -49,7 +49,7 @@ class TaskDefinitionBuilder:
 
         Args:
             repository_name: Name of the repository for display
-            source_path: Path to backup from
+            source_paths: JSON array string of paths to backup
             compression: Compression algorithm to use
             dry_run: Whether this is a dry run
             ignore_lock: Whether to run 'borg break-lock' before backup
@@ -58,7 +58,7 @@ class TaskDefinitionBuilder:
             Task definition dictionary
         """
         parameters: ConfigDict = {
-            "source_path": source_path,
+            "source_paths": source_paths,
             "compression": compression,
             "dry_run": dry_run,
             "ignore_lock": ignore_lock,
@@ -419,7 +419,7 @@ class TaskDefinitionBuilder:
 
         if include_backup:
             if backup_params:
-                source_path = str(backup_params.get("source_path", "/data"))
+                source_paths = str(backup_params.get("source_paths", "[]"))
                 compression = str(backup_params.get("compression", "zstd"))
                 dry_run = bool(backup_params.get("dry_run", False))
                 ignore_lock = bool(backup_params.get("ignore_lock", False))
@@ -431,8 +431,7 @@ class TaskDefinitionBuilder:
                 else:
                     patterns = []
             else:
-                # Use defaults when no backup_params provided
-                source_path = "/data"
+                source_paths = "[]"
                 compression = "zstd"
                 dry_run = False
                 ignore_lock = False
@@ -441,7 +440,7 @@ class TaskDefinitionBuilder:
             tasks.append(
                 self.build_backup_task(
                     repository_name,
-                    source_path,
+                    source_paths,
                     compression,
                     dry_run,
                     ignore_lock,

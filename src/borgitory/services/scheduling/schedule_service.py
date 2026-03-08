@@ -138,7 +138,7 @@ class ScheduleService:
         name: str,
         repository_id: int,
         cron_expression: str,
-        source_path: str,
+        source_paths: str,
         cloud_sync_config_id: Optional[int] = None,
         prune_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
@@ -175,7 +175,7 @@ class ScheduleService:
             db_schedule.name = name
             db_schedule.repository_id = repository_id
             db_schedule.cron_expression = cron_expression
-            db_schedule.source_path = source_path
+            db_schedule.source_paths = source_paths
             db_schedule.enabled = True
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
             db_schedule.prune_config_id = prune_config_id
@@ -423,32 +423,11 @@ class ScheduleService:
                     return None
                 return str(value).strip()
 
-            source_paths = json_data.get("source_paths")
-            if isinstance(source_paths, list):
-                from borgitory.utils.source_paths import serialize_source_paths
-
-                filtered = [
-                    p.strip() for p in source_paths if isinstance(p, str) and p.strip()
-                ]
-                if not filtered:
-                    return False, {}, "At least one source path is required"
-                non_absolute = [p for p in filtered if not p.startswith("/")]
-                if non_absolute:
-                    return (
-                        False,
-                        {},
-                        f"All source paths must be absolute (start with /). "
-                        f"Invalid: {', '.join(non_absolute)}",
-                    )
-                source_path_value = serialize_source_paths(filtered)
-            else:
-                source_path_value = json_data.get("source_path", "")
-
             processed_data = {
                 "name": name,
                 "repository_id": repository_id,
                 "cron_expression": cron_expression,
-                "source_path": source_path_value,
+                "source_paths": json_data.get("source_paths", "[]"),
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "prune_config_id": safe_int(json_data.get("prune_config_id")),
                 "notification_config_id": safe_int(

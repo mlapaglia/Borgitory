@@ -19,7 +19,7 @@ class TestScheduleCreateSourcePaths:
             repository_id=1,
             source_paths=["/data", "/backup"],
         )
-        paths = json.loads(s.source_path)  # type: ignore[arg-type]
+        paths = json.loads(s.source_paths)
         assert paths == ["/data", "/backup"]
 
     def test_relative_path_rejected(self) -> None:
@@ -47,17 +47,17 @@ class TestScheduleCreateSourcePaths:
             repository_id=1,
             source_paths=["/data", "", "  "],
         )
-        paths = json.loads(s.source_path)  # type: ignore[arg-type]
+        paths = json.loads(s.source_paths)
         assert paths == ["/data"]
 
-    def test_all_empty_strings_falls_through_to_default(self) -> None:
+    def test_all_empty_strings_becomes_empty_array(self) -> None:
         s = ScheduleCreate(
             name="test",
             cron_expression="0 2 * * *",
             repository_id=1,
             source_paths=["", "  "],
         )
-        assert s.source_path == "/data"
+        assert s.source_paths == "[]"
 
     def test_no_source_paths_uses_default(self) -> None:
         s = ScheduleCreate(
@@ -65,68 +65,50 @@ class TestScheduleCreateSourcePaths:
             cron_expression="0 2 * * *",
             repository_id=1,
         )
-        assert s.source_path == "/data"
+        assert s.source_paths == "[]"
 
-    def test_bare_string_source_paths(self) -> None:
+    def test_json_array_string_accepted(self) -> None:
         s = ScheduleCreate(
             name="test",
             cron_expression="0 2 * * *",
             repository_id=1,
-            source_paths="/single",
+            source_paths='["/single"]',
         )
-        paths = json.loads(s.source_path)  # type: ignore[arg-type]
+        paths = json.loads(s.source_paths)
         assert paths == ["/single"]
 
-    def test_bare_string_relative_rejected(self) -> None:
+    def test_json_array_string_relative_rejected(self) -> None:
         with pytest.raises(ValidationError, match="must be absolute"):
             ScheduleCreate(
                 name="test",
                 cron_expression="0 2 * * *",
                 repository_id=1,
-                source_paths="no-slash",
+                source_paths='["/ok", "bad"]',
             )
 
-    def test_direct_source_path_absolute_accepted(self) -> None:
+    def test_json_array_string_absolute_accepted(self) -> None:
         s = ScheduleCreate(
             name="test",
             cron_expression="0 2 * * *",
             repository_id=1,
-            source_path="/direct",
+            source_paths='["/a", "/b"]',
         )
-        assert s.source_path == "/direct"
+        assert s.source_paths == '["/a", "/b"]'
 
-    def test_direct_source_path_relative_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="must be absolute"):
-            ScheduleCreate(
-                name="test",
-                cron_expression="0 2 * * *",
-                repository_id=1,
-                source_path="relative",
-            )
-
-    def test_direct_source_path_json_array_relative_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="must be absolute"):
-            ScheduleCreate(
-                name="test",
-                cron_expression="0 2 * * *",
-                repository_id=1,
-                source_path='["/ok", "bad"]',
-            )
-
-    def test_direct_source_path_json_array_absolute_accepted(self) -> None:
+    def test_list_serialized_to_json_string(self) -> None:
         s = ScheduleCreate(
             name="test",
             cron_expression="0 2 * * *",
             repository_id=1,
-            source_path='["/a", "/b"]',
+            source_paths=["/x", "/y"],
         )
-        assert s.source_path == '["/a", "/b"]'
+        assert s.source_paths == '["/x", "/y"]'
 
 
 class TestScheduleUpdateSourcePaths:
     def test_absolute_paths_accepted(self) -> None:
         s = ScheduleUpdate(source_paths=["/data", "/backup"])
-        paths = json.loads(s.source_path)  # type: ignore[arg-type]
+        paths = json.loads(s.source_paths)
         assert paths == ["/data", "/backup"]
 
     def test_relative_path_rejected(self) -> None:
@@ -135,15 +117,15 @@ class TestScheduleUpdateSourcePaths:
 
     def test_no_source_paths_leaves_none(self) -> None:
         s = ScheduleUpdate(name="updated")
-        assert s.source_path is None
+        assert s.source_paths is None
 
-    def test_direct_source_path_relative_rejected(self) -> None:
+    def test_json_array_string_relative_rejected(self) -> None:
         with pytest.raises(ValidationError, match="must be absolute"):
-            ScheduleUpdate(source_path="relative")
+            ScheduleUpdate(source_paths='["relative"]')
 
-    def test_direct_source_path_absolute_accepted(self) -> None:
-        s = ScheduleUpdate(source_path="/valid")
-        assert s.source_path == "/valid"
+    def test_json_array_string_absolute_accepted(self) -> None:
+        s = ScheduleUpdate(source_paths='["/valid"]')
+        assert s.source_paths == '["/valid"]'
 
 
 class TestBackupRequestSourcePaths:
@@ -152,7 +134,7 @@ class TestBackupRequestSourcePaths:
             repository_id=1,
             source_paths=["/home/user/src", "/home/user/docs"],
         )
-        paths = json.loads(r.source_path)
+        paths = json.loads(r.source_paths)
         assert paths == ["/home/user/src", "/home/user/docs"]
 
     def test_relative_path_rejected(self) -> None:
@@ -164,16 +146,19 @@ class TestBackupRequestSourcePaths:
 
     def test_no_source_paths_uses_default(self) -> None:
         r = BackupRequest(repository_id=1)
-        assert r.source_path == "/"
+        assert r.source_paths == "[]"
 
-    def test_direct_source_path_relative_rejected(self) -> None:
+    def test_json_array_string_relative_rejected(self) -> None:
         with pytest.raises(ValidationError, match="must be absolute"):
-            BackupRequest(repository_id=1, source_path="relative")
+            BackupRequest(repository_id=1, source_paths='["/ok", "nope"]')
 
-    def test_direct_source_path_json_array_relative_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="must be absolute"):
-            BackupRequest(repository_id=1, source_path='["/ok", "nope"]')
+    def test_json_array_string_absolute_accepted(self) -> None:
+        r = BackupRequest(repository_id=1, source_paths='["/explicit"]')
+        assert r.source_paths == '["/explicit"]'
 
-    def test_direct_source_path_absolute_accepted(self) -> None:
-        r = BackupRequest(repository_id=1, source_path="/explicit")
-        assert r.source_path == "/explicit"
+    def test_list_serialized_to_json_string(self) -> None:
+        r = BackupRequest(
+            repository_id=1,
+            source_paths=["/a", "/b"],
+        )
+        assert r.source_paths == '["/a", "/b"]'

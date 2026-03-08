@@ -175,7 +175,7 @@ class TestJobsAPI:
 
         backup_request = {
             "repository_id": sample_repository.id,
-            "source_path": "/test/path",
+            "source_paths": '["/test/path"]',
             "compression": "zstd",
             "dry_run": False,
         }
@@ -198,7 +198,7 @@ class TestJobsAPI:
 
         backup_request = {
             "repository_id": 999,
-            "source_path": "/test/path",
+            "source_paths": '["/test/path"]',
             "compression": "zstd",
             "dry_run": False,
         }
@@ -224,7 +224,7 @@ class TestJobsAPI:
 
         backup_request = {
             "repository_id": sample_repository.id,
-            "source_path": "/test/path",
+            "source_paths": '["/test/path"]',
             "compression": "zstd",
             "dry_run": False,
         }
@@ -690,7 +690,7 @@ class TestJobsAPI:
         """Test backup request validation."""
         # Test missing repository_id
         invalid_request = {
-            "source_path": "/test/path",
+            "source_paths": '["/test/path"]',
             "compression": "zstd",
         }
 
@@ -700,7 +700,7 @@ class TestJobsAPI:
         # Test invalid repository_id (must be > 0)
         invalid_request = {
             "repository_id": "0",
-            "source_path": "/test/path",
+            "source_paths": '["/test/path"]',
             "compression": "zstd",
         }
 

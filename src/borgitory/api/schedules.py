@@ -25,7 +25,6 @@ from borgitory.api.auth import get_current_user
 from borgitory.models.database import User
 from borgitory.utils.source_paths import (
     parse_source_paths,
-    parse_source_paths_raw,
     serialize_source_paths,
 )
 
@@ -98,7 +97,7 @@ async def create_schedule(
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
-        source_path=schedule.source_path or "",
+        source_paths=schedule.source_paths,
         cloud_sync_config_id=schedule.cloud_sync_config_id,
         prune_config_id=schedule.prune_config_id,
         notification_config_id=schedule.notification_config_id,
@@ -247,16 +246,15 @@ async def get_schedule_edit_form(
             raise HTTPException(status_code=404, detail="Schedule not found")
 
         form_data = await config_service.get_schedule_form_data(db)
-        source_paths = (
-            parse_source_paths(schedule.source_path) if schedule.source_path else []
+        source_paths_list = (
+            parse_source_paths(schedule.source_paths) if schedule.source_paths else []
         )
-        source_path_json = serialize_source_paths(source_paths)
         context = {
             **form_data,
             "schedule": schedule,
             "is_edit_mode": True,
-            "source_paths": source_paths,
-            "source_path_json": source_path_json,
+            "source_paths": source_paths_list,
+            "source_paths_json": schedule.source_paths or "[]",
         }
 
         return templates.TemplateResponse(
@@ -643,18 +641,18 @@ async def get_source_paths_modal(
     """Open source paths configuration modal with current path data from parent."""
     try:
         json_data = await request.json()
-        source_path_value = str(json_data.get("source_path", "[]"))
+        source_paths_value = str(json_data.get("source_paths", "[]"))
     except ValueError, TypeError, KeyError:
-        source_path_value = "[]"
+        source_paths_value = "[]"
 
-    source_paths = parse_source_paths_raw(source_path_value)
-    if not source_paths:
-        source_paths = [""]
+    paths = parse_source_paths(source_paths_value)
+    if not paths:
+        paths = [""]
 
     return templates.TemplateResponse(
         request,
         "partials/shared/source_paths_modal.html",
-        {"source_paths": source_paths},
+        {"source_paths": paths},
     )
 
 

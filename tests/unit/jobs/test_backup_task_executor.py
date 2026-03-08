@@ -46,7 +46,7 @@ def _make_executor() -> tuple[BackupTaskExecutor, Mock, Mock, Mock, Mock]:
 
 
 def _make_job_and_task(
-    source_path: str,
+    source_paths: str,
     archive_name: str = "test-archive",
     repo_id: int = 1,
 ) -> tuple[BorgJob, BorgJobTask]:
@@ -54,7 +54,7 @@ def _make_job_and_task(
         task_type=TaskTypeEnum.BACKUP,
         task_name="Test Backup",
         parameters={
-            "source_path": source_path,
+            "source_paths": source_paths,
             "archive_name": archive_name,
         },
     )
@@ -94,35 +94,11 @@ def _setup_successful_run(
 class TestBackupTaskExecutorSourcePaths:
     """Verify that source_path values are correctly expanded in the borg command."""
 
-    async def test_single_legacy_path(self) -> None:
-        executor, job_executor, _, _, database_manager = _make_executor()
-        _setup_successful_run(job_executor, database_manager)
-        job, task = _make_job_and_task(source_path="/data")
-        captured_args: list[list[str]] = []
-
-        with patch(
-            "borgitory.services.jobs.task_executors.backup_task_executor.create_borg_command"
-        ) as mock_cmd:
-            mock_cmd.side_effect = lambda **kwargs: (
-                captured_args.append(kwargs.get("additional_args", [])),
-                BorgCommandResult(command=["borg", "create"], environment={}),
-            )[1]
-
-            await executor.execute_backup_task(job, task)
-
-        args = captured_args[0]
-        assert "/data" in args
-        repo_archive_idx = next(
-            i for i, a in enumerate(args) if "test-repo::test-archive" in a
-        )
-        path_args = args[repo_archive_idx + 1 :]
-        assert path_args == ["/data"]
-
     async def test_multiple_paths_json_array(self) -> None:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
         job, task = _make_job_and_task(
-            source_path='["/home/user/src", "/home/user/Documents"]'
+            source_paths='["/home/user/src", "/home/user/Documents"]'
         )
         captured_args: list[list[str]] = []
 
@@ -148,7 +124,7 @@ class TestBackupTaskExecutorSourcePaths:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
         job, task = _make_job_and_task(
-            source_path='["/appdata/app1", "/appdata/app2", "/appdata/app3"]'
+            source_paths='["/appdata/app1", "/appdata/app2", "/appdata/app3"]'
         )
         captured_args: list[list[str]] = []
 
@@ -172,7 +148,7 @@ class TestBackupTaskExecutorSourcePaths:
     async def test_single_path_json_array(self) -> None:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
-        job, task = _make_job_and_task(source_path='["/data"]')
+        job, task = _make_job_and_task(source_paths='["/data"]')
         captured_args: list[list[str]] = []
 
         with patch(
@@ -195,8 +171,8 @@ class TestBackupTaskExecutorSourcePaths:
     async def test_empty_source_path_appends_nothing(self) -> None:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
-        job, task = _make_job_and_task(source_path="")
-        task.parameters["source_path"] = ""
+        job, task = _make_job_and_task(source_paths="")
+        task.parameters["source_paths"] = ""
         captured_args: list[list[str]] = []
 
         with patch(
@@ -256,7 +232,7 @@ class TestBackupTaskExecutorSourcePaths:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
         job, task = _make_job_and_task(
-            source_path='["/src", "/docs"]'
+            source_paths='["/src", "/docs"]'
         )
         captured_args: list[list[str]] = []
 
@@ -286,7 +262,7 @@ class TestBackupTaskExecutorSourcePaths:
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
             parameters={
-                "source_path": '["/data", "/backup"]',
+                "source_paths": '["/data", "/backup"]',
                 "archive_name": "test-archive",
                 "patterns": ["+*.txt", "-*.log"],
                 "dry_run": True,

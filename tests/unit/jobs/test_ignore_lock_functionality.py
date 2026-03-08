@@ -82,7 +82,7 @@ class TestIgnoreLockFunctionality:
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup with Ignore Lock",
             parameters={
-                "source_path": "/test/source",
+                "source_paths": '["/test/source"]',
                 "compression": "zstd",
                 "dry_run": False,
                 "ignore_lock": True,
@@ -99,7 +99,7 @@ class TestIgnoreLockFunctionality:
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup without Ignore Lock",
             parameters={
-                "source_path": "/test/source",
+                "source_paths": '["/test/source"]',
                 "compression": "zstd",
                 "dry_run": False,
                 "ignore_lock": False,

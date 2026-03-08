@@ -393,7 +393,7 @@ class TestJobManagerTaskExecution:
                 type=TaskTypeEnum.BACKUP,
                 name="Test Backup",
                 parameters={
-                    "source_path": "/tmp/test",
+                    "source_paths": '["/tmp/test"]',
                     "compression": "lz4",
                     "dry_run": False,
                 },
@@ -698,10 +698,10 @@ class TestJobManagerTaskExecution:
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup Dry Run",
             parameters={
-                "source_path": "/tmp",
+                "source_paths": '["/tmp"]',
                 "excludes": ["*.log"],
                 "archive_name": "test-archive-dry",
-                "dry_run": True,  # This is the key parameter we're testing
+                "dry_run": True,
             },
         )
 

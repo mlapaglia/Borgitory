@@ -84,7 +84,7 @@ def sample_composite_job() -> BorgJob:
         task_type=TaskTypeEnum.BACKUP,
         task_name="Backup Task",
         status=TaskStatusEnum.COMPLETED,
-        parameters={"source_path": "/data"},
+        parameters={"source_paths": '["/data"]'},
     )
     task2 = BorgJobTask(
         task_type=TaskTypeEnum.PRUNE,

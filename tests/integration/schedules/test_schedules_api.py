@@ -135,7 +135,7 @@ class TestSchedulesAPI:
             "name": "Test Schedule",
             "repository_id": sample_repository.id,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=schedule_data)
@@ -165,7 +165,7 @@ class TestSchedulesAPI:
             "name": "Test Schedule",
             "repository_id": 999,  # Non-existent repository
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=schedule_data)
@@ -187,7 +187,7 @@ class TestSchedulesAPI:
             "name": "Test Schedule",
             "repository_id": sample_repository.id,
             "cron_expression": "invalid cron",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=schedule_data)
@@ -210,13 +210,13 @@ class TestSchedulesAPI:
         schedule1.name = "schedule-1"
         schedule1.repository_id = sample_repository.id
         schedule1.cron_expression = "0 2 * * *"
-        schedule1.source_path = "/data1"
+        schedule1.source_paths = '["/data1"]'
 
         schedule2 = Schedule()
         schedule2.name = "schedule-2"
         schedule2.repository_id = sample_repository.id
         schedule2.cron_expression = "0 3 * * *"
-        schedule2.source_path = "/data2"
+        schedule2.source_paths = '["/data2"]'
         test_db.add_all([schedule1, schedule2])
         await test_db.commit()
 
@@ -242,7 +242,7 @@ class TestSchedulesAPI:
             schedule.name = f"schedule-{i}"
             schedule.repository_id = sample_repository.id
             schedule.cron_expression = "0 2 * * *"
-            schedule.source_path = f"/data{i}"
+            schedule.source_paths = f'["/data{i}"]'
             test_db.add(schedule)
         await test_db.commit()
 
@@ -316,7 +316,7 @@ class TestSchedulesAPI:
         schedule1.name = "schedule-1"
         schedule1.repository_id = sample_repository.id
         schedule1.cron_expression = "0 2 * * *"
-        schedule1.source_path = "/data1"
+        schedule1.source_paths = '["/data1"]'
         test_db.add(schedule1)
         await test_db.commit()
 
@@ -357,7 +357,7 @@ class TestSchedulesAPI:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -381,7 +381,7 @@ class TestSchedulesAPI:
         schedule.name = "original-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -415,7 +415,7 @@ class TestSchedulesAPI:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         schedule.enabled = False
         test_db.add(schedule)
         await test_db.commit()
@@ -454,7 +454,7 @@ class TestSchedulesAPI:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
