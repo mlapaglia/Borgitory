@@ -292,7 +292,7 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test-${{ matrix.arch }} \
-          playwright install --with-deps chromium && pytest tests/e2e/ -v \
+          pip install -e .[dev] && playwright install --with-deps chromium && pytest tests/e2e/ -v \
             --tb=short \
             --browser chromium \
             --screenshot only-on-failure \
