@@ -158,7 +158,7 @@ jobs:
     - name: Load Docker image
       run: docker load < /tmp/borgitory-test-${{ matrix.arch }}.tar
 
-    - name: Run unit tests
+    - name: Run unit tests with coverage
       run: |
         docker run --rm \
           --cap-add SYS_ADMIN \
@@ -166,11 +166,12 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test-${{ matrix.arch }} \
-          sh -c "pip install -e .[dev] && pytest tests/ --ignore=tests/integration --ignore=tests/e2e \
+          pytest tests/unit/ -v \
+            --tb=short \
             --cov=src/borgitory \
             --cov-report=xml:coverage.xml \
             --junitxml=junit.xml \
-            --override-ini junit_family=legacy"
+            --override-ini junit_family=legacy
 
     - name: Upload unit test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -228,11 +229,12 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test-${{ matrix.arch }} \
-          pytest tests/integration/ -v --tb=short \
+          pytest tests/integration/ -v \
+            --tb=short \
             --cov=src/borgitory \
             --cov-report=xml:integration-coverage.xml \
             --junitxml=junit.xml \
-            --override-ini junit_family=legacy"
+            --override-ini junit_family=legacy
 
     - name: Upload integration test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -290,12 +292,14 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test-${{ matrix.arch }} \
-          sh -c "pip install -e .[dev] && playwright install --with-deps chromium && pytest tests/e2e/ -o 'addopts=' -v --tb=short --browser chromium \
+          playwright install --with-deps chromium && pytest tests/e2e/ -v \
+            --tb=short \
+            --browser chromium \
             --screenshot only-on-failure \
             --cov=src/borgitory \
             --cov-report=xml:e2e-coverage.xml \
             --junitxml=junit.xml \
-            --override-ini junit_family=legacy"
+            --override-ini junit_family=legacy
 
     - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
