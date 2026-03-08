@@ -5,6 +5,7 @@ Tests for ArchiveManager caching functionality
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
+from borgitory.config.command_runner_config import CommandRunnerConfig
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.models.database import Repository
@@ -36,13 +37,22 @@ class TestArchiveManagerCaching:
         return repo
 
     @pytest.fixture
+    def command_runner_config(self) -> CommandRunnerConfig:
+        """Mock command runner config"""
+        return CommandRunnerConfig(timeout=60)
+
+    @pytest.fixture
     def manager(
-        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock
+        self,
+        mock_job_executor: AsyncMock,
+        mock_command_executor: AsyncMock,
+        command_runner_config: CommandRunnerConfig,
     ) -> ArchiveManager:
         """Create ArchiveManager instance with short cache TTL for testing"""
         return ArchiveManager(
             job_executor=mock_job_executor,
             command_executor=mock_command_executor,
+            command_runner_config=command_runner_config,
             cache_ttl=timedelta(seconds=1),  # Very short TTL for testing
         )
 
@@ -256,44 +266,50 @@ class TestArchiveManagerCaching:
         # Results should be the same
         assert len(result1) == len(result2)
 
-    async def test_list_archive_directory_contents_cache_miss(
-        self, manager: ArchiveManager, mock_repository: MagicMock
-    ) -> None:
-        """Test that list_archive_directory_contents calls borg when cache is empty"""
-        # Mock the borg list output
-        json_output = """{"type": "d", "mode": "drwxr-xr-x", "uid": 1000, "gid": 1000, "user": "user", "group": "user", "size": 0, "mtime": "2023-01-01T00:00:00Z", "path": "test_dir"}"""
+    class TestListArchiveDirectoryContentsTimeout:
+        """Tests that verify timeout is passed from config to executor."""
 
-        # Mock the command executor to return our test data
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.stdout = json_output
-        mock_result.stderr = ""
+        @pytest.fixture
+        def command_runner_config(self) -> CommandRunnerConfig:
+            return CommandRunnerConfig(timeout=120)
 
-        # Mock the BorgCommand object
-        mock_borg_command = MagicMock()
-        mock_borg_command.command = [
-            "borg",
-            "list",
-            "--json-lines",
-            "/test/repo::test_archive",
-        ]
-        mock_borg_command.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+        async def test_list_archive_directory_contents_cache_miss(
+            self, manager: ArchiveManager, mock_repository: MagicMock
+        ) -> None:
+            """Test that list_archive_directory_contents calls borg when cache is empty and passes config timeout."""
+            json_output = """{"type": "d", "mode": "drwxr-xr-x", "uid": 1000, "gid": 1000, "user": "user", "group": "user", "size": 0, "mtime": "2023-01-01T00:00:00Z", "path": "test_dir"}"""
 
-        # Call should hit borg list since cache is empty
-        with (
-            patch(
-                "borgitory.services.archives.archive_manager.create_borg_command",
-                return_value=mock_borg_command,
-            ),
-            patch.object(
-                manager.command_executor, "execute_command", return_value=mock_result
-            ) as mock_execute,
-        ):
-            result = await manager.list_archive_directory_contents(
-                mock_repository, "test_archive", ""
-            )
+            mock_result = MagicMock()
+            mock_result.success = True
+            mock_result.stdout = json_output
+            mock_result.stderr = ""
 
-            # Should have called command executor
-            assert mock_execute.called
-            assert len(result) == 1
-            assert result[0].name == "test_dir"
+            mock_borg_command = MagicMock()
+            mock_borg_command.command = [
+                "borg",
+                "list",
+                "--json-lines",
+                "/test/repo::test_archive",
+            ]
+            mock_borg_command.environment = {"BORG_PASSPHRASE": "test_passphrase"}
+
+            with (
+                patch(
+                    "borgitory.services.archives.archive_manager.create_borg_command",
+                    return_value=mock_borg_command,
+                ),
+                patch.object(
+                    manager.command_executor,
+                    "execute_command",
+                    return_value=mock_result,
+                ) as mock_execute,
+            ):
+                result = await manager.list_archive_directory_contents(
+                    mock_repository, "test_archive", ""
+                )
+
+                assert mock_execute.called
+                mock_execute.assert_called_once()
+                assert mock_execute.call_args.kwargs["timeout"] == 120
+                assert len(result) == 1
+                assert result[0].name == "test_dir"

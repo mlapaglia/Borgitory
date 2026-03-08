@@ -82,14 +82,17 @@ class TestJobManagerProperDI:
         assert "direct instantiation" in singleton_doc
         assert "tests" in singleton_doc
         assert "background tasks" in singleton_doc
-        assert "Don't use for: FastAPI endpoints" in singleton_doc
+        assert (
+            "This is the singleton version that resolves dependencies directly."
+            in singleton_doc
+        )
 
         # Dependency function should document FastAPI DI usage
         assert dependency_doc is not None
         assert "FastAPI endpoints" in dependency_doc
         assert "Depends(get_job_manager_dependency)" in dependency_doc
-        assert "Don't use for: Direct calls" in dependency_doc
-        assert "use get_job_manager_singleton() instead" in dependency_doc
+        assert "For direct calls or singletons" in dependency_doc
+        assert "() instead." in dependency_doc
 
 
 class TestJobManagerDIAntiPatterns:

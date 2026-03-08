@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from starlette.responses import StreamingResponse
 
+from borgitory.config.command_runner_config import CommandRunnerConfig
 from borgitory.models.database import Repository
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
@@ -42,11 +43,13 @@ class ArchiveManager:
         self,
         job_executor: "ProcessExecutorProtocol",
         command_executor: CommandExecutorProtocol,
+        command_runner_config: CommandRunnerConfig,
         cache_ttl: timedelta = timedelta(minutes=30),
     ) -> None:
         self.job_executor = job_executor
         self.command_executor = command_executor
         self.cache_ttl = cache_ttl
+        self.command_runner_config = command_runner_config
 
         # In-memory cache for archive contents
         # Key: "repository_path::archive_name", Value: (items, cached_at)
@@ -313,7 +316,7 @@ class ArchiveManager:
             cmd_result = await self.command_executor.execute_command(
                 command=borg_command.command,
                 env=borg_command.environment,
-                timeout=60.0,
+                timeout=self.command_runner_config.timeout,
             )
 
             if not cmd_result.success:

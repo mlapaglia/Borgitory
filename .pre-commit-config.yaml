@@ -12,12 +12,34 @@ repos:
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
+- repo: https://github.com/rhysd/actionlint
+  rev: 393031adb9afb225ee52ae2ccd7a5af5525e03e8 # v1.7.11
+  hooks:
+  - id: actionlint
 - repo: local
   hooks:
-  - id: lint
-    name: lint
-    entry: python lint.py all
+  - id: mypy
+    name: mypy
+    entry: python lint.py mypy
     language: system
     types: [python]
     pass_filenames: true
     exclude: ^tests/
+  - id: ruff-fix
+    name: ruff fix
+    entry: python lint.py fix
+    language: system
+    types: [python]
+    pass_filenames: true
+  - id: ruff-format
+    name: ruff format
+    entry: python lint.py format
+    language: system
+    types: [python]
+    pass_filenames: true
+  - id: html
+    name: djlint
+    entry: python lint.py html-fix
+    language: system
+    types: [html]
+    pass_filenames: true
