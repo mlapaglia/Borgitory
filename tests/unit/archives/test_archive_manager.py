@@ -37,13 +37,16 @@ class TestArchiveManager:
     @pytest.fixture
     def mock_command_runner_config(self) -> MagicMock:
         """Mock command runner config"""
-        config = MagicMock()
-        config.timeout = 60.0
+        config = MagicMock(spec=["timeout"])
+        config.timeout = 60
         return config
 
     @pytest.fixture
     def manager(
-        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock, mock_command_runner_config: MagicMock
+        self,
+        mock_job_executor: AsyncMock,
+        mock_command_executor: AsyncMock,
+        mock_command_runner_config: MagicMock,
     ) -> ArchiveManager:
         """Create ArchiveManager instance"""
         return ArchiveManager(
@@ -53,7 +56,10 @@ class TestArchiveManager:
         )
 
     def test_init_with_dependencies(
-        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock, mock_command_runner_config: MagicMock
+        self,
+        mock_job_executor: AsyncMock,
+        mock_command_executor: AsyncMock,
+        mock_command_runner_config: MagicMock,
     ) -> None:
         """Test initialization with dependencies"""
         manager = ArchiveManager(

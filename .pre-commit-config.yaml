@@ -14,10 +14,28 @@ repos:
   - id: trailing-whitespace
 - repo: local
   hooks:
-  - id: lint
-    name: lint
-    entry: python lint.py all
+  - id: mypy
+    name: mypy
+    entry: python lint.py mypy
     language: system
     types: [python]
     pass_filenames: true
     exclude: ^tests/
+  - id: ruff
+    name: ruff fix
+    entry: python lint.py fix
+    language: system
+    types: [python]
+    pass_filenames: true
+  - id: ruff
+    name: ruff format
+    entry: python lint.py format
+    language: system
+    types: [python]
+    pass_filenames: true
+  - id: html
+    name: djlint
+    entry: python lint.py html-fix
+    language: system
+    types: [html]
+    pass_filenames: true
