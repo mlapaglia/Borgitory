@@ -169,30 +169,25 @@ jobs:
           sh -c "pip install -e .[dev] && pytest tests/ --ignore=tests/integration --ignore=tests/e2e \
             --cov=src/borgitory \
             --cov-report=xml:coverage.xml \
-            --cov-report=html:htmlcov \
             --junitxml=junit.xml \
-            -o junit_family=legacy"
+            --override-ini junit_family=legacy
 
     - name: Upload unit test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
-        files: ./coverage.xml
         flags: unit
         name: unit-tests
         token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: false
 
-    - name: Upload test results to Codecov
+    - name: Upload unit test results to Codecov
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
         report_type: test_results
         name: unit-tests-results
-        files: junit.xml
         flags: unit
         token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: false
 
   test-integration:
     runs-on: ${{ matrix.os }}
@@ -236,9 +231,8 @@ jobs:
           pytest tests/integration/ -v --tb=short \
             --cov=src/borgitory \
             --cov-report=xml:integration-coverage.xml \
-            --cov-report=html:integration-htmlcov \
             --junitxml=junit.xml \
-            --cov-append
+            --override-ini junit_family=legacy
 
     - name: Upload integration test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -248,18 +242,15 @@ jobs:
         flags: integration
         name: integration-tests
         token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: false
 
-    - name: Upload test results to Codecov
+    - name: Upload integration test results to Codecov
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
         report_type: test_results
         name: integration-tests-results
-        files: junit.xml
         flags: integration
         token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: false
 
   test-e2e:
     runs-on: ${{ matrix.os }}
@@ -304,8 +295,8 @@ jobs:
             --screenshot only-on-failure \
             --cov=src/borgitory \
             --cov-report=xml:e2e-coverage.xml \
-            --cov-report=html:e2e-htmlcov" \
-            --junitxml=junit.xml
+            --junitxml=junit.xml \
+            --override-ini junit_family=legacy
 
     - name: Upload E2E test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -315,7 +306,6 @@ jobs:
         flags: e2e
         name: e2e-tests
         token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: false
 
     - name: Upload test results to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -323,10 +313,8 @@ jobs:
       with:
         report_type: test_results
         name: e2e-tests-results
-        files: junit.xml
         flags: e2e
         token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: false
 
     - name: Upload Playwright traces and screenshots on failure
       if: failure()
