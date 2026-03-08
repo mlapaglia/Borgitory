@@ -189,6 +189,7 @@ jobs:
       with:
         report_type: test_results
         name: unit-tests-results
+        files: junit.xml
         flags: unit
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
@@ -245,6 +246,17 @@ jobs:
         files: ./integration-coverage.xml
         flags: integration
         name: integration-tests
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+
+    - name: Upload test results to Codecov
+      if: always() && matrix.arch == 'x86_64'
+      uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+      with:
+        report_type: test_results
+        name: integration-tests-results
+        files: junit.xml
+        flags: integration
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
@@ -309,6 +321,7 @@ jobs:
       with:
         report_type: test_results
         name: e2e-tests-results
+        files: junit.xml
         flags: e2e
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
