@@ -292,14 +292,11 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test-${{ matrix.arch }} \
-          sh -c "pip install -e .[dev] && playwright install --with-deps chromium && pytest tests/e2e/ -v \
-            --tb=short \
-            --browser chromium \
-            --screenshot only-on-failure \
-            --cov=src/borgitory \
-            --cov-report=xml:e2e-coverage.xml \
-            --junitxml=junit.xml \
-            --override-ini junit_family=legacy"
+          sh -c "pip install -e .[dev] && playwright install --with-deps chromium && pytest tests/e2e/ \
+          --config-file tests/e2e/pytest.e2e.ini \
+          --cov src/borgitory \
+          --cov-report xml:e2e-coverage.xml \
+          --cov-report html:e2e-htmlcov"
 
     - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
