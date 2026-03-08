@@ -24,6 +24,7 @@
             <!-- Modal Content -->
             <div>
             <form hx-post="/api/schedules/source-paths/save-source-paths"
+                  hx-ext="json-enc"
                   hx-target="body"
                   hx-swap="none"
                   hx-target-error="#source-paths-error-container">

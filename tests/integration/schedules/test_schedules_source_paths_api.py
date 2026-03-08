@@ -4,6 +4,7 @@ Tests for schedule source paths API endpoints in schedules.py
 Tests all source-path-related endpoints using proper DI with mocks, no patches.
 """
 
+import json
 import pytest
 from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock
@@ -69,18 +70,183 @@ class TestScheduleSourcePathsAPI:
     def teardown_method(self) -> None:
         app.dependency_overrides.clear()
 
-    # ── add-field endpoint ──────────────────────────────────────────────
+    # ── source-paths-modal endpoint ────────────────────────────────────
+
+    async def test_modal_opens_with_json_array(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/source-paths-modal",
+            json={"source_path": '["/data", "/backup"]'},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["source_paths"] == ["/data", "/backup"]
+        assert captured[-1]["template"] == "partials/shared/source_paths_modal.html"
+
+    async def test_modal_opens_with_empty_array(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/source-paths-modal",
+            json={"source_path": "[]"},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["source_paths"] == [""]
+
+    async def test_modal_opens_with_legacy_single_path(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/source-paths-modal",
+            json={"source_path": "/data"},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["source_paths"] == ["/data"]
+
+    async def test_modal_opens_with_missing_source_path(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/source-paths-modal",
+            json={},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["source_paths"] == [""]
+
+    # ── save-source-paths endpoint ─────────────────────────────────────
+
+    async def test_save_valid_paths(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/save-source-paths",
+            json={"source_paths": ["/data", "/home/user/docs"]},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["total_count"] == 2
+        parsed = json.loads(ctx["source_paths_json"])
+        assert parsed == ["/data", "/home/user/docs"]
+        assert (
+            captured[-1]["template"]
+            == "partials/shared/source_paths_save_response.html"
+        )
+
+    async def test_save_single_path(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/save-source-paths",
+            json={"source_paths": "/data"},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["total_count"] == 1
+
+    async def test_save_filters_empty_paths(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/save-source-paths",
+            json={"source_paths": ["/data", "", "  ", "/backup"]},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["total_count"] == 2
+        parsed = json.loads(ctx["source_paths_json"])
+        assert parsed == ["/data", "/backup"]
+
+    async def test_save_empty_paths_returns_zero_count(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/save-source-paths",
+            json={"source_paths": ["", "  "]},
+        )
+
+        assert response.status_code == 200
+        ctx = captured[-1]["context"]
+        assert ctx["total_count"] == 0
+
+    async def test_save_rejects_relative_paths(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/save-source-paths",
+            json={"source_paths": ["/valid", "relative/path"]},
+        )
+
+        assert response.status_code == 400
+        ctx = captured[-1]["context"]
+        assert "relative/path" in ctx["error_message"]
+        assert (
+            captured[-1]["template"]
+            == "partials/shared/source_paths_validation_error.html"
+        )
+
+    async def test_save_rejects_all_relative_paths(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        captured = setup_test_dependencies["captured_contexts"]
+
+        response = await async_client.post(
+            "/api/schedules/source-paths/save-source-paths",
+            json={"source_paths": ["no-slash", "also-bad"]},
+        )
+
+        assert response.status_code == 400
+
+    # ── close-modal endpoint ───────────────────────────────────────────
+
+    async def test_close_modal(
+        self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
+    ) -> None:
+        response = await async_client.get(
+            "/api/schedules/source-paths/close-modal"
+        )
+
+        assert response.status_code == 200
+        assert '<div id="modal-container"></div>' in response.text
+
+    # ── add-field endpoint ─────────────────────────────────────────────
 
     async def test_add_field_appends_empty_path(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
-        """Adding a field should append one empty string to the paths list."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {"source_paths": ["/data"]}
 
         response = await async_client.post(
             "/api/schedules/source-paths/add-field",
-            json=json_data,
+            json={"source_paths": ["/data"]},
         )
 
         assert response.status_code == 200
@@ -92,11 +258,10 @@ class TestScheduleSourcePathsAPI:
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {"source_paths": ["/src", "/Documents", "/Pictures"]}
 
         response = await async_client.post(
             "/api/schedules/source-paths/add-field",
-            json=json_data,
+            json={"source_paths": ["/src", "/Documents", "/Pictures"]},
         )
 
         assert response.status_code == 200
@@ -106,13 +271,11 @@ class TestScheduleSourcePathsAPI:
     async def test_add_field_empty_form(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
-        """Adding a field with no existing paths should result in one empty path."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data: Dict[str, Any] = {}
 
         response = await async_client.post(
             "/api/schedules/source-paths/add-field",
-            json=json_data,
+            json={},
         )
 
         assert response.status_code == 200
@@ -124,11 +287,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """json-enc sends a bare string when there's only one input with that name."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {"source_paths": "/only-one"}
 
         response = await async_client.post(
             "/api/schedules/source-paths/add-field",
-            json=json_data,
+            json={"source_paths": "/only-one"},
         )
 
         assert response.status_code == 200
@@ -139,11 +301,10 @@ class TestScheduleSourcePathsAPI:
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {"source_paths": ["/my/typed/path"]}
 
         response = await async_client.post(
             "/api/schedules/source-paths/add-field",
-            json=json_data,
+            json={"source_paths": ["/my/typed/path"]},
         )
 
         assert response.status_code == 200
@@ -165,20 +326,19 @@ class TestScheduleSourcePathsAPI:
             == "partials/shared/source_paths_container.html"
         )
 
-    # ── remove-field endpoint ───────────────────────────────────────────
+    # ── remove-field endpoint ──────────────────────────────────────────
 
     async def test_remove_field_removes_by_index(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/keep", "/remove", "/also-keep"],
-            "remove_index": 1,
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={
+                "source_paths": ["/keep", "/remove", "/also-keep"],
+                "remove_index": 1,
+            },
         )
 
         assert response.status_code == 200
@@ -189,14 +349,10 @@ class TestScheduleSourcePathsAPI:
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/first", "/second"],
-            "remove_index": 0,
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={"source_paths": ["/first", "/second"], "remove_index": 0},
         )
 
         assert response.status_code == 200
@@ -207,14 +363,13 @@ class TestScheduleSourcePathsAPI:
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/first", "/second", "/third"],
-            "remove_index": 2,
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={
+                "source_paths": ["/first", "/second", "/third"],
+                "remove_index": 2,
+            },
         )
 
         assert response.status_code == 200
@@ -226,14 +381,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """Removing the only path should leave one empty path so the UI isn't blank."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/only-path"],
-            "remove_index": 0,
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={"source_paths": ["/only-path"], "remove_index": 0},
         )
 
         assert response.status_code == 200
@@ -245,14 +396,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """Out-of-range index should leave the list unchanged."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/data"],
-            "remove_index": 99,
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={"source_paths": ["/data"], "remove_index": 99},
         )
 
         assert response.status_code == 200
@@ -264,14 +411,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """Negative index should leave the list unchanged."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/data"],
-            "remove_index": -1,
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={"source_paths": ["/data"], "remove_index": -1},
         )
 
         assert response.status_code == 200
@@ -283,14 +426,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """Non-integer index should be handled gracefully."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/data", "/backup"],
-            "remove_index": "abc",
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={"source_paths": ["/data", "/backup"], "remove_index": "abc"},
         )
 
         assert response.status_code == 200
@@ -302,13 +441,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """Missing remove_index should default to 0."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data = {
-            "source_paths": ["/first", "/second"],
-        }
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={"source_paths": ["/first", "/second"]},
         )
 
         assert response.status_code == 200
@@ -320,11 +456,10 @@ class TestScheduleSourcePathsAPI:
     ) -> None:
         """Empty JSON body should result in one empty path."""
         captured = setup_test_dependencies["captured_contexts"]
-        json_data: Dict[str, Any] = {}
 
         response = await async_client.post(
             "/api/schedules/source-paths/remove-field",
-            json=json_data,
+            json={},
         )
 
         assert response.status_code == 200

@@ -621,6 +621,20 @@ async def close_modal() -> HTMLResponse:
 # Source Paths API endpoints
 
 
+def _extract_source_paths_from_json(data: Dict[str, Any]) -> list[str]:
+    """Extract source_paths from JSON request data.
+
+    json-enc sends multiple inputs with the same name as an array,
+    or a single input as a bare string.
+    """
+    raw = data.get("source_paths", [])
+    if isinstance(raw, list):
+        return [str(p) for p in raw]
+    if isinstance(raw, str):
+        return [raw]
+    return [""]
+
+
 @router.post("/source-paths/source-paths-modal", response_class=HTMLResponse)
 async def get_source_paths_modal(
     request: Request,
@@ -650,9 +664,9 @@ async def save_source_paths(
     templates: TemplatesDep,
 ) -> HTMLResponse:
     """Save source paths and update parent form via OOB swap."""
-    form_data = await request.form()
-    raw_paths = form_data.getlist("source_paths")
-    filtered = [p.strip() for p in raw_paths if isinstance(p, str) and p.strip()]
+    json_data = await request.json()
+    raw_paths = _extract_source_paths_from_json(json_data)
+    filtered = [p.strip() for p in raw_paths if p.strip()]
 
     non_absolute = [p for p in filtered if not p.startswith("/")]
     if non_absolute:
@@ -693,8 +707,8 @@ async def add_source_path_field(
     templates: TemplatesDep,
 ) -> HTMLResponse:
     """Add a new source path field row via HTMX."""
-    form_data = await request.form()
-    current_paths = list(form_data.getlist("source_paths"))
+    json_data = await request.json()
+    current_paths = _extract_source_paths_from_json(json_data)
     current_paths.append("")
 
     return templates.TemplateResponse(
@@ -710,11 +724,11 @@ async def remove_source_path_field(
     templates: TemplatesDep,
 ) -> HTMLResponse:
     """Remove a source path field row via HTMX."""
-    form_data = await request.form()
-    current_paths = list(form_data.getlist("source_paths"))
+    json_data = await request.json()
+    current_paths = _extract_source_paths_from_json(json_data)
 
     try:
-        remove_index = int(str(form_data.get("remove_index", 0)))
+        remove_index = int(str(json_data.get("remove_index", 0)))
         if 0 <= remove_index < len(current_paths):
             current_paths.pop(remove_index)
     except ValueError, TypeError:
