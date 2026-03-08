@@ -35,14 +35,23 @@ class TestArchiveManagerCaching:
         repo.get_keyfile_content.return_value = None
         return repo
 
+
+    @pytest.fixture
+    def mock_command_runner_config(self) -> MagicMock:
+        """Mock command runner config"""
+        config = MagicMock()
+        config.timeout = 60.0
+        return config
+
     @pytest.fixture
     def manager(
-        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock
+        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock, mock_command_runner_config: MagicMock
     ) -> ArchiveManager:
         """Create ArchiveManager instance with short cache TTL for testing"""
         return ArchiveManager(
             job_executor=mock_job_executor,
             command_executor=mock_command_executor,
+            command_runner_config=mock_command_runner_config,
             cache_ttl=timedelta(seconds=1),  # Very short TTL for testing
         )
 

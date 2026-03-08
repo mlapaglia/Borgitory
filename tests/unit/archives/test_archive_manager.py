@@ -35,26 +35,36 @@ class TestArchiveManager:
         return repo
 
     @pytest.fixture
+    def mock_command_runner_config(self) -> MagicMock:
+        """Mock command runner config"""
+        config = MagicMock()
+        config.timeout = 60.0
+        return config
+
+    @pytest.fixture
     def manager(
-        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock
+        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock, mock_command_runner_config: MagicMock
     ) -> ArchiveManager:
         """Create ArchiveManager instance"""
         return ArchiveManager(
             job_executor=mock_job_executor,
             command_executor=mock_command_executor,
+            command_runner_config=mock_command_runner_config,
         )
 
     def test_init_with_dependencies(
-        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock
+        self, mock_job_executor: AsyncMock, mock_command_executor: AsyncMock, mock_command_runner_config: MagicMock
     ) -> None:
         """Test initialization with dependencies"""
         manager = ArchiveManager(
             job_executor=mock_job_executor,
             command_executor=mock_command_executor,
+            command_runner_config=mock_command_runner_config,
         )
 
         assert manager.job_executor == mock_job_executor
         assert manager.command_executor == mock_command_executor
+        assert manager.command_runner_config == mock_command_runner_config
 
     async def test_parse_borg_list_output(self, manager: ArchiveManager) -> None:
         """Test parsing borg list JSON output"""
