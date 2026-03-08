@@ -12,8 +12,12 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-TAILWIND_CSS = os.path.join(REPO_ROOT, "src", "borgitory", "static", "css", "tailwind.css")
-TAILWIND_INPUT = os.path.join(REPO_ROOT, "src", "borgitory", "static", "css", "tailwind-input.css")
+TAILWIND_CSS = os.path.join(
+    REPO_ROOT, "src", "borgitory", "static", "css", "tailwind.css"
+)
+TAILWIND_INPUT = os.path.join(
+    REPO_ROOT, "src", "borgitory", "static", "css", "tailwind-input.css"
+)
 
 
 def _tailwind_needs_build() -> bool:
@@ -39,4 +43,6 @@ if __name__ == "__main__":
     _ensure_tailwind_built()
 
     print("Starting Borgitory development server on port 8000")
-    uvicorn.run("borgitory.main:app", host="0.0.0.0", port=8000, reload=False, log_level="info")
+    uvicorn.run(
+        "borgitory.main:app", host="0.0.0.0", port=8000, reload=False, log_level="info"
+    )

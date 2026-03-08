@@ -60,7 +60,7 @@ class SystemOperations(SystemOperationsProtocol):
         try:
             result = path.is_file()
             return bool(result)
-        except (AttributeError, OSError):
+        except AttributeError, OSError:
             return False
 
 

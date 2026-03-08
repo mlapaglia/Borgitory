@@ -1,0 +1,53 @@
+<!-- pCloud Fields -->
+<div id="pcloud-fields" class="space-y-4">
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            OAuth Token (JSON)
+        </label>
+        <textarea name="provider_config[token]"
+                  rows="4"
+                  class="input-modern mt-1"
+                  placeholder="{% if config %}Leave empty to keep current token{% else %}{'access_token':'...','token_type':'bearer','expiry':'...'}{% endif %}">{% if config and not config.token %}{% endif %}</textarea>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {% if config %}Leave empty to keep the current token.{% endif %}
+        </p>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Hostname
+        </label>
+        <select name="provider_config[hostname]" class="select-modern mt-1">
+            <option value="api.pcloud.com"
+                    {% if config and (config.hostname or 'api.pcloud.com') == 'api.pcloud.com' %}selected{% endif %}>
+                api.pcloud.com (US)
+            </option>
+            <option value="eapi.pcloud.com"
+                    {% if config and config.hostname == 'eapi.pcloud.com' %}selected{% endif %}>
+                eapi.pcloud.com (EU)
+            </option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Root Folder ID (optional)
+        </label>
+        <input type="text"
+               name="provider_config[root_folder_id]"
+               {% if config %}value="{{ config.root_folder_id or '' }}"{% endif %}
+               placeholder="d0"
+               class="input-modern mt-1">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Leave blank for account root.
+        </p>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Path Prefix (optional)
+        </label>
+        <input type="text"
+               name="path_prefix"
+               {% if config %}value="{{ config.path_prefix or '' }}"{% endif %}
+               placeholder="backups/borgitory"
+               class="input-modern mt-1">
+    </div>
+</div>

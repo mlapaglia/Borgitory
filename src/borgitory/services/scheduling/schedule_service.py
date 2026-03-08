@@ -400,7 +400,7 @@ class ScheduleService:
 
             try:
                 repository_id = int(repository_id)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return False, {}, "Invalid repository ID"
 
             # Validate name
@@ -414,7 +414,7 @@ class ScheduleService:
                     return None
                 try:
                     return int(value)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     return None
 
             # Process hooks and patterns (they come as JSON strings)
@@ -426,7 +426,10 @@ class ScheduleService:
             source_paths = json_data.get("source_paths")
             if isinstance(source_paths, list):
                 from borgitory.utils.source_paths import serialize_source_paths
-                filtered = [p.strip() for p in source_paths if isinstance(p, str) and p.strip()]
+
+                filtered = [
+                    p.strip() for p in source_paths if isinstance(p, str) and p.strip()
+                ]
                 if not filtered:
                     return False, {}, "At least one source path is required"
                 non_absolute = [p for p in filtered if not p.startswith("/")]

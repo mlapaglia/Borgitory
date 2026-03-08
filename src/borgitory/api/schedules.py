@@ -243,10 +243,17 @@ async def get_schedule_edit_form(
             raise HTTPException(status_code=404, detail="Schedule not found")
 
         form_data = await config_service.get_schedule_form_data(db)
-        source_paths = parse_source_paths(schedule.source_path) if schedule.source_path else [""]
+        source_paths = (
+            parse_source_paths(schedule.source_path) if schedule.source_path else [""]
+        )
         if not source_paths:
             source_paths = [""]
-        context = {**form_data, "schedule": schedule, "is_edit_mode": True, "source_paths": source_paths}
+        context = {
+            **form_data,
+            "schedule": schedule,
+            "is_edit_mode": True,
+            "source_paths": source_paths,
+        }
 
         return templates.TemplateResponse(
             request, "partials/schedules/edit_form.html", context
@@ -493,7 +500,7 @@ async def move_hook(
             {"hook_type": hook_type, "hooks": current_hooks},
         )
 
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -523,7 +530,7 @@ async def remove_hook_field(
             {"hook_type": hook_type, "hooks": current_hooks},
         )
 
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -541,7 +548,7 @@ async def get_hooks_modal(
         # Get data from the actual form field names
         pre_hooks_json = str(json_data.get("pre_job_hooks", "[]"))
         post_hooks_json = str(json_data.get("post_job_hooks", "[]"))
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         pre_hooks_json = "[]"
         post_hooks_json = "[]"
 
@@ -584,7 +591,7 @@ async def save_hooks(
     try:
         pre_count = len(json.loads(pre_hooks_json)) if pre_hooks_json else 0
         post_count = len(json.loads(post_hooks_json)) if post_hooks_json else 0
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         pre_count = 0
         post_count = 0
 
@@ -652,7 +659,7 @@ async def remove_source_path_field(
         remove_index = int(json_data.get("remove_index", 0))
         if 0 <= remove_index < len(current_paths):
             current_paths.pop(remove_index)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         pass
 
     if not current_paths:
@@ -725,7 +732,7 @@ async def move_pattern(
             {"patterns": current_patterns},
         )
 
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -752,7 +759,7 @@ async def remove_pattern_field(
             {"patterns": current_patterns},
         )
 
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -803,7 +810,7 @@ async def save_patterns(
 
     try:
         total_count = len(json.loads(patterns_json)) if patterns_json else 0
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         total_count = 0
 
     return templates.TemplateResponse(

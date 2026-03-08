@@ -10,7 +10,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import Callable, Dict, Optional, List, AsyncGenerator, Union, cast
+from typing import Callable, Dict, Optional, List, AsyncGenerator, cast
 from pydantic import Field, field_validator, model_validator
 from contextlib import asynccontextmanager, AsyncExitStack
 from typing import AsyncIterator
@@ -224,7 +224,9 @@ class SFTPStorage(CloudStorage):
                 )
             return status == "success"
         except Exception as e:
-            logger.error(f"SFTP connection test failed with exception: {e}", exc_info=True)
+            logger.error(
+                f"SFTP connection test failed with exception: {e}", exc_info=True
+            )
             return False
 
     def get_connection_info(self) -> ConnectionInfo:
@@ -580,58 +582,6 @@ class SFTPStorage(CloudStorage):
                     os.unlink(key_file_path)
                 except OSError:
                     pass
-
-    def parse_rclone_progress(
-        self, line: str
-    ) -> Optional[Dict[str, Union[str, int, float]]]:
-        """Parse Rclone progress output"""
-        if "Transferred:" in line:
-            try:
-                parts = line.split()
-                if len(parts) >= 6:
-                    transferred = parts[1]
-                    total = parts[4].rstrip(",")
-                    percentage = parts[5].rstrip("%,")
-                    speed = parts[6] if len(parts) > 6 else "0"
-
-                    return {
-                        "transferred": transferred,
-                        "total": total,
-                        "percentage": float(percentage)
-                        if percentage.replace(".", "").isdigit()
-                        else 0,
-                        "speed": speed,
-                    }
-            except (IndexError, ValueError):
-                pass
-
-        if "ETA" in line:
-            try:
-                eta_part = line.split("ETA")[-1].strip()
-                return {"eta": eta_part}
-            except (ValueError, KeyError):
-                pass
-
-        return None
-
-    async def _merge_async_generators(
-        self, *async_generators: AsyncGenerator[ProgressData, None]
-    ) -> AsyncGenerator[ProgressData, None]:
-        """Merge multiple async generators into one"""
-        tasks = []
-        for gen in async_generators:
-
-            async def wrapper(
-                g: AsyncGenerator[ProgressData, None],
-            ) -> AsyncGenerator[ProgressData, None]:
-                async for item in g:
-                    yield item
-
-            tasks.append(wrapper(gen))
-
-        for task in tasks:
-            async for item in task:
-                yield item
 
 
 @register_provider(

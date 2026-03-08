@@ -1,6 +1,6 @@
 repos:
 - repo: https://github.com/gitleaks/gitleaks
-  rev: 51ca0f89b915509f07f956144ce2c64994b80947 # v8.16.3
+  rev: 6eaad039603a4de39fddd1cf5f727391efe9974e # v8.30.0
   hooks:
   - id: gitleaks
 - repo: https://github.com/jumanjihouse/pre-commit-hooks
@@ -8,13 +8,16 @@ repos:
   hooks:
   - id: shellcheck
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: f71fa2c1f9cf5cb705f73dffe4b21f7c61470ba9 # v4.4.0
+  rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: 0470f7c8a653e950f7cc5a653204ceb3fde4c02a # v0.15.0
+- repo: local
   hooks:
-  - id: ruff
-    args: [--fix]
-  - id: ruff-format
+  - id: lint
+    name: lint
+    entry: python lint.py all
+    language: system
+    types: [python]
+    pass_filenames: true
+    exclude: ^tests/

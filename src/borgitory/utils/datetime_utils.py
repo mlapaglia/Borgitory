@@ -35,7 +35,7 @@ def parse_datetime_string(dt_string: str) -> Optional[datetime]:
         # Try parsing as-is (may have timezone offset)
         return datetime.fromisoformat(dt_string)
 
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         # If all parsing attempts fail
         return None
 
@@ -63,7 +63,7 @@ def get_server_timezone() -> timezone:
                 hours, minutes = map(int, tz_name[1:].split(":"))
                 offset = timedelta(hours=sign * hours, minutes=sign * minutes)
                 return timezone(offset)
-        except (ValueError, AttributeError):
+        except ValueError, AttributeError:
             pass
 
     # Default to UTC for consistency
@@ -133,7 +133,7 @@ def parse_timezone_offset(tz_offset_minutes: Union[int, None]) -> timezone:
     try:
         # Ensure we have a valid integer
         offset_int = int(tz_offset_minutes)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return UTC
 
     # Convert minutes to hours and minutes

@@ -87,6 +87,7 @@ def get_cipher_suite() -> Fernet:
         _cipher_suite = Fernet(fernet_key)
     return _cipher_suite
 
+
 class Repository(Base):
     __tablename__ = "repositories"
 
@@ -287,9 +288,7 @@ class User(Base):
             raise ValueError(
                 f"Password exceeds bcrypt limit of {BCRYPT_MAX_PASSWORD_BYTES} bytes"
             )
-        self.password_hash = bcrypt.hashpw(
-            encoded,
-            bcrypt.gensalt()).decode("utf-8")
+        self.password_hash = bcrypt.hashpw(encoded, bcrypt.gensalt()).decode("utf-8")
 
     def verify_password(self, password: str) -> bool:
         """Verify a password against the stored hash. Returns False if password exceeds 72 bytes."""
