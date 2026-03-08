@@ -188,7 +188,7 @@ jobs:
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
         report_type: test_results
-        name: unit-tests
+        name: unit-tests-results
         flags: unit
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
@@ -308,7 +308,7 @@ jobs:
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
         report_type: test_results
-        name: e2e-tests
+        name: e2e-tests-results
         flags: e2e
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
