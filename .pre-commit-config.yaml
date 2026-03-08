@@ -12,6 +12,10 @@ repos:
   hooks:
   - id: end-of-file-fixer
   - id: trailing-whitespace
+- repo: https://github.com/rhysd/actionlint
+  rev: 393031adb9afb225ee52ae2ccd7a5af5525e03e8 # v1.7.11
+  hooks:
+  - id: actionlint
 - repo: local
   hooks:
   - id: mypy

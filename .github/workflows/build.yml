@@ -245,8 +245,15 @@ jobs:
         fail_ci_if_error: false
 
   test-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: prepare-test-images
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
 
     steps:
     - name: Harden the runner (Audit all outbound calls)
@@ -277,12 +284,13 @@ jobs:
           -w /app \
           borgitory-test-x86_64 \
           sh -c "pip install -e .[dev] && playwright install --with-deps chromium && pytest tests/e2e/ -o 'addopts=' -v --tb=short --browser chromium \
+            --screenshot only-on-failure \
             --cov=src/borgitory \
             --cov-report=xml:e2e-coverage.xml \
             --cov-report=html:e2e-htmlcov"
 
     - name: Upload E2E test coverage to Codecov
-      if: always()
+      if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
         files: ./e2e-coverage.xml
@@ -291,11 +299,11 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
-    - name: Upload Playwright traces on failure
+    - name: Upload Playwright traces and screenshots on failure
       if: failure()
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
-        name: playwright-traces
+        name: playwright-traces-and-screenshots
         path: test-results/
         retention-days: 7
 
