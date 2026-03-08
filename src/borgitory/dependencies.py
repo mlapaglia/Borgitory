@@ -325,13 +325,9 @@ def get_notification_service_singleton() -> NotificationService:
     """
     Create NotificationService singleton for application-scoped use.
 
-    📋 USAGE:
-    ✅ Use for: Singletons, direct instantiation, tests, JobManager
-    ❌ Don't use for: FastAPI endpoints (use get_notification_service instead)
-
-    📋 PATTERN: Dual Functions
+    Use for singletons, direct instantiation, tests, and JobManager.
+    For FastAPI endpoints use get_notification_service with Depends() instead.
     This is the singleton version that resolves dependencies directly.
-    For FastAPI DI, use get_notification_service() with Depends().
 
     Returns:
         NotificationService: Cached singleton instance
@@ -351,16 +347,9 @@ def get_notification_service(
     """
     Provide NotificationService with FastAPI dependency injection.
 
-    📋 USAGE:
-    ✅ Use for: FastAPI endpoints with Depends(get_notification_service)
-    ❌ Don't use for: Direct calls, singletons, tests
-
-    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
-    ⚠️  For direct calls, use get_notification_service_singleton() instead.
-
-    📋 PATTERN: Dual Functions
-    This is the FastAPI DI version that expects resolved dependencies.
-    For direct calls, use get_notification_service_singleton().
+    Use for FastAPI endpoints with Depends(get_notification_service).
+    For direct calls or singletons use get_notification_service_singleton() instead.
+    This function should only be called by FastAPI's DI system.
 
     Args:
         provider_factory: Injected by FastAPI DI system
@@ -727,13 +716,9 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
     """
     Create JobManager singleton for application-scoped use.
 
-    📋 USAGE:
-    ✅ Use for: Singletons, direct instantiation, tests, background tasks
-    ❌ Don't use for: FastAPI endpoints (use get_job_manager_dependency instead)
-
-    📋 PATTERN: Dual Functions
+    Use for singletons, direct instantiation, tests, and background tasks.
+    For FastAPI endpoints use get_job_manager_dependency with Depends() instead.
     This is the singleton version that resolves dependencies directly.
-    For FastAPI DI, use get_job_manager_dependency() with Depends().
 
     Returns:
         JobManagerProtocol: Cached singleton instance
@@ -801,16 +786,10 @@ def get_job_manager_dependency() -> "JobManagerProtocol":
     """
     Provide JobManager with FastAPI dependency injection.
 
-    📋 USAGE:
-    ✅ Use for: FastAPI endpoints with Depends(get_job_manager_dependency)
-    ❌ Don't use for: Direct calls, singletons, tests
-
-    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
-    ⚠️  For direct calls, use get_job_manager_singleton() instead.
-
-    📋 PATTERN: Dual Functions
-    This is the FastAPI DI version that returns the same singleton instance.
-    For direct calls, use get_job_manager_singleton().
+    Use for FastAPI endpoints with Depends(get_job_manager_dependency).
+    For direct calls or singletons use get_job_manager_singleton() instead.
+    This function should only be called by FastAPI's DI system.
+    Returns the same singleton instance as get_job_manager_singleton().
 
     Returns:
         JobManagerProtocol: The same singleton instance as get_job_manager_singleton()
@@ -825,13 +804,9 @@ def get_scheduler_service_singleton() -> SchedulerService:
     """
     Create SchedulerService singleton for application-scoped use.
 
-    📋 USAGE:
-    ✅ Use for: Singletons, direct instantiation, tests, background tasks, application lifecycle
-    ❌ Don't use for: FastAPI endpoints (use get_scheduler_service_dependency instead)
-
-    📋 PATTERN: Dual Functions
+    Use for singletons, direct instantiation, tests, background tasks, and application lifecycle.
+    For FastAPI endpoints use get_scheduler_service_dependency with Depends() instead.
     This is the singleton version that resolves dependencies directly.
-    For FastAPI DI, use get_scheduler_service_dependency() with Depends().
 
     Returns:
         SchedulerService: Cached singleton instance
@@ -851,16 +826,10 @@ def get_scheduler_service_dependency() -> SchedulerService:
     """
     Provide SchedulerService with FastAPI dependency injection.
 
-    📋 USAGE:
-    ✅ Use for: FastAPI endpoints with Depends(get_scheduler_service_dependency)
-    ❌ Don't use for: Direct calls, singletons, tests
-
-    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
-    ⚠️  For direct calls, use get_scheduler_service_singleton() instead.
-
-    📋 PATTERN: Dual Functions
-    This is the FastAPI DI version that returns the same singleton instance.
-    For direct calls, use get_scheduler_service_singleton().
+    Use for FastAPI endpoints with Depends(get_scheduler_service_dependency).
+    For direct calls or singletons use get_scheduler_service_singleton() instead.
+    This function should only be called by FastAPI's DI system.
+    Returns the same singleton instance as get_scheduler_service_singleton().
 
     Returns:
         SchedulerService: The same singleton instance as get_scheduler_service_singleton()
@@ -965,7 +934,7 @@ def get_cloud_sync_config_service(
     return factory.create_cloud_sync_config_service("default")
 
 
-# 📋 SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
+# SEMANTIC TYPE ALIASES FOR DEPENDENCY INJECTION
 #
 # These type aliases express the INTENDED USAGE PATTERN and LIFECYCLE:
 # - ApplicationScoped* = Singleton instances for app-wide services (JobManager, background tasks)
@@ -1097,13 +1066,9 @@ def get_archive_manager_singleton() -> ArchiveManagerProtocol:
     """
     Create ArchiveManager singleton for application-scoped use.
 
-    📋 USAGE:
-    ✅ Use for: Singletons, direct instantiation, tests, background tasks
-    ❌ Don't use for: FastAPI endpoints (use get_archive_manager_dependency instead)
-
-    📋 PATTERN: Dual Functions
+    Use for singletons, direct instantiation, tests, and background tasks.
+    For FastAPI endpoints use get_archive_manager_dependency with Depends() instead.
     This is the singleton version that resolves dependencies directly.
-    For FastAPI DI, use get_archive_manager_dependency() with Depends().
 
     Returns:
         ArchiveManagerProtocol: Cached singleton instance with persistent cache state
@@ -1113,10 +1078,12 @@ def get_archive_manager_singleton() -> ArchiveManagerProtocol:
     platform_service = get_platform_service()
     command_executor = get_command_executor(wsl_executor, platform_service)
     job_executor = get_job_executor(command_executor)
+    command_runner_config = get_command_runner_config()
 
     return ArchiveManager(
         job_executor=job_executor,
         command_executor=command_executor,
+        command_runner_config=command_runner_config,
         cache_ttl=timedelta(minutes=30),
     )
 
@@ -1125,16 +1092,10 @@ def get_archive_manager_dependency() -> ArchiveManagerProtocol:
     """
     Provide ArchiveManager with FastAPI dependency injection.
 
-    📋 USAGE:
-    ✅ Use for: FastAPI endpoints with Depends(get_archive_manager_dependency)
-    ❌ Don't use for: Direct calls, singletons, tests
-
-    ⚠️  WARNING: This function should ONLY be called by FastAPI's DI system.
-    ⚠️  For direct calls, use get_archive_manager_singleton() instead.
-
-    📋 PATTERN: Dual Functions
-    This is the FastAPI DI version that returns the same singleton instance.
-    For direct calls, use get_archive_manager_singleton().
+    Use for FastAPI endpoints with Depends(get_archive_manager_dependency).
+    For direct calls or singletons use get_archive_manager_singleton() instead.
+    This function should only be called by FastAPI's DI system.
+    Returns the same singleton instance as get_archive_manager_singleton().
 
     Returns:
         ArchiveManagerProtocol: The same singleton instance as get_archive_manager_singleton()
@@ -1191,6 +1152,7 @@ def get_borg_service(
 def get_archive_manager(
     job_executor: JobExecutor = Depends(get_job_executor),
     command_executor: "CommandExecutorProtocol" = Depends(get_command_executor),
+    command_runner_config: "CommandRunnerConfig" = Depends(get_command_runner_config),
 ) -> ArchiveManagerProtocol:
     """
     Provide an ArchiveManager instance with proper dependency injection.
@@ -1203,6 +1165,7 @@ def get_archive_manager(
     """
     return ArchiveManager(
         job_executor=job_executor,
+        command_runner_config=command_runner_config,
         command_executor=command_executor,
         cache_ttl=timedelta(minutes=30),
     )
