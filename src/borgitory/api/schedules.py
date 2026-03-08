@@ -23,7 +23,11 @@ from borgitory.services.scheduling.pattern_service import PatternService
 from borgitory.services.scheduling.hook_service import HookService
 from borgitory.api.auth import get_current_user
 from borgitory.models.database import User
-from borgitory.utils.source_paths import parse_source_paths
+from borgitory.utils.source_paths import (
+    parse_source_paths,
+    parse_source_paths_raw,
+    serialize_source_paths,
+)
 
 router = APIRouter()
 
@@ -244,15 +248,15 @@ async def get_schedule_edit_form(
 
         form_data = await config_service.get_schedule_form_data(db)
         source_paths = (
-            parse_source_paths(schedule.source_path) if schedule.source_path else [""]
+            parse_source_paths(schedule.source_path) if schedule.source_path else []
         )
-        if not source_paths:
-            source_paths = [""]
+        source_path_json = serialize_source_paths(source_paths)
         context = {
             **form_data,
             "schedule": schedule,
             "is_edit_mode": True,
             "source_paths": source_paths,
+            "source_path_json": source_path_json,
         }
 
         return templates.TemplateResponse(
@@ -615,18 +619,72 @@ async def close_modal() -> HTMLResponse:
 
 
 # Source Paths API endpoints
-def _extract_source_paths_from_request_data(data: Dict[str, Any]) -> list[str]:
-    """Extract source_paths from JSON request data.
 
-    json-enc sends multiple inputs with the same name as an array,
-    or a single input as a bare string.
-    """
-    raw = data.get("source_paths", [])
-    if isinstance(raw, list):
-        return [str(p) for p in raw]
-    if isinstance(raw, str):
-        return [raw]
-    return [""]
+
+@router.post("/source-paths/source-paths-modal", response_class=HTMLResponse)
+async def get_source_paths_modal(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Open source paths configuration modal with current path data from parent."""
+    try:
+        json_data = await request.json()
+        source_path_value = str(json_data.get("source_path", "[]"))
+    except ValueError, TypeError, KeyError:
+        source_path_value = "[]"
+
+    source_paths = parse_source_paths_raw(source_path_value)
+    if not source_paths:
+        source_paths = [""]
+
+    return templates.TemplateResponse(
+        request,
+        "partials/shared/source_paths_modal.html",
+        {"source_paths": source_paths},
+    )
+
+
+@router.post("/source-paths/save-source-paths", response_class=HTMLResponse)
+async def save_source_paths(
+    request: Request,
+    templates: TemplatesDep,
+) -> HTMLResponse:
+    """Save source paths and update parent form via OOB swap."""
+    form_data = await request.form()
+    raw_paths = form_data.getlist("source_paths")
+    filtered = [p.strip() for p in raw_paths if isinstance(p, str) and p.strip()]
+
+    non_absolute = [p for p in filtered if not p.startswith("/")]
+    if non_absolute:
+        return templates.TemplateResponse(
+            request,
+            "partials/shared/source_paths_validation_error.html",
+            {
+                "error_message": (
+                    f"All source paths must be absolute (start with /). "
+                    f"Invalid: {', '.join(non_absolute)}"
+                )
+            },
+            status_code=400,
+        )
+
+    source_paths_json = serialize_source_paths(filtered)
+    total_count = len(filtered)
+
+    return templates.TemplateResponse(
+        request,
+        "partials/shared/source_paths_save_response.html",
+        {
+            "source_paths_json": source_paths_json,
+            "total_count": total_count,
+        },
+    )
+
+
+@router.get("/source-paths/close-modal", response_class=HTMLResponse)
+async def close_source_paths_modal() -> HTMLResponse:
+    """Close source paths modal without saving."""
+    return HTMLResponse(content='<div id="modal-container"></div>', status_code=200)
 
 
 @router.post("/source-paths/add-field", response_class=HTMLResponse)
@@ -635,8 +693,8 @@ async def add_source_path_field(
     templates: TemplatesDep,
 ) -> HTMLResponse:
     """Add a new source path field row via HTMX."""
-    json_data = await request.json()
-    current_paths = _extract_source_paths_from_request_data(json_data)
+    form_data = await request.form()
+    current_paths = list(form_data.getlist("source_paths"))
     current_paths.append("")
 
     return templates.TemplateResponse(
@@ -652,11 +710,11 @@ async def remove_source_path_field(
     templates: TemplatesDep,
 ) -> HTMLResponse:
     """Remove a source path field row via HTMX."""
-    json_data = await request.json()
-    current_paths = _extract_source_paths_from_request_data(json_data)
+    form_data = await request.form()
+    current_paths = list(form_data.getlist("source_paths"))
 
     try:
-        remove_index = int(json_data.get("remove_index", 0))
+        remove_index = int(str(form_data.get("remove_index", 0)))
         if 0 <= remove_index < len(current_paths):
             current_paths.pop(remove_index)
     except ValueError, TypeError:

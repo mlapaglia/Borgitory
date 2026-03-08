@@ -671,7 +671,7 @@ class BackupRequest(BaseModel):
     repository_id: int = Field(gt=0)
     source_path: str = Field(
         default="/",
-        description="Absolute path(s) to source directory, stored as JSON array string",
+        description="Source path(s) to backup. Can be a single path string (legacy) or JSON array string of multiple paths.",
     )
     compression: CompressionType = CompressionType.ZSTD
     dry_run: bool = False

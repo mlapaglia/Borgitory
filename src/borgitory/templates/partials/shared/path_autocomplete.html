@@ -15,6 +15,7 @@
            hx-get="/api/repositories/directories/autocomplete"
            hx-trigger="input changed delay:300ms, focus delay:100ms, autocomplete-immediate"
            hx-target="#{{ input_id }}-dropdown"
+           hx-swap="innerHTML"
            hx-include="this"
            hx-headers='{"hx-target-input": "{{ input_id }}"}'
            autocomplete="off"
