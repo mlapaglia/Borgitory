@@ -35,7 +35,6 @@ class TestArchiveManagerCaching:
         repo.get_keyfile_content.return_value = None
         return repo
 
-
     @pytest.fixture
     def mock_command_runner_config(self) -> MagicMock:
         """Mock command runner config"""
