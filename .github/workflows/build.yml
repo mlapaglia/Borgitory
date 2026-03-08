@@ -184,9 +184,9 @@ jobs:
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
-        report_type: test_results
-        name: unit-tests-results
         flags: unit
+        name: unit-tests-results
+        report_type: test_results
         token: ${{ secrets.CODECOV_TOKEN }}
 
   test-integration:
@@ -238,7 +238,6 @@ jobs:
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
-        files: ./integration-coverage.xml
         flags: integration
         name: integration-tests
         token: ${{ secrets.CODECOV_TOKEN }}
@@ -247,9 +246,9 @@ jobs:
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
-        report_type: test_results
-        name: integration-tests-results
         flags: integration
+        name: integration-tests-results
+        report_type: test_results
         token: ${{ secrets.CODECOV_TOKEN }}
 
   test-e2e:
@@ -283,7 +282,7 @@ jobs:
     - name: Load Docker image
       run: docker load < /tmp/borgitory-test-${{ matrix.arch }}.tar
 
-    - name: Run E2E tests with coverage
+    - name: Run e2e tests with coverage
       run: |
         docker run --rm \
           --cap-add SYS_ADMIN \
@@ -298,22 +297,21 @@ jobs:
             --junitxml=junit.xml \
             --override-ini junit_family=legacy
 
-    - name: Upload E2E test coverage to Codecov
+    - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
-        files: ./e2e-coverage.xml
         flags: e2e
         name: e2e-tests
         token: ${{ secrets.CODECOV_TOKEN }}
 
-    - name: Upload test results to Codecov
+    - name: Upload e2e test results to Codecov
       if: always() && matrix.arch == 'x86_64'
       uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
-        report_type: test_results
-        name: e2e-tests-results
         flags: e2e
+        name: e2e-tests-results
+        report_type: test_results
         token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload Playwright traces and screenshots on failure
