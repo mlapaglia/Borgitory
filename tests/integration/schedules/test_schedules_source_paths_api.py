@@ -216,7 +216,7 @@ class TestScheduleSourcePathsAPI:
     async def test_save_rejects_all_relative_paths(
         self, setup_test_dependencies: Dict[str, Any], async_client: AsyncClient
     ) -> None:
-        captured = setup_test_dependencies["captured_contexts"]
+        _ = setup_test_dependencies["captured_contexts"]
 
         response = await async_client.post(
             "/api/schedules/source-paths/save-source-paths",
