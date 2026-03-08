@@ -1,6 +1,5 @@
 """Tests for source_paths validation in Pydantic schemas."""
 
-import json
 import pytest
 from pydantic import ValidationError
 
