@@ -292,7 +292,7 @@ jobs:
           -v $(pwd):/app \
           -w /app \
           borgitory-test-${{ matrix.arch }} \
-          pytest tests/e2e/ \
+          playwright install --with-deps chromium && pytest tests/e2e/ \
             --config-file tests/e2e/pytest.e2e.ini \
             --cov src/borgitory \
             --junitxml junit.xml \
