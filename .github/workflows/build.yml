@@ -185,9 +185,13 @@ jobs:
 
     - name: Upload test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
+      uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
       with:
+        report_type: test_results
+        name: unit-tests
+        flags: unit
         token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
 
   test-integration:
     runs-on: ${{ matrix.os }}
@@ -296,6 +300,16 @@ jobs:
         files: ./e2e-coverage.xml
         flags: e2e
         name: e2e-tests
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+
+    - name: Upload test results to Codecov
+      if: always() && matrix.arch == 'x86_64'
+      uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+      with:
+        report_type: test_results
+        name: e2e-tests
+        flags: e2e
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
 
