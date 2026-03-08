@@ -448,7 +448,7 @@ class TestExecuteScheduledBackup:
         schedule.id = 1
         schedule.name = "Test Schedule"
         schedule.repository_id = 10
-        schedule.source_paths = '["/data/backup"]'
+        schedule.source_paths = ["/data/backup"]
         schedule.cloud_sync_config_id = None
         schedule.prune_config_id = 2
         schedule.check_config_id = 3
@@ -522,7 +522,7 @@ class TestExecuteScheduledBackup:
         assert call_args.args[0] is mock_db
         backup_request = call_args.args[1]
         assert backup_request.repository_id == 10
-        assert backup_request.source_paths == '["/data/backup"]'
+        assert backup_request.source_paths == ["/data/backup"]
         assert backup_request.prune_config_id == 2
         assert backup_request.check_config_id == 3
         assert call_args.args[2] == JobType.SCHEDULED_BACKUP
