@@ -39,15 +39,14 @@ def production_registry() -> ProviderRegistry:
     Create a registry with all production providers registered.
 
     This fixture provides a completely isolated registry that matches the production environment,
-    with all real cloud providers (S3, SFTP, SMB) registered.
+    with all real cloud providers (S3, SFTP, SMB, pCloud) registered.
 
     Returns:
         ProviderRegistry: Registry with all production providers
     """
     from borgitory.services.cloud_providers.registry_factory import RegistryFactory
 
-    # Create an isolated registry with all providers for testing
-    return RegistryFactory.create_test_registry(["s3", "sftp", "smb"])
+    return RegistryFactory.create_test_registry(["s3", "sftp", "smb", "pcloud"])
 
 
 @pytest.fixture

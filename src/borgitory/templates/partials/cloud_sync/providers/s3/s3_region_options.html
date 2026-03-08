@@ -2,13 +2,18 @@
     Region
 </label>
 {% if has_regions %}
-<select name="provider_config[region]" class="select-modern mt-1">
-    {% for region in regions %}
-    <option value="{{ region }}" {% if region == selected_region %}selected{% endif %}>
-        {{ region }}
-    </option>
-    {% endfor %}
-</select>
+    <select name="provider_config[region]" class="select-modern mt-1">
+        {% for region in regions %}
+            <option value="{{ region }}"
+                    {% if region == selected_region %}selected{% endif %}>
+                {{ region }}
+            </option>
+        {% endfor %}
+    </select>
 {% else %}
-<input type="text" name="provider_config[region]" value="{{ selected_region }}" placeholder="Enter region (optional)" class="input-modern mt-1">
+    <input type="text"
+           name="provider_config[region]"
+           value="{{ selected_region }}"
+           placeholder="Enter region (optional)"
+           class="input-modern mt-1">
 {% endif %}

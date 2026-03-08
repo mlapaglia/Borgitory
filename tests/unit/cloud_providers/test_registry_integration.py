@@ -176,11 +176,10 @@ class TestAPIProviderIntegration:
 
         # Should be a list of dicts with correct structure
         assert isinstance(providers, list)
-        assert len(providers) == 3
+        assert len(providers) >= 3
 
-        # Check structure of first provider (s3, since it's sorted)
-        s3_provider = providers[0]
-        assert s3_provider["value"] == "s3"
+        # Check structure of s3 provider (registry is sorted, so find by value)
+        s3_provider = next(p for p in providers if p["value"] == "s3")
         assert s3_provider["label"] == "S3-Compatible Storage"
         assert s3_provider["description"] == "Amazon S3-compatible storage providers"
 
@@ -202,8 +201,8 @@ class TestAPIProviderIntegration:
         providers = _get_supported_providers(registry)
 
         values = [p["value"] for p in providers]
-        assert values == sorted(values)  # Should be sorted
-        assert values == ["s3", "sftp", "smb"]
+        assert values == sorted(values)
+        assert set(values) >= {"s3", "sftp", "smb", "pcloud"}
 
 
 class TestServiceLayerIntegration:

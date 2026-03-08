@@ -5,12 +5,20 @@ import shutil
 from typing import Generator
 
 import pytest
-from playwright.sync_api import Page, BrowserContext
+from playwright.sync_api import Page, BrowserContext, expect
 
 from tests.integration.test_app_startup import AppRunner
 
 E2E_USERNAME = "e2e_admin"
 E2E_PASSWORD = "e2e_password_123"
+
+HTMX_BUSY_SELECTOR = ".htmx-request, .htmx-settling, .htmx-swapping, .htmx-added"
+
+
+def wait_for_htmx(page: Page, timeout: int = 10000) -> None:
+    """Wait until HTMX has no in-flight requests or pending swaps."""
+    page.wait_for_load_state("networkidle")
+    expect(page.locator(HTMX_BUSY_SELECTOR)).to_have_count(0, timeout=timeout)
 
 
 @pytest.fixture(scope="session")
@@ -70,13 +78,11 @@ def authenticated_page(
     page.goto(f"{app_server.base_url}/")
     page.wait_for_load_state("networkidle")
 
-    # Fill and submit the login form
     page.locator("#username").wait_for(timeout=10000)
     page.fill("#username", E2E_USERNAME)
     page.fill("#password", E2E_PASSWORD)
     page.click("#login-form button[type='submit']")
 
-    # Wait for redirect to the main app (the sidebar nav should be present)
     page.locator("#nav-repositories").wait_for(timeout=15000)
     page.wait_for_load_state("networkidle")
 

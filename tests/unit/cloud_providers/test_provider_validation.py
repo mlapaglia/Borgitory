@@ -58,10 +58,12 @@ def clean_registry() -> Generator[None, None, None]:
     import borgitory.services.cloud_providers.storage.s3_storage
     import borgitory.services.cloud_providers.storage.sftp_storage
     import borgitory.services.cloud_providers.storage.smb_storage
+    import borgitory.services.cloud_providers.storage.pcloud_storage
 
     importlib.reload(borgitory.services.cloud_providers.storage.s3_storage)
     importlib.reload(borgitory.services.cloud_providers.storage.sftp_storage)
     importlib.reload(borgitory.services.cloud_providers.storage.smb_storage)
+    importlib.reload(borgitory.services.cloud_providers.storage.pcloud_storage)
     yield None
     # Don't clear after - let the next test's setup handle it
 

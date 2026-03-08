@@ -9,7 +9,7 @@ import asyncio
 import logging
 import re
 from enum import Enum
-from typing import AsyncGenerator, Callable, Dict, List, Optional, Union, cast
+from typing import AsyncGenerator, Callable, Dict, List, Optional, cast
 from pydantic import Field, field_validator, model_validator
 
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
@@ -184,14 +184,15 @@ class S3Storage(CloudStorage):
             )
 
         try:
-            final_status = None
             async for progress in self.sync_repository_to_s3(
                 repository_path=repository_path,
                 path_prefix=remote_path,
             ):
-                if progress.get("type") == "completed":
-                    final_status = progress.get("status")
-                elif progress_callback and progress.get("type") == "log":
+                if not progress_callback:
+                    continue
+
+                progress_type = progress.get("type")
+                if progress_type == "progress":
                     progress_callback(
                         SyncEvent(
                             type=SyncEventType.PROGRESS,
@@ -199,11 +200,34 @@ class S3Storage(CloudStorage):
                             progress=float(progress.get("percentage", 0.0) or 0.0),
                         )
                     )
-
-            if final_status == "failed":
-                raise Exception(
-                    f"{self._config.provider_type.value} sync failed with non-zero exit code"
-                )
+                elif progress_type == "log":
+                    progress_callback(
+                        SyncEvent(
+                            type=SyncEventType.LOG,
+                            message=str(progress.get("message", "")),
+                        )
+                    )
+                elif progress_type == "error":
+                    error_msg = str(progress.get("message", "Unknown error"))
+                    progress_callback(
+                        SyncEvent(
+                            type=SyncEventType.ERROR,
+                            message=error_msg,
+                            error=error_msg,
+                        )
+                    )
+                    raise Exception(error_msg)
+                elif progress_type == "completed":
+                    if progress.get("status") != "success":
+                        error_msg = f"{self._config.provider_type.value} sync failed with return code {progress.get('return_code')}"
+                        progress_callback(
+                            SyncEvent(
+                                type=SyncEventType.ERROR,
+                                message=error_msg,
+                                error=error_msg,
+                            )
+                        )
+                        raise Exception(error_msg)
 
             if progress_callback:
                 progress_callback(
@@ -443,9 +467,26 @@ class S3Storage(CloudStorage):
                 stderr=asyncio.subprocess.PIPE,
             )
 
+            sensitive_prefixes = ("--s3-access-key-id", "--s3-secret-access-key")
+            safe_parts = []
+            skip_next = False
+            for part in command:
+                if skip_next:
+                    safe_parts.append("***")
+                    skip_next = False
+                elif part in sensitive_prefixes:
+                    safe_parts.append(part)
+                    skip_next = True
+                else:
+                    safe_parts.append(part)
+
             yield cast(
                 ProgressData,
-                {"type": "started", "command": " ".join(command), "pid": process.pid},
+                {
+                    "type": "started",
+                    "command": " ".join(safe_parts),
+                    "pid": process.pid,
+                },
             )
 
             async def read_stream(
@@ -613,56 +654,6 @@ class S3Storage(CloudStorage):
 
         except Exception as e:
             return {"status": "failed", "message": f"Write test failed: {str(e)}"}
-
-    def parse_rclone_progress(
-        self, line: str
-    ) -> Optional[Dict[str, Union[str, int, float]]]:
-        if "Transferred:" in line:
-            try:
-                parts = line.split()
-                if len(parts) >= 6:
-                    transferred = parts[1]
-                    total = parts[4].rstrip(",")
-                    percentage = parts[5].rstrip("%,")
-                    speed = parts[6] if len(parts) > 6 else "0"
-
-                    return {
-                        "transferred": transferred,
-                        "total": total,
-                        "percentage": float(percentage)
-                        if percentage.replace(".", "").isdigit()
-                        else 0,
-                        "speed": speed,
-                    }
-            except IndexError, ValueError:
-                pass
-
-        if "ETA" in line:
-            try:
-                eta_part = line.split("ETA")[-1].strip()
-                return {"eta": eta_part}
-            except ValueError, KeyError:
-                pass
-
-        return None
-
-    async def _merge_async_generators(
-        self, *async_generators: AsyncGenerator[ProgressData, None]
-    ) -> AsyncGenerator[ProgressData, None]:
-        tasks = []
-        for gen in async_generators:
-
-            async def wrapper(
-                g: AsyncGenerator[ProgressData, None],
-            ) -> AsyncGenerator[ProgressData, None]:
-                async for item in g:
-                    yield item
-
-            tasks.append(wrapper(gen))
-
-        for task in tasks:
-            async for item in task:
-                yield item
 
 
 @register_provider(

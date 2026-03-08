@@ -268,6 +268,7 @@ class StorageFactory:
             "s3": ["access_key", "secret_key"],
             "sftp": ["password", "private_key"],
             "smb": ["pass"],
+            "pcloud": ["token"],
         }
         return mapping.get(provider, [])
 
