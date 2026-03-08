@@ -168,9 +168,9 @@ jobs:
           borgitory-test-${{ matrix.arch }} \
           pytest tests/unit/ -v \
             --tb=short \
-            --cov=src/borgitory \
-            --cov-report=xml:coverage.xml \
-            --junitxml=junit.xml \
+            --cov src/borgitory \
+            --cov-report xml:coverage.xml \
+            --junitxml junit.xml \
             --override-ini junit_family=legacy
 
     - name: Upload unit test coverage to Codecov
@@ -230,10 +230,10 @@ jobs:
           -w /app \
           borgitory-test-${{ matrix.arch }} \
           pytest tests/integration/ -v \
-            --tb=short \
-            --cov=src/borgitory \
-            --cov-report=xml:integration-coverage.xml \
-            --junitxml=junit.xml \
+            --tb short \
+            --cov src/borgitory \
+            --cov-report xml:integration-coverage.xml \
+            --junitxml junit.xml \
             --override-ini junit_family=legacy
 
     - name: Upload integration test coverage to Codecov
@@ -293,9 +293,11 @@ jobs:
           -w /app \
           borgitory-test-${{ matrix.arch }} \
           sh -c "pip install -e .[dev] && playwright install --with-deps chromium && pytest tests/e2e/ \
-          --config-file tests/e2e/pytest.e2e.ini \
-          --cov src/borgitory \
-          --cov-report xml:e2e-coverage.xml"
+            --config-file tests/e2e/pytest.e2e.ini \
+            --cov src/borgitory \
+            --junitxml junit.xml \
+            --cov-report xml:e2e-coverage.xml \
+            --override-ini junit_family=legacy"
 
     - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
