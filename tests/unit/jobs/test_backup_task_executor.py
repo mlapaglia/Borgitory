@@ -46,7 +46,7 @@ def _make_executor() -> tuple[BackupTaskExecutor, Mock, Mock, Mock, Mock]:
 
 
 def _make_job_and_task(
-    source_paths: str,
+    source_paths: list[str],
     archive_name: str = "test-archive",
     repo_id: int = 1,
 ) -> tuple[BorgJob, BorgJobTask]:
@@ -98,7 +98,7 @@ class TestBackupTaskExecutorSourcePaths:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
         job, task = _make_job_and_task(
-            source_paths='["/home/user/src", "/home/user/Documents"]'
+            source_paths=["/home/user/src", "/home/user/Documents"]
         )
         captured_args: list[list[str]] = []
 
@@ -124,7 +124,7 @@ class TestBackupTaskExecutorSourcePaths:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
         job, task = _make_job_and_task(
-            source_paths='["/appdata/app1", "/appdata/app2", "/appdata/app3"]'
+            source_paths=["/appdata/app1", "/appdata/app2", "/appdata/app3"]
         )
         captured_args: list[list[str]] = []
 
@@ -148,7 +148,7 @@ class TestBackupTaskExecutorSourcePaths:
     async def test_single_path_json_array(self) -> None:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
-        job, task = _make_job_and_task(source_paths='["/data"]')
+        job, task = _make_job_and_task(source_paths=["/data"])
         captured_args: list[list[str]] = []
 
         with patch(
@@ -171,8 +171,8 @@ class TestBackupTaskExecutorSourcePaths:
     async def test_empty_source_path_appends_nothing(self) -> None:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
-        job, task = _make_job_and_task(source_paths="")
-        task.parameters["source_paths"] = ""
+        job, task = _make_job_and_task(source_paths=[])
+        task.parameters["source_paths"] = []
         captured_args: list[list[str]] = []
 
         with patch(
@@ -232,7 +232,7 @@ class TestBackupTaskExecutorSourcePaths:
         executor, job_executor, _, _, database_manager = _make_executor()
         _setup_successful_run(job_executor, database_manager)
         job, task = _make_job_and_task(
-            source_paths='["/src", "/docs"]'
+            source_paths=["/src", "/docs"]
         )
         captured_args: list[list[str]] = []
 
@@ -262,7 +262,7 @@ class TestBackupTaskExecutorSourcePaths:
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
             parameters={
-                "source_paths": '["/data", "/backup"]',
+                "source_paths": ["/data", "/backup"],
                 "archive_name": "test-archive",
                 "patterns": ["+*.txt", "-*.log"],
                 "dry_run": True,

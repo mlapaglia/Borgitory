@@ -8,7 +8,9 @@ import json
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 from borgitory.models.enums import EncryptionType
-from borgitory.utils.source_paths import parse_source_paths, serialize_source_paths
+from borgitory.utils.source_paths import (
+    parse_source_paths,
+)
 
 
 def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
@@ -92,31 +94,29 @@ def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
 ABSOLUTE_PATH_PATTERN = r"^/.*"
 
 
-def _coerce_source_paths(v: object) -> str:
-    """Coerce source_paths input to a JSON array string.
+def _coerce_source_paths_to_list(v: object) -> list[str]:
+    """Coerce source_paths input to a list of path strings.
 
     Accepts a JSON array string, a plain list of strings, None, or empty string.
     """
     if v is None or (isinstance(v, str) and not v.strip()):
-        return "[]"
+        return []
     if isinstance(v, list):
-        filtered = [p.strip() for p in v if isinstance(p, str) and p.strip()]
-        return serialize_source_paths(filtered)
+        return [p.strip() for p in v if isinstance(p, str) and p.strip()]
     if isinstance(v, str):
-        return v
-    return "[]"
+        return parse_source_paths(v)
+    return []
 
 
-def _validate_source_paths_absolute(v: str) -> str:
-    """Validate that every path inside a source_paths JSON array is absolute."""
-    paths = parse_source_paths(v)
+def _validate_source_paths_absolute_list(paths: list[str]) -> list[str]:
+    """Validate that every path is absolute."""
     non_absolute = [p for p in paths if not p.startswith("/")]
     if non_absolute:
         raise ValueError(
             f"All source paths must be absolute (start with /). "
             f"Invalid: {', '.join(non_absolute)}"
         )
-    return v
+    return paths
 
 
 # Enums for type safety and validation
@@ -333,8 +333,9 @@ class ScheduleBase(BaseModel):
 
 class ScheduleCreate(ScheduleBase):
     repository_id: int
-    source_paths: str = Field(
-        default="[]", description="JSON array of absolute source paths"
+    source_paths: list[str] = Field(
+        default_factory=list,
+        description="List of absolute source paths",
     )
     cloud_sync_config_id: Optional[int] = None
     prune_config_id: Optional[int] = None
@@ -346,13 +347,13 @@ class ScheduleCreate(ScheduleBase):
 
     @field_validator("source_paths", mode="before")
     @classmethod
-    def coerce_source_paths(cls, v: object) -> str:
-        return _coerce_source_paths(v)
+    def coerce_source_paths(cls, v: object) -> list[str]:
+        return _coerce_source_paths_to_list(v)
 
     @field_validator("source_paths", mode="after")
     @classmethod
-    def validate_source_paths(cls, v: str) -> str:
-        return _validate_source_paths_absolute(v)
+    def validate_source_paths(cls, v: list[str]) -> list[str]:
+        return _validate_source_paths_absolute_list(v)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
@@ -428,7 +429,7 @@ class ScheduleUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=128)
     cron_expression: Optional[str] = Field(None, min_length=5)
     repository_id: Optional[int] = None
-    source_paths: Optional[str] = None
+    source_paths: Optional[list[str]] = None
     cloud_sync_config_id: Optional[int] = None
     prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
@@ -440,17 +441,17 @@ class ScheduleUpdate(BaseModel):
 
     @field_validator("source_paths", mode="before")
     @classmethod
-    def coerce_source_paths(cls, v: object) -> Optional[str]:
+    def coerce_source_paths(cls, v: object) -> Optional[list[str]]:
         if v is None:
             return None
-        return _coerce_source_paths(v)
+        return _coerce_source_paths_to_list(v)
 
     @field_validator("source_paths", mode="after")
     @classmethod
-    def validate_source_paths(cls, v: Optional[str]) -> Optional[str]:
+    def validate_source_paths(cls, v: Optional[list[str]]) -> Optional[list[str]]:
         if v is None:
             return None
-        return _validate_source_paths_absolute(v)
+        return _validate_source_paths_absolute_list(v)
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -540,7 +541,7 @@ class ScheduleUpdate(BaseModel):
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
     repository_id: int = Field(gt=0)
-    source_paths: str = Field(default="[]")
+    source_paths: list[str] = Field(default_factory=list)
     enabled: bool
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
@@ -658,9 +659,9 @@ class NotificationConfig(NotificationConfigBase):
 
 class BackupRequest(BaseModel):
     repository_id: int = Field(gt=0)
-    source_paths: str = Field(
-        default="[]",
-        description="JSON array string of absolute source paths to backup.",
+    source_paths: list[str] = Field(
+        default_factory=list,
+        description="List of absolute source paths to backup.",
     )
     compression: CompressionType = CompressionType.ZSTD
     dry_run: bool = False
@@ -675,13 +676,13 @@ class BackupRequest(BaseModel):
 
     @field_validator("source_paths", mode="before")
     @classmethod
-    def coerce_source_paths(cls, v: object) -> str:
-        return _coerce_source_paths(v)
+    def coerce_source_paths(cls, v: object) -> list[str]:
+        return _coerce_source_paths_to_list(v)
 
     @field_validator("source_paths", mode="after")
     @classmethod
-    def validate_source_paths(cls, v: str) -> str:
-        return _validate_source_paths_absolute(v)
+    def validate_source_paths(cls, v: list[str]) -> list[str]:
+        return _validate_source_paths_absolute_list(v)
 
     @field_validator("dry_run", mode="before")
     @classmethod

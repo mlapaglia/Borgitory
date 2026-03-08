@@ -38,7 +38,7 @@ class TaskDefinitionBuilder:
     def build_backup_task(
         self,
         repository_name: str,
-        source_paths: str = "[]",
+        source_paths: list[str] | None = None,
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
@@ -49,7 +49,7 @@ class TaskDefinitionBuilder:
 
         Args:
             repository_name: Name of the repository for display
-            source_paths: JSON array string of paths to backup
+            source_paths: List of paths to backup
             compression: Compression algorithm to use
             dry_run: Whether this is a dry run
             ignore_lock: Whether to run 'borg break-lock' before backup
@@ -58,7 +58,7 @@ class TaskDefinitionBuilder:
             Task definition dictionary
         """
         parameters: ConfigDict = {
-            "source_paths": source_paths,
+            "source_paths": source_paths or [],
             "compression": compression,
             "dry_run": dry_run,
             "ignore_lock": ignore_lock,
@@ -419,7 +419,11 @@ class TaskDefinitionBuilder:
 
         if include_backup:
             if backup_params:
-                source_paths = str(backup_params.get("source_paths", "[]"))
+                source_paths_value = backup_params.get("source_paths") or []
+                if isinstance(source_paths_value, list):
+                    source_paths = source_paths_value
+                else:
+                    source_paths = []
                 compression = str(backup_params.get("compression", "zstd"))
                 dry_run = bool(backup_params.get("dry_run", False))
                 ignore_lock = bool(backup_params.get("ignore_lock", False))
@@ -431,7 +435,7 @@ class TaskDefinitionBuilder:
                 else:
                     patterns = []
             else:
-                source_paths = "[]"
+                source_paths = []
                 compression = "zstd"
                 dry_run = False
                 ignore_lock = False

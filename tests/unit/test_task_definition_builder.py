@@ -108,7 +108,7 @@ class TestTaskDefinitionBuilder:
             type=TaskTypeEnum.BACKUP,
             name="Backup test-repo",
             parameters={
-                "source_paths": "[]",
+                "source_paths": [],
                 "compression": "zstd",
                 "dry_run": False,
                 "ignore_lock": False,
@@ -122,14 +122,14 @@ class TestTaskDefinitionBuilder:
     ) -> None:
         """Test building backup task with custom parameters"""
         task = task_builder.build_backup_task(
-            "custom-repo", source_paths='["/custom/path"]', compression="lz4", dry_run=True
+            "custom-repo", source_paths=["/custom/path"], compression="lz4", dry_run=True
         )
 
         expected = TaskDefinition(
             type=TaskTypeEnum.BACKUP,
             name="Backup custom-repo",
             parameters={
-                "source_paths": '["/custom/path"]',
+                "source_paths": ["/custom/path"],
                 "compression": "lz4",
                 "dry_run": True,
                 "ignore_lock": False,
@@ -479,7 +479,7 @@ class TestTaskDefinitionBuilder:
             mock_db,
             repository_name="test-repo",
             include_backup=True,
-            backup_params={"source_paths": '["/custom"]', "compression": "lz4"},
+            backup_params={"source_paths": ['/custom'], "compression": "lz4"},
             prune_config_id=1,
             check_config_id=1,
             include_cloud_sync=True,
@@ -500,7 +500,7 @@ class TestTaskDefinitionBuilder:
 
         # Verify backup task uses custom params
         backup_task = next(task for task in tasks if task.type == TaskTypeEnum.BACKUP)
-        assert backup_task.parameters["source_paths"] == '["/custom"]'
+        assert backup_task.parameters["source_paths"] == ["/custom"]
         assert backup_task.parameters["compression"] == "lz4"
 
     async def test_build_task_list_minimal(

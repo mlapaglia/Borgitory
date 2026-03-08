@@ -110,11 +110,10 @@ class BackupTaskExecutor:
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
-            if source_paths:
-                from borgitory.utils.source_paths import parse_source_paths
-
-                for path in parse_source_paths(str(source_paths)):
-                    additional_args.append(path)
+            paths = source_paths if isinstance(source_paths, list) else []
+            for path in paths:
+                if path and str(path).strip():
+                    additional_args.append(str(path).strip())
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")
 

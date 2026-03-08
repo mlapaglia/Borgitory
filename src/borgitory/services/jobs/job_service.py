@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class BackupParams:
     """Parameters for backup tasks."""
 
-    source_paths: str
+    source_paths: list[str]
     compression: str
     dry_run: bool
     ignore_lock: bool

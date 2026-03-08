@@ -246,15 +246,15 @@ async def get_schedule_edit_form(
             raise HTTPException(status_code=404, detail="Schedule not found")
 
         form_data = await config_service.get_schedule_form_data(db)
-        source_paths_list = (
-            parse_source_paths(schedule.source_paths) if schedule.source_paths else []
-        )
+        source_paths_list = list(schedule.source_paths) if schedule.source_paths else []
         context = {
             **form_data,
             "schedule": schedule,
             "is_edit_mode": True,
             "source_paths": source_paths_list,
-            "source_paths_json": schedule.source_paths or "[]",
+            "source_paths_json": json.dumps(schedule.source_paths)
+            if schedule.source_paths
+            else "[]",
         }
 
         return templates.TemplateResponse(

@@ -138,7 +138,7 @@ class ScheduleService:
         name: str,
         repository_id: int,
         cron_expression: str,
-        source_paths: str,
+        source_paths: list[str],
         cloud_sync_config_id: Optional[int] = None,
         prune_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
@@ -427,7 +427,7 @@ class ScheduleService:
                 "name": name,
                 "repository_id": repository_id,
                 "cron_expression": cron_expression,
-                "source_paths": json_data.get("source_paths", "[]"),
+                "source_paths": json_data.get("source_paths", []),
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "prune_config_id": safe_int(json_data.get("prune_config_id")),
                 "notification_config_id": safe_int(
