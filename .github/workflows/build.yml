@@ -237,6 +237,7 @@ jobs:
             --cov=src/borgitory \
             --cov-report=xml:integration-coverage.xml \
             --cov-report=html:integration-htmlcov \
+            --junitxml=junit.xml \
             --cov-append
 
     - name: Upload integration test coverage to Codecov
@@ -303,7 +304,8 @@ jobs:
             --screenshot only-on-failure \
             --cov=src/borgitory \
             --cov-report=xml:e2e-coverage.xml \
-            --cov-report=html:e2e-htmlcov"
+            --cov-report=html:e2e-htmlcov" \
+            --junitxml=junit.xml
 
     - name: Upload E2E test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
