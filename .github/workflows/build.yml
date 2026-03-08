@@ -170,7 +170,7 @@ jobs:
             --cov=src/borgitory \
             --cov-report=xml:coverage.xml \
             --junitxml=junit.xml \
-            --override-ini junit_family=legacy
+            --override-ini junit_family=legacy"
 
     - name: Upload unit test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -232,7 +232,7 @@ jobs:
             --cov=src/borgitory \
             --cov-report=xml:integration-coverage.xml \
             --junitxml=junit.xml \
-            --override-ini junit_family=legacy
+            --override-ini junit_family=legacy"
 
     - name: Upload integration test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
@@ -295,7 +295,7 @@ jobs:
             --cov=src/borgitory \
             --cov-report=xml:e2e-coverage.xml \
             --junitxml=junit.xml \
-            --override-ini junit_family=legacy
+            --override-ini junit_family=legacy"
 
     - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
