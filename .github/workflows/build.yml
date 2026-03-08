@@ -303,7 +303,7 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
-        name: playwright-traces-and-screenshots
+        name: playwright-traces-and-screenshots-${{ matrix.arch }}
         path: test-results/
         retention-days: 7
 

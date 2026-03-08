@@ -25,13 +25,13 @@ repos:
     types: [python]
     pass_filenames: true
     exclude: ^tests/
-  - id: ruff
+  - id: ruff-fix
     name: ruff fix
     entry: python lint.py fix
     language: system
     types: [python]
     pass_filenames: true
-  - id: ruff
+  - id: ruff-format
     name: ruff format
     entry: python lint.py format
     language: system
