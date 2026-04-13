@@ -205,14 +205,18 @@ class ArchiveManager:
             validate_archive_name(archive_name)
 
             # Build borg extract command with --stdout
-            # Ensure file_path starts with / for borg
-            if not file_path.startswith("/"):
-                file_path = "/" + file_path
+            # Borg archives store paths without a leading slash; strip any that
+            # may have been passed in so the include pattern matches correctly.
+            file_path = file_path.lstrip("/")
             borg_args = ["--stdout", f"{repository.path}::{archive_name}", file_path]
 
-            # Use manual keyfile management for streaming operations
+            # repository_path is intentionally empty here because the
+            # REPO::ARCHIVE spec is already embedded in borg_args.  Passing it
+            # again would cause build_secure_borg_command to append the bare
+            # repo path as a trailing argument, which borg treats as an include
+            # pattern that never matches (issue #227).
             borg_command = create_borg_command(
-                repository_path=repository.path,
+                repository_path="",
                 passphrase=repository.get_passphrase(),
                 base_command="borg extract",
                 additional_args=borg_args,
