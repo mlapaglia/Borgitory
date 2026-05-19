@@ -4,6 +4,7 @@ Tests for ArchiveManager
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
+from borgitory.config.command_runner_config import CommandRunnerConfig
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.models.database import Repository
@@ -191,3 +192,116 @@ class TestArchiveManager:
         assert result[0].name == "dir1"  # directory
         assert result[1].name == "dir2"  # directory
         assert result[2].name == "file1.txt"  # file
+
+
+class TestExtractFileStreamCommand:
+    """
+    Tests that confirm the bugs reported in issue #227:
+    1. Repository path is appended twice to the borg extract command.
+    2. A leading slash is prepended to the archive file path, causing a no-match.
+    """
+
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        repo = MagicMock(spec=Repository)
+        repo.path = "/repos/Linux_Server_Backups"
+        repo.name = "Linux Server Backups"
+        repo.get_passphrase.return_value = None
+        repo.get_keyfile_content.return_value = None
+        return repo
+
+    @pytest.fixture
+    def manager(self) -> ArchiveManager:
+        mock_process = MagicMock()
+        mock_process.stdout = AsyncMock()
+        mock_process.stdout.read = AsyncMock(return_value=b"")
+        mock_process.stderr = AsyncMock()
+        mock_process.stderr.read = AsyncMock(return_value=b"")
+        mock_process.wait = AsyncMock(return_value=0)
+        mock_process.returncode = 0
+
+        mock_command_executor = AsyncMock()
+        mock_command_executor.create_subprocess = AsyncMock(return_value=mock_process)
+
+        return ArchiveManager(
+            job_executor=AsyncMock(),
+            command_executor=mock_command_executor,
+            command_runner_config=CommandRunnerConfig(timeout=60),
+        )
+
+    @pytest.mark.asyncio
+    async def test_extract_command_does_not_append_repo_path_twice(
+        self, manager: ArchiveManager, mock_repository: MagicMock
+    ) -> None:
+        """
+        Regression test for issue #227.
+
+        The repo path must not appear as a trailing argument after the
+        REPO::ARCHIVE spec, because borg interprets it as an include pattern
+        that never matches any archive entry.
+        """
+        archive_name = "test-archive-2026-01-01"
+        file_path = "mnt/backup_snapshots/rootsnapshot/srv/nextcloud/.env.app"
+
+        response = await manager.extract_file_stream(
+            mock_repository, archive_name, file_path
+        )
+
+        # Consume the stream so the subprocess call is made
+        async def _consume() -> None:
+            async for _ in response.body_iterator:
+                pass
+
+        await _consume()
+
+        call_args = manager.command_executor.create_subprocess.call_args
+        command = call_args.kwargs.get("command") or call_args.args[0]
+
+        repo_archive_spec = f"{mock_repository.path}::{archive_name}"
+
+        # The REPO::ARCHIVE spec must appear exactly once
+        assert command.count(repo_archive_spec) == 1, (
+            f"REPO::ARCHIVE spec appeared {command.count(repo_archive_spec)} times in command: {command}"
+        )
+
+        # The bare repo path must NOT appear as a standalone trailing argument
+        assert (
+            mock_repository.path not in command[command.index(repo_archive_spec) + 1 :]
+        ), (
+            f"Repository path '{mock_repository.path}' was appended again after "
+            f"the REPO::ARCHIVE spec in command: {command}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_extract_command_does_not_prepend_slash_to_file_path(
+        self, manager: ArchiveManager, mock_repository: MagicMock
+    ) -> None:
+        """
+        Regression test for issue #227.
+
+        Borg archives store paths without a leading slash.  Prepending '/'
+        causes borg to report 'Include pattern never matched' for the file.
+        """
+        archive_name = "test-archive-2026-01-01"
+        file_path = "mnt/backup_snapshots/rootsnapshot/srv/nextcloud/.env.app"
+
+        response = await manager.extract_file_stream(
+            mock_repository, archive_name, file_path
+        )
+
+        async def _consume() -> None:
+            async for _ in response.body_iterator:
+                pass
+
+        await _consume()
+
+        call_args = manager.command_executor.create_subprocess.call_args
+        command = call_args.kwargs.get("command") or call_args.args[0]
+
+        # The file path argument must not have a leading slash added to it
+        assert "/" + file_path not in command, (
+            f"File path was given a spurious leading slash in command: {command}"
+        )
+        assert file_path in command, (
+            f"File path '{file_path}' not found in command: {command}"
+        )
