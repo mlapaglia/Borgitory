@@ -23,6 +23,13 @@
                         <div>
                             <strong>Cron Expression:</strong> {{ schedule.cron_expression }}
                         </div>
+                        {% if schedule.backup_timeout_seconds or schedule.backup_retry_count or schedule.cloud_sync_timeout_seconds or schedule.cloud_sync_retry_count %}
+                            <div>
+                                <strong>Retries / Timeouts:</strong>
+                                Backup {{ schedule.backup_retry_count }} retries{% if schedule.backup_timeout_seconds %}, {{ schedule.backup_timeout_seconds }}s timeout{% endif %};
+                                Cloud {{ schedule.cloud_sync_retry_count }} retries{% if schedule.cloud_sync_timeout_seconds %}, {{ schedule.cloud_sync_timeout_seconds }}s timeout{% endif %}
+                            </div>
+                        {% endif %}
                         {% if schedule.last_run %}
                             <div>
                                 <strong>Last Run:</strong> {{ schedule.last_run | format_datetime_browser('%Y-%m-%d %H:%M:%S', browser_tz_offset) }}

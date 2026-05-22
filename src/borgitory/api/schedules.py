@@ -96,10 +96,15 @@ async def create_schedule(
         source_path=schedule.source_path or "",
         cloud_sync_config_id=schedule.cloud_sync_config_id,
         prune_config_id=schedule.prune_config_id,
+        check_config_id=schedule.check_config_id,
         notification_config_id=schedule.notification_config_id,
         pre_job_hooks=schedule.pre_job_hooks,
         post_job_hooks=schedule.post_job_hooks,
         patterns=schedule.patterns,
+        backup_timeout_seconds=schedule.backup_timeout_seconds,
+        backup_retry_count=schedule.backup_retry_count,
+        cloud_sync_timeout_seconds=schedule.cloud_sync_timeout_seconds,
+        cloud_sync_retry_count=schedule.cloud_sync_retry_count,
     )
 
     if result.is_error or not result.schedule:
@@ -489,7 +494,7 @@ async def move_hook(
             {"hook_type": hook_type, "hooks": current_hooks},
         )
 
-    except ValueError, TypeError, KeyError:
+    except (ValueError, TypeError, KeyError):
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -519,7 +524,7 @@ async def remove_hook_field(
             {"hook_type": hook_type, "hooks": current_hooks},
         )
 
-    except ValueError, TypeError, KeyError:
+    except (ValueError, TypeError, KeyError):
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -537,7 +542,7 @@ async def get_hooks_modal(
         # Get data from the actual form field names
         pre_hooks_json = str(json_data.get("pre_job_hooks", "[]"))
         post_hooks_json = str(json_data.get("post_job_hooks", "[]"))
-    except ValueError, TypeError, KeyError:
+    except (ValueError, TypeError, KeyError):
         pre_hooks_json = "[]"
         post_hooks_json = "[]"
 
@@ -580,7 +585,7 @@ async def save_hooks(
     try:
         pre_count = len(json.loads(pre_hooks_json)) if pre_hooks_json else 0
         post_count = len(json.loads(post_hooks_json)) if post_hooks_json else 0
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         pre_count = 0
         post_count = 0
 
@@ -663,7 +668,7 @@ async def move_pattern(
             {"patterns": current_patterns},
         )
 
-    except ValueError, TypeError, KeyError:
+    except (ValueError, TypeError, KeyError):
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -690,7 +695,7 @@ async def remove_pattern_field(
             {"patterns": current_patterns},
         )
 
-    except ValueError, TypeError, KeyError:
+    except (ValueError, TypeError, KeyError):
         return HTMLResponse(content='<div class="space-y-4"></div>')
 
 
@@ -741,7 +746,7 @@ async def save_patterns(
 
     try:
         total_count = len(json.loads(patterns_json)) if patterns_json else 0
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         total_count = 0
 
     return templates.TemplateResponse(

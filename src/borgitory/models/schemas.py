@@ -313,6 +313,10 @@ class ScheduleCreate(ScheduleBase):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+    backup_timeout_seconds: Optional[int] = Field(None, gt=0)
+    backup_retry_count: int = Field(default=0, ge=0)
+    cloud_sync_timeout_seconds: Optional[int] = Field(None, gt=0)
+    cloud_sync_retry_count: int = Field(default=0, ge=0)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
@@ -383,6 +387,21 @@ class ScheduleCreate(ScheduleBase):
             raise ValueError(f"Invalid patterns configuration: {error_msg}")
         return v.strip()
 
+    @field_validator(
+        "backup_timeout_seconds",
+        "backup_retry_count",
+        "cloud_sync_timeout_seconds",
+        "cloud_sync_retry_count",
+        mode="before",
+    )
+    @classmethod
+    def validate_optional_numeric_fields(
+        cls, v: Union[str, int, None]
+    ) -> Optional[int]:
+        if v == "" or v is None:
+            return None
+        return int(v)
+
 
 class ScheduleUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=128)
@@ -397,6 +416,10 @@ class ScheduleUpdate(BaseModel):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+    backup_timeout_seconds: Optional[int] = Field(None, gt=0)
+    backup_retry_count: Optional[int] = Field(None, ge=0)
+    cloud_sync_timeout_seconds: Optional[int] = Field(None, gt=0)
+    cloud_sync_retry_count: Optional[int] = Field(None, ge=0)
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -482,6 +505,21 @@ class ScheduleUpdate(BaseModel):
             return None
         return int(v)
 
+    @field_validator(
+        "backup_timeout_seconds",
+        "backup_retry_count",
+        "cloud_sync_timeout_seconds",
+        "cloud_sync_retry_count",
+        mode="before",
+    )
+    @classmethod
+    def validate_optional_numeric_fields(
+        cls, v: Union[str, int, None]
+    ) -> Optional[int]:
+        if v == "" or v is None:
+            return None
+        return int(v)
+
 
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
@@ -493,6 +531,10 @@ class Schedule(ScheduleBase):
     created_at: datetime
     cloud_sync_config_id: Optional[int] = Field(None, gt=0)
     prune_config_id: Optional[int] = Field(None, gt=0)
+    backup_timeout_seconds: Optional[int] = Field(None, gt=0)
+    backup_retry_count: int = Field(default=0, ge=0)
+    cloud_sync_timeout_seconds: Optional[int] = Field(None, gt=0)
+    cloud_sync_retry_count: int = Field(default=0, ge=0)
 
     model_config = {
         "from_attributes": True,
@@ -619,6 +661,10 @@ class BackupRequest(BaseModel):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+    backup_timeout_seconds: Optional[int] = Field(None, gt=0)
+    backup_retry_count: Optional[int] = Field(None, ge=0)
+    cloud_sync_timeout_seconds: Optional[int] = Field(None, gt=0)
+    cloud_sync_retry_count: Optional[int] = Field(None, ge=0)
 
     @field_validator("dry_run", mode="before")
     @classmethod
@@ -673,6 +719,21 @@ class BackupRequest(BaseModel):
         if not is_valid:
             raise ValueError(f"Invalid patterns configuration: {error_msg}")
         return v.strip()
+
+    @field_validator(
+        "backup_timeout_seconds",
+        "backup_retry_count",
+        "cloud_sync_timeout_seconds",
+        "cloud_sync_retry_count",
+        mode="before",
+    )
+    @classmethod
+    def validate_optional_numeric_fields(
+        cls, v: Union[str, int, None]
+    ) -> Optional[int]:
+        if v == "" or v is None:
+            return None
+        return int(v)
 
 
 class CloudSyncConfigBase(BaseModel):

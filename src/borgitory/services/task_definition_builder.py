@@ -43,6 +43,8 @@ class TaskDefinitionBuilder:
         dry_run: bool = False,
         ignore_lock: bool = False,
         patterns: List[str] = [],
+        timeout: Optional[int] = None,
+        retry_count: Optional[int] = None,
     ) -> TaskDefinition:
         """
         Build a backup task definition.
@@ -72,6 +74,8 @@ class TaskDefinitionBuilder:
             type=TaskTypeEnum.BACKUP,
             name=f"Backup {repository_name}",
             parameters=parameters,
+            timeout=timeout,
+            retry_count=retry_count,
         )
 
     async def build_prune_task_from_config(
@@ -240,6 +244,8 @@ class TaskDefinitionBuilder:
         self,
         repository_name: Optional[str] = None,
         cloud_sync_config_id: Optional[int] = None,
+        timeout: Optional[int] = None,
+        retry_count: Optional[int] = None,
     ) -> TaskDefinition:
         """
         Build a cloud sync task definition.
@@ -261,6 +267,8 @@ class TaskDefinitionBuilder:
             parameters={
                 "cloud_sync_config_id": cloud_sync_config_id,
             },
+            timeout=timeout,
+            retry_count=retry_count,
         )
 
     async def build_notification_task(
@@ -378,12 +386,16 @@ class TaskDefinitionBuilder:
         repository_name: str,
         include_backup: bool = True,
         backup_params: Optional[ConfigDict] = None,
+        backup_timeout_seconds: Optional[int] = None,
+        backup_retry_count: Optional[int] = None,
         prune_config_id: Optional[int] = None,
         prune_request: Optional[PruneRequest] = None,
         check_config_id: Optional[int] = None,
         check_request: Optional[CheckRequest] = None,
         include_cloud_sync: bool = False,
         cloud_sync_config_id: Optional[int] = None,
+        cloud_sync_timeout_seconds: Optional[int] = None,
+        cloud_sync_retry_count: Optional[int] = None,
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
@@ -446,6 +458,8 @@ class TaskDefinitionBuilder:
                     dry_run,
                     ignore_lock,
                     patterns,
+                    backup_timeout_seconds,
+                    backup_retry_count,
                 )
             )
 
@@ -478,7 +492,12 @@ class TaskDefinitionBuilder:
 
         if include_cloud_sync:
             tasks.append(
-                self.build_cloud_sync_task(repository_name, cloud_sync_config_id)
+                self.build_cloud_sync_task(
+                    repository_name,
+                    cloud_sync_config_id,
+                    cloud_sync_timeout_seconds,
+                    cloud_sync_retry_count,
+                )
             )
 
         if notification_config_id:

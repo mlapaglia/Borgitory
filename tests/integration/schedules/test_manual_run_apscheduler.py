@@ -456,6 +456,10 @@ class TestExecuteScheduledBackup:
         schedule.pre_job_hooks = None
         schedule.post_job_hooks = None
         schedule.patterns = None
+        schedule.backup_timeout_seconds = 120
+        schedule.backup_retry_count = 2
+        schedule.cloud_sync_timeout_seconds = 300
+        schedule.cloud_sync_retry_count = 1
         schedule.last_run = None
         return schedule
 
@@ -525,6 +529,10 @@ class TestExecuteScheduledBackup:
         assert backup_request.source_path == "/data/backup"
         assert backup_request.prune_config_id == 2
         assert backup_request.check_config_id == 3
+        assert backup_request.backup_timeout_seconds == 120
+        assert backup_request.backup_retry_count == 2
+        assert backup_request.cloud_sync_timeout_seconds == 300
+        assert backup_request.cloud_sync_retry_count == 1
         assert call_args.args[2] == JobType.SCHEDULED_BACKUP
 
     @pytest.mark.asyncio

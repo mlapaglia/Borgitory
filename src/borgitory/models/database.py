@@ -252,6 +252,14 @@ class Schedule(Base):
     pre_job_hooks: Mapped[str | None] = mapped_column(Text, nullable=True)
     post_job_hooks: Mapped[str | None] = mapped_column(Text, nullable=True)
     patterns: Mapped[str | None] = mapped_column(Text, nullable=True)
+    backup_timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    backup_retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cloud_sync_timeout_seconds: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    cloud_sync_retry_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
 
     repository: Mapped["Repository"] = relationship(
         "Repository", back_populates="schedules"

@@ -88,6 +88,52 @@
                     Automatically backup to cloud after each scheduled Borg backup
                 </p>
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Backup Timeout (seconds)
+                    </label>
+                    <input type="number"
+                           name="backup_timeout_seconds"
+                           min="1"
+                           step="1"
+                           placeholder="No timeout"
+                           class="mt-1 input-modern block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Backup Retries
+                    </label>
+                    <input type="number"
+                           name="backup_retry_count"
+                           min="0"
+                           step="1"
+                           value="0"
+                           class="mt-1 input-modern block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Cloud Backup Timeout (seconds)
+                    </label>
+                    <input type="number"
+                           name="cloud_sync_timeout_seconds"
+                           min="1"
+                           step="1"
+                           placeholder="No timeout"
+                           class="mt-1 input-modern block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Cloud Backup Retries
+                    </label>
+                    <input type="number"
+                           name="cloud_sync_retry_count"
+                           min="0"
+                           step="1"
+                           value="0"
+                           class="mt-1 input-modern block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
+                </div>
+            </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                     Repository Check (Optional)
