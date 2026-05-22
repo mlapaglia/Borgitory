@@ -83,7 +83,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pyfuse3=${PYFUSE3_VERSION} \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && mkdir -p /app/data
+    && mkdir -p /app/data /cache \
+    && chmod 0777 /app/data /cache
 
 COPY --from=builder /opt/venv /opt/venv
 
