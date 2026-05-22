@@ -53,7 +53,7 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
        image: mlapaglia/borgitory:latest
        ports:
          - "8000:8000"
-       # Optional: run as your host user to avoid root-owned files
+       # Optional: run as your host user to avoid root-owned files (set UID/GID first)
        # user: "${UID}:${GID}"
        volumes:
          - ./data:/app/data # database and encryption key location
@@ -72,6 +72,7 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
    ```
 
    When running with a non-root container user, ensure mounted directories are writable by that user.
+   On Linux you can set these variables with `export UID=$(id -u) GID=$(id -g)` before starting Compose.
 
 2. **Access the web interface**
    - Open <http://localhost:8000> in your browser
