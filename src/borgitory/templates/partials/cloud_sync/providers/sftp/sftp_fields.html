@@ -76,6 +76,25 @@
     </div>
     <div>
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Server-Side Checksums
+        </label>
+        <select name="provider_config[disable_server_side_checksums]"
+                class="select-modern mt-1">
+            <option value="false"
+                    {% if not config or not config.disable_server_side_checksums %}selected{% endif %}>
+                Enabled (Recommended)
+            </option>
+            <option value="true"
+                    {% if config and config.disable_server_side_checksums %}selected{% endif %}>
+                Disabled (for restricted SFTP servers, e.g. Ugreen NAS)
+            </option>
+        </select>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Disable if your SFTP server does not allow remote command execution (md5sum/sha1sum).
+        </p>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
             Path Prefix (optional)
         </label>
         <input type="text"
