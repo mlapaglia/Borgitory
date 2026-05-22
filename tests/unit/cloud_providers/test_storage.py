@@ -495,6 +495,27 @@ class TestSFTPStorageConfig:
                 remote_path="",  # Empty
             )
 
+    def test_disable_server_side_checksums_defaults_false(self) -> None:
+        """Test that server-side checksums are enabled by default"""
+        config = SFTPStorageConfig(
+            host="nas.example.com",
+            username="backup",
+            password="secret",
+            remote_path="/backups",
+        )
+        assert config.disable_server_side_checksums is False
+
+    def test_disable_server_side_checksums_explicit_true(self) -> None:
+        """Test that server-side checksums can be disabled (e.g. for Ugreen NAS)"""
+        config = SFTPStorageConfig(
+            host="nas.example.com",
+            username="backup",
+            password="secret",
+            remote_path="/backups",
+            disable_server_side_checksums=True,
+        )
+        assert config.disable_server_side_checksums is True
+
 
 class TestS3Storage:
     """Test S3Storage implementation"""

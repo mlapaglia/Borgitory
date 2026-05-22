@@ -290,7 +290,6 @@ class SFTPStorage(CloudStorage):
             optional_params={
                 "port": 22,
                 "path_prefix": "",
-                "disable_server_side_checksums": False,
             },
         )
 
@@ -448,6 +447,7 @@ class SFTPStorage(CloudStorage):
         port: int = 22,
         password: Optional[str] = None,
         private_key: Optional[str] = None,
+        disable_hashcheck: bool = False,
     ) -> ConnectionTestResult:
         """Test SFTP connection by listing remote directory"""
         try:
@@ -619,7 +619,6 @@ class SFTPStorage(CloudStorage):
         optional_params={
             "port": 22,
             "path_prefix": "",
-            "disable_server_side_checksums": False,
         },
     ),
 )
