@@ -72,7 +72,7 @@ Borgitory is a comprehensive web-based management interface for BorgBackup repos
    ```
 
    When running with a non-root container user, ensure mounted directories are writable by that user.
-   On Linux you can set these variables with `export UID=$(id -u) GID=$(id -g)` before starting Compose.
+   On Linux you can set these variables with `export UID; export GID=$(id -g)` before starting Compose.
 
 2. **Access the web interface**
    - Open <http://localhost:8000> in your browser
