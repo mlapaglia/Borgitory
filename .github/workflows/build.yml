@@ -175,7 +175,7 @@ jobs:
 
     - name: Upload unit test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         flags: unit
         name: unit-tests
@@ -183,7 +183,7 @@ jobs:
 
     - name: Upload unit test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         flags: unit
         name: unit-tests-results
@@ -238,7 +238,7 @@ jobs:
 
     - name: Upload integration test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         flags: integration
         name: integration-tests
@@ -246,7 +246,7 @@ jobs:
 
     - name: Upload integration test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         flags: integration
         name: integration-tests-results
@@ -301,7 +301,7 @@ jobs:
 
     - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         flags: e2e
         name: e2e-tests
@@ -309,7 +309,7 @@ jobs:
 
     - name: Upload e2e test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         flags: e2e
         name: e2e-tests-results
