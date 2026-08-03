@@ -110,6 +110,23 @@ class LinuxCommandExecutor(CommandExecutorProtocol):
 
             return result
 
+        except FileNotFoundError:
+            execution_time = time.time() - start_time
+            missing = command[0] if command else "command"
+            error_msg = (
+                f"Command not found: '{missing}'. "
+                "Ensure it is installed and available on PATH."
+            )
+            logger.error(f"{error_msg} (Command: {' '.join(command)})")
+            return CommandResult(
+                command=command,
+                return_code=-1,
+                stdout="",
+                stderr=error_msg,
+                success=False,
+                execution_time=execution_time,
+                error=error_msg,
+            )
         except Exception as e:
             execution_time = time.time() - start_time
             error_msg = f"Linux command execution failed: {str(e)}"
@@ -120,7 +137,7 @@ class LinuxCommandExecutor(CommandExecutorProtocol):
                 command=command,
                 return_code=-1,
                 stdout="",
-                stderr="",
+                stderr=error_msg,
                 success=False,
                 execution_time=execution_time,
                 error=error_msg,

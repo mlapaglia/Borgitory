@@ -1026,9 +1026,9 @@ class RepositoryService:
         try:
             directories: List[DirectoryInfo] = []
 
-            if not self.path_service.path_exists(path):
+            if not await self.path_service.path_exists(path):
                 directories = []
-            elif not self.path_service.is_directory(path):
+            elif not await self.path_service.is_directory(path):
                 directories = []
             else:
                 directories = await self.path_service.list_directory(
