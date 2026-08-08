@@ -67,7 +67,7 @@ class TestTaskDefinitionBuilderHookIntegration:
                 "command": "echo starting"
             },
             {
-                "name": "Pre Hook 2", 
+                "name": "Pre Hook 2",
                 "command": "mkdir -p /tmp/backup"
             }
         ]"""
@@ -118,7 +118,7 @@ class TestTaskDefinitionBuilderHookIntegration:
             repository_name="test-repo",
             include_backup=True,
             backup_params={
-                "source_path": "/data",
+                "source_paths": '["/data"]',
                 "compression": "zstd",
                 "dry_run": False,
                 "ignore_lock": False,

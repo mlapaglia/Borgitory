@@ -83,7 +83,7 @@ class TestScheduleCreationAPI:
             "name": "Daily Backup",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
             "cloud_sync_config_id": None,
             "prune_config_id": None,
             "notification_config_id": None,
@@ -108,7 +108,7 @@ class TestScheduleCreationAPI:
             "name": "",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -126,7 +126,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": "",
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -144,7 +144,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": "not-a-number",
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -162,7 +162,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -180,7 +180,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "0 2 * *",  # Only 4 parts
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -198,7 +198,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "0 2 * * * *",  # 6 parts
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -225,7 +225,7 @@ class TestScheduleCreationAPI:
                 "name": f"Test Schedule - {description}",
                 "repository_id": 1,
                 "cron_expression": cron_expr,
-                "source_path": "/data",
+                "source_paths": '["/data"]',
             }
 
             response = await async_client.post("/api/schedules/", json=valid_data)
@@ -242,12 +242,12 @@ class TestScheduleCreationAPI:
     async def test_create_schedule_whitespace_handling(
         self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
     ) -> None:
-        """Test creating a schedule with whitespace in inputs."""
+        """Test creating a schedule with whitespace in inputs (name, cron)."""
         data_with_whitespace = {
             "name": "  Test Schedule  ",
             "repository_id": 1,
             "cron_expression": "  0 2 * * *  ",
-            "source_path": "  /data  ",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=data_with_whitespace)
@@ -276,7 +276,7 @@ class TestScheduleCreationAPI:
                 "name": "Test Schedule",
                 "repository_id": 1,
                 "cron_expression": "0 2 * * *",
-                "source_path": "/data",
+                "source_paths": '["/data"]',
                 **optional_fields,
             }
 
@@ -294,7 +294,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 999,  # Non-existent repository
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=invalid_data)
@@ -316,7 +316,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=valid_data)
@@ -353,7 +353,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=valid_data)
@@ -371,7 +371,7 @@ class TestScheduleCreationAPI:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": '["/data"]',
         }
 
         response = await async_client.post("/api/schedules/", json=valid_data)

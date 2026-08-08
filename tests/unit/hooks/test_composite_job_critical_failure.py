@@ -71,7 +71,7 @@ class TestCompositeJobCriticalFailure:
         return BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Backup repository",
-            parameters={"source_path": "/data"},
+            parameters={"source_paths": '["/data"]'},
         )
 
     def create_notification_task(self) -> BorgJobTask:

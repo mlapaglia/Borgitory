@@ -61,7 +61,7 @@ class TestJobService:
 
         backup_request = BackupRequest(
             repository_id=repository.id,
-            source_path="/data",
+            source_paths='["/data"]',
             compression=CompressionType.LZ4,
             dry_run=False,
             cloud_sync_config_id=None,
@@ -108,7 +108,7 @@ class TestJobService:
 
         backup_request = BackupRequest(
             repository_id=repository.id,
-            source_path="/data",
+            source_paths='["/data"]',
             compression=CompressionType.LZ4,
             dry_run=False,
             prune_config_id=prune_config.id,
@@ -139,7 +139,7 @@ class TestJobService:
         """Test backup job creation with non-existent repository."""
         backup_request = BackupRequest(
             repository_id=999,
-            source_path="/data",
+            source_paths='["/data"]',
             compression=CompressionType.LZ4,
             dry_run=False,
             cloud_sync_config_id=None,

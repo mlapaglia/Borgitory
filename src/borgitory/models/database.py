@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Uuid,
+    JSON,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
@@ -232,7 +233,12 @@ class Schedule(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     cron_expression: Mapped[str] = mapped_column(String, nullable=False)
-    source_path: Mapped[str] = mapped_column(String, nullable=False, default="/data")
+    source_paths: Mapped[List[str]] = mapped_column(
+        "source_paths_json", JSON, nullable=False, default=lambda: []
+    )
+    source_paths_legacy: Mapped[str] = mapped_column(
+        "source_path", String, nullable=False, default="[]"
+    )  # deprecated: use source_paths (JSON) instead
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

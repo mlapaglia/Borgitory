@@ -80,12 +80,12 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.info("SCHEDULER: Creating scheduled backup via JobService")
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
-            logger.info(f"  - source_path: {schedule.source_path}")
+            logger.info(f"  - source_paths: {schedule.source_paths}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
             backup_request = BackupRequest(
                 repository_id=repository.id,
-                source_path=schedule.source_path,
+                source_paths=schedule.source_paths,
                 compression=CompressionType.ZSTD,
                 dry_run=False,
                 prune_config_id=schedule.prune_config_id,

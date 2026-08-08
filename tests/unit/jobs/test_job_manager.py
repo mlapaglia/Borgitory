@@ -235,12 +235,12 @@ class TestJobManager:
         task = BorgJobTask(
             task_type=TaskTypeEnum.BACKUP,
             task_name="Test Backup",
-            parameters={"source_path": "/data"},
+            parameters={"source_paths": '["/data"]'},
         )
 
         assert task.task_type == "backup"
         assert task.task_name == "Test Backup"
-        assert task.parameters["source_path"] == "/data"
+        assert task.parameters["source_paths"] == '["/data"]'
 
     def test_create_job(self, job_manager: JobManager) -> None:
         """Test job creation"""

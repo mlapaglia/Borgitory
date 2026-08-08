@@ -78,7 +78,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -113,13 +113,13 @@ class TestScheduleService:
         schedule1.name = "schedule-1"
         schedule1.repository_id = sample_repository.id
         schedule1.cron_expression = "0 2 * * *"
-        schedule1.source_path = "/data1"
+        schedule1.source_paths = '["/data1"]'
 
         schedule2 = Schedule()
         schedule2.name = "schedule-2"
         schedule2.repository_id = sample_repository.id
         schedule2.cron_expression = "0 3 * * *"
-        schedule2.source_path = "/data2"
+        schedule2.source_paths = '["/data2"]'
         test_db.add(schedule1)
         test_db.add(schedule2)
         await test_db.commit()
@@ -142,7 +142,7 @@ class TestScheduleService:
             schedule.name = f"schedule-{i}"
             schedule.repository_id = sample_repository.id
             schedule.cron_expression = "0 2 * * *"
-            schedule.source_path = f"/data{i}"
+            schedule.source_paths = f'["/data{i}"]'
             test_db.add(schedule)
         await test_db.commit()
 
@@ -160,7 +160,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
 
@@ -181,7 +181,7 @@ class TestScheduleService:
             name="new-schedule",
             repository_id=sample_repository.id,
             cron_expression="0 2 * * *",
-            source_path="/backup",
+            source_paths='["/backup"]',
         )
 
         assert result.success is True
@@ -211,7 +211,7 @@ class TestScheduleService:
             name="test-schedule",
             repository_id=999,
             cron_expression="0 2 * * *",
-            source_path="/data",
+            source_paths='["/data"]',
         )
 
         assert result.success is False
@@ -231,7 +231,7 @@ class TestScheduleService:
             name="test-schedule",
             repository_id=sample_repository.id,
             cron_expression="invalid cron",
-            source_path="/data",
+            source_paths='["/data"]',
         )
 
         assert result.success is False
@@ -254,7 +254,7 @@ class TestScheduleService:
             name="test-schedule",
             repository_id=sample_repository.id,
             cron_expression="0 2 * * *",
-            source_path="/data",
+            source_paths='["/data"]',
         )
 
         assert result.success is False
@@ -282,7 +282,7 @@ class TestScheduleService:
         schedule.name = "original-name"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         schedule.enabled = True
         test_db.add(schedule)
         await test_db.commit()
@@ -324,7 +324,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         schedule.enabled = False
         test_db.add(schedule)
         await test_db.commit()
@@ -352,7 +352,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         schedule.enabled = True
         test_db.add(schedule)
         await test_db.commit()
@@ -391,7 +391,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         schedule.enabled = False
         test_db.add(schedule)
         await test_db.commit()
@@ -420,7 +420,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -465,7 +465,7 @@ class TestScheduleService:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = '["/data"]'
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -495,7 +495,7 @@ class TestScheduleService:
             name="lifecycle-test",
             repository_id=sample_repository.id,
             cron_expression="0 2 * * *",
-            source_path="/data",
+            source_paths='["/data"]',
         )
         assert result.success is True
         assert result.schedule is not None

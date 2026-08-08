@@ -19,13 +19,18 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Source Path
+                    Source Paths
                 </label>
-                {% set input_id = "backup-source-path" %}
-                {% set input_name = "source_path" %}
-                {% set placeholder = "/pictures/" %}
-                {% set required = false %}
-                {% include "partials/shared/path_autocomplete.html" %}
+                <button type="button"
+                        class="flex items-stretch w-full text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors overflow-hidden mt-1"
+                        hx-post="/api/schedules/source-paths/source-paths-modal"
+                        hx-include="#source-paths-data"
+                        hx-target="#modal-container">
+                    <span class="flex-1 px-4 py-2 text-left" id="source-paths-button-text">Source Paths</span>
+                    <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
+                          id="source-paths-count-badge">0</span>
+                </button>
+                <input type="hidden" name="source_paths" id="source-paths-data" value="[]">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -121,3 +126,4 @@
     </form>
     <div id="backup-status" class="mt-4"></div>
 </div>
+<div id="modal-container"></div>

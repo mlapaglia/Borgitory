@@ -133,7 +133,7 @@ async def list_directories_autocomplete(
     for param_name in form_data.keys():
         if param_name in [
             "path",
-            "source_path",
+            "source_paths",
             "create-path",
             "import-path",
             "backup-source-path",

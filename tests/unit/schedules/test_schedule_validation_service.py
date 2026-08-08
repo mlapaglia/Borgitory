@@ -31,7 +31,7 @@ class TestScheduleValidationService:
             "name": "Daily Backup",
             "repository_id": "1",
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
             "cloud_sync_config_id": "2",
             "prune_config_id": "3",
             "notification_config_id": "4",
@@ -47,7 +47,7 @@ class TestScheduleValidationService:
             "name": "Daily Backup",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
             "cloud_sync_config_id": 2,
             "prune_config_id": 3,
             "notification_config_id": 4,
@@ -64,7 +64,7 @@ class TestScheduleValidationService:
             "name": "Test Schedule",
             "repository_id": "1",
             "cron_expression": "*/5 * * * *",
-            "source_path": "",
+            "source_paths": [],
             "cloud_sync_config_id": "",
             "prune_config_id": "",
             "notification_config_id": "",
@@ -80,7 +80,7 @@ class TestScheduleValidationService:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "*/5 * * * *",
-            "source_path": "",
+            "source_paths": [],
             "cloud_sync_config_id": None,
             "prune_config_id": None,
             "notification_config_id": None,
@@ -276,6 +276,114 @@ class TestScheduleValidationService:
 
             assert is_valid is True
             assert processed_data["cloud_sync_config_id"] == expected_output
+
+    def test_validate_source_paths_valid(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """Test that valid absolute source_paths are accepted and serialized."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["/data", "/backup"],
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert error_msg is None
+        assert processed_data["source_paths"] == ["/data", "/backup"]
+
+    def test_validate_source_paths_empty_after_filtering(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """All-empty source_paths are passed through as-is."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["", "  "],
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert processed_data["source_paths"] == ["", "  "]
+
+    def test_validate_source_paths_relative_passed_through(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """Relative paths are passed through as-is (validation happens elsewhere)."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["relative/path"],
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert processed_data["source_paths"] == ["relative/path"]
+
+    def test_validate_source_paths_mixed_passed_through(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """A mix of absolute and relative paths are passed through as-is."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["/valid", "bad"],
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert processed_data["source_paths"] == ["/valid", "bad"]
+
+    def test_validate_source_paths_strips_whitespace(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": ["  /data  "],
+        }
+
+        is_valid, processed_data, _ = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert processed_data["source_paths"] == ["  /data  "]
+
+    def test_validate_source_paths_string_fallback(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """When source_paths is absent, source_paths string is used as-is."""
+        data = {
+            "name": "Test",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_paths": "/legacy",
+        }
+
+        is_valid, processed_data, _ = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert processed_data["source_paths"] == "/legacy"
 
     def test_validate_cron_expression_valid(
         self, schedule_service: ScheduleService
