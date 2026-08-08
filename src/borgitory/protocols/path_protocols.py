@@ -60,6 +60,16 @@ class PlatformServiceProtocol(ABC):
         """
         pass
 
+    @abstractmethod
+    def is_macos(self) -> bool:
+        """
+        Check if running on macOS.
+
+        Returns:
+            True if running on macOS (darwin)
+        """
+        pass
+
 
 class PathServiceInterface(ABC):
     """
