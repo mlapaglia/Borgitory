@@ -20,6 +20,7 @@ from borgitory.models.schemas import BackupRequest, CompressionType
 from borgitory.models.enums import JobType
 from borgitory.models.job_results import JobCreationResult
 from borgitory.services.jobs.job_service import JobService
+from borgitory.services.scheduling.cron_utils import normalize_cron_for_apscheduler
 from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)
@@ -235,7 +236,9 @@ class SchedulerService:
 
         try:
             try:
-                trigger = CronTrigger.from_crontab(cron_expression)
+                trigger = CronTrigger.from_crontab(
+                    normalize_cron_for_apscheduler(cron_expression)
+                )
             except ValueError as e:
                 raise ValueError(
                     f"Invalid cron expression '{cron_expression}': {str(e)}"

@@ -52,6 +52,15 @@ class PlatformService(PlatformServiceProtocol):
         """
         return self.get_platform_name() == "linux"
 
+    def is_macos(self) -> bool:
+        """
+        Check if running on macOS.
+
+        Returns:
+            True if running on macOS (darwin)
+        """
+        return self.get_platform_name() == "darwin"
+
     def get_base_data_dir(self) -> str:
         """
         Get the base data directory from configuration.
@@ -71,5 +80,8 @@ class PlatformService(PlatformServiceProtocol):
         elif self.is_linux():
             home = os.path.expanduser("~")
             return os.path.join(home, ".local", "share", "borgitory")
+        elif self.is_macos():
+            home = os.path.expanduser("~")
+            return os.path.join(home, "Library", "Application Support", "Borgitory")
         else:
             raise ValueError("Unknown platform")

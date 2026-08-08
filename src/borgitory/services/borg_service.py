@@ -90,7 +90,10 @@ class BorgService:
                 )
             else:
                 error_msg = (
-                    result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                    result.stderr.strip()
+                    or result.stdout.strip()
+                    or (result.error or "").strip()
+                    or "Unknown error"
                 )
                 decoded_error = (
                     error_msg.decode("utf-8", errors="replace")

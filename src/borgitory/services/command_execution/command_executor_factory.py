@@ -42,7 +42,7 @@ def create_command_executor(
 
     This factory function automatically detects the environment:
     - Windows with WSL: Uses WSLCommandExecutor
-    - Linux/Container: Uses LinuxCommandExecutor
+    - Linux/macOS/Container: Uses LinuxCommandExecutor (native POSIX)
 
     Returns:
         CommandExecutorProtocol: A command executor implementation
@@ -54,8 +54,15 @@ def create_command_executor(
 
         logger.debug("Creating WSL command executor")
         return WSLCommandExecutor()
-    elif platform_service.is_linux() or platform_service.is_docker():
-        logger.debug("Creating Linux command executor")
+    elif (
+        platform_service.is_linux()
+        or platform_service.is_macos()
+        or platform_service.is_docker()
+    ):
+        logger.debug(
+            "Creating native POSIX command executor for %s",
+            platform_service.get_platform_name(),
+        )
         return LinuxCommandExecutor()
     else:
         raise RuntimeError(
