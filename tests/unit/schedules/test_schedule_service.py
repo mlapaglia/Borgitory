@@ -51,6 +51,15 @@ class TestScheduleService:
         assert result.success is True
         assert result.error_message is None
 
+    def test_validate_cron_expression_sunday_aliases(
+        self, service: ScheduleService
+    ) -> None:
+        """Unix cron Sunday values 0 and 7, plus sun, should all validate."""
+        for expr in ("0 1 * * 0", "0 1 * * 7", "0 1 * * sun"):
+            result = service.validate_cron_expression(expr)
+            assert result.success is True, f"Expected '{expr}' to be valid"
+            assert result.error_message is None
+
     def test_validate_cron_expression_invalid(self, service: ScheduleService) -> None:
         """Test invalid cron expression validation."""
         result = service.validate_cron_expression("invalid cron")

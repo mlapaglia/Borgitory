@@ -323,9 +323,9 @@ class ScheduleBase(BaseModel):
                 "Cron expression must have 5 parts: minute hour day month weekday"
             )
 
-        # Basic validation of each part
+        # Allow numbers, wildcards, ranges/lists/steps, and cron month/weekday names
         for i, part in enumerate(parts):
-            if not re.match(r"^[\d\*\-\,\/]+$", part):
+            if not re.match(r"^[\d\*a-zA-Z\-\,\/]+$", part):
                 raise ValueError(f"Invalid cron expression part {i + 1}: {part}")
 
         return v
@@ -497,7 +497,7 @@ class ScheduleUpdate(BaseModel):
                 "Invalid cron expression format. Expected 5 parts: minute hour day_of_month month day_of_week"
             )
         for i, part in enumerate(parts):
-            if not re.match(r"^[\d\*\-\,\/]+$", part):
+            if not re.match(r"^[\d\*a-zA-Z\-\,\/]+$", part):
                 raise ValueError(f"Invalid cron expression part {i + 1}: {part}")
         return v
 

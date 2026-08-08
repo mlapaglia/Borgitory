@@ -255,8 +255,8 @@ def register_provider(
         # Register with global registry
         _registry.register_provider(
             name=name,
-            config_class=provider_class.config_class,
-            storage_class=provider_class.storage_class,  # type: ignore[attr-defined]
+            config_class=getattr(provider_class, "config_class"),
+            storage_class=getattr(provider_class, "storage_class"),
             metadata=metadata,
         )
 

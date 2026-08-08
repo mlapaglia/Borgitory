@@ -44,7 +44,7 @@ def create_file_service(
 
     This factory function automatically detects the environment:
     - Windows with WSL: Uses WSLFileService
-    - Linux/Container: Uses LinuxFileService
+    - Linux/macOS/Container: Uses LinuxFileService (native POSIX)
 
     Returns:
         FileServiceProtocol: A file service implementation
@@ -57,8 +57,15 @@ def create_file_service(
         else:
             logger.error("WSL is not available on Windows environment")
             raise RuntimeError("WSL is not available on Windows environment")
-    elif platform_service.is_linux() or platform_service.is_docker():
-        logger.debug("Creating Linux file service")
+    elif (
+        platform_service.is_linux()
+        or platform_service.is_macos()
+        or platform_service.is_docker()
+    ):
+        logger.debug(
+            "Creating native POSIX file service for %s",
+            platform_service.get_platform_name(),
+        )
         return LinuxFileService()
     else:
         logger.error(

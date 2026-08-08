@@ -230,6 +230,7 @@ class TestScheduleValidationService:
             "*/5 * * * *",  # Every 5 minutes
             "0 9-17 * * 1-5",  # Business hours weekdays
             "30 14 * * 0",  # Sunday afternoon
+            "0 1 * * 7",  # Sunday via Unix alias
             "0 0 1 * *",  # First day of month
             "15,45 * * * *",  # At 15 and 45 minutes
         ]
@@ -393,6 +394,8 @@ class TestScheduleValidationService:
             "*/5 * * * *",
             "0 9-17 * * 1-5",
             "30 14 * * 0",
+            "0 1 * * 7",  # Sunday via Unix cron alias
+            "0 1 * * sun",
         ]
 
         for expr in valid_expressions:

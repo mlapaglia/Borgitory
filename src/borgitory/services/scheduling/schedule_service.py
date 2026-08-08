@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from borgitory.models.database import Schedule, Repository
+from borgitory.services.scheduling.cron_utils import normalize_cron_for_apscheduler
 
 if TYPE_CHECKING:
     from borgitory.services.scheduling.scheduler_service import SchedulerService
@@ -99,7 +100,7 @@ class ScheduleService:
             ScheduleValidationResult with success status and optional error message
         """
         try:
-            CronTrigger.from_crontab(cron_expression)
+            CronTrigger.from_crontab(normalize_cron_for_apscheduler(cron_expression))
             return ScheduleValidationResult(success=True)
         except ValueError as e:
             return ScheduleValidationResult(

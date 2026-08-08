@@ -1,5 +1,6 @@
 import re
 import secrets
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -112,11 +113,15 @@ def build_secure_borg_command(
     # Sanitize inputs
     safe_repo_path = sanitize_path(repository_path) if repository_path else ""
 
-    # Build environment variables
-    environment = {
-        "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes",
-        "BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK": "yes",
-    }
+    # Start from the current environment so PATH and other vars are preserved.
+    # create_subprocess_exec replaces the process env entirely when env= is set.
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "BORG_RELOCATED_REPO_ACCESS_IS_OK": "yes",
+            "BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK": "yes",
+        }
+    )
 
     if passphrase:
         environment["BORG_PASSPHRASE"] = sanitize_passphrase(passphrase)
