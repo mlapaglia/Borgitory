@@ -95,6 +95,10 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
                 pre_job_hooks=schedule.pre_job_hooks,
                 post_job_hooks=schedule.post_job_hooks,
                 patterns=schedule.patterns,
+                backup_timeout_seconds=schedule.backup_timeout_seconds,
+                backup_retry_count=schedule.backup_retry_count,
+                cloud_sync_timeout_seconds=schedule.cloud_sync_timeout_seconds,
+                cloud_sync_retry_count=schedule.cloud_sync_retry_count,
             )
 
             backup_result = await job_service.create_backup_job(

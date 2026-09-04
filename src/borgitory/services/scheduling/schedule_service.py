@@ -142,10 +142,15 @@ class ScheduleService:
         source_path: str,
         cloud_sync_config_id: Optional[int] = None,
         prune_config_id: Optional[int] = None,
+        check_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
         patterns: Optional[str] = None,
+        backup_timeout_seconds: Optional[int] = None,
+        backup_retry_count: int = 0,
+        cloud_sync_timeout_seconds: Optional[int] = None,
+        cloud_sync_retry_count: int = 0,
     ) -> ScheduleOperationResult:
         """
         Create a new schedule.
@@ -180,10 +185,15 @@ class ScheduleService:
             db_schedule.enabled = True
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
             db_schedule.prune_config_id = prune_config_id
+            db_schedule.check_config_id = check_config_id
             db_schedule.notification_config_id = notification_config_id
             db_schedule.pre_job_hooks = pre_job_hooks
             db_schedule.post_job_hooks = post_job_hooks
             db_schedule.patterns = patterns
+            db_schedule.backup_timeout_seconds = backup_timeout_seconds
+            db_schedule.backup_retry_count = backup_retry_count
+            db_schedule.cloud_sync_timeout_seconds = cloud_sync_timeout_seconds
+            db_schedule.cloud_sync_retry_count = cloud_sync_retry_count
 
             db.add(db_schedule)
             await db.commit()
@@ -401,7 +411,7 @@ class ScheduleService:
 
             try:
                 repository_id = int(repository_id)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return False, {}, "Invalid repository ID"
 
             # Validate name
@@ -415,7 +425,7 @@ class ScheduleService:
                     return None
                 try:
                     return int(value)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     return None
 
             # Process hooks and patterns (they come as JSON strings)
@@ -437,6 +447,17 @@ class ScheduleService:
                 "pre_job_hooks": safe_json_string(json_data.get("pre_job_hooks")),
                 "post_job_hooks": safe_json_string(json_data.get("post_job_hooks")),
                 "patterns": safe_json_string(json_data.get("patterns")),
+                "backup_timeout_seconds": safe_int(
+                    json_data.get("backup_timeout_seconds")
+                ),
+                "backup_retry_count": safe_int(json_data.get("backup_retry_count")) or 0,
+                "cloud_sync_timeout_seconds": safe_int(
+                    json_data.get("cloud_sync_timeout_seconds")
+                ),
+                "cloud_sync_retry_count": safe_int(
+                    json_data.get("cloud_sync_retry_count")
+                )
+                or 0,
             }
 
             return True, processed_data, None

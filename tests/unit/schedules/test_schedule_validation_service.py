@@ -54,6 +54,10 @@ class TestScheduleValidationService:
             "pre_job_hooks": None,
             "post_job_hooks": None,
             "patterns": None,
+            "backup_timeout_seconds": None,
+            "backup_retry_count": 0,
+            "cloud_sync_timeout_seconds": None,
+            "cloud_sync_retry_count": 0,
         }
 
     def test_validate_schedule_creation_data_minimal_valid_input(
@@ -87,6 +91,10 @@ class TestScheduleValidationService:
             "pre_job_hooks": None,
             "post_job_hooks": None,
             "patterns": None,
+            "backup_timeout_seconds": None,
+            "backup_retry_count": 0,
+            "cloud_sync_timeout_seconds": None,
+            "cloud_sync_retry_count": 0,
         }
 
     def test_validate_schedule_creation_data_missing_name(
@@ -276,6 +284,31 @@ class TestScheduleValidationService:
 
             assert is_valid is True
             assert processed_data["cloud_sync_config_id"] == expected_output
+
+    def test_validate_schedule_creation_data_retry_timeout_conversion(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """Test conversion of retry and timeout fields."""
+        data = {
+            "name": "Test Schedule",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "backup_timeout_seconds": "120",
+            "backup_retry_count": "2",
+            "cloud_sync_timeout_seconds": "300",
+            "cloud_sync_retry_count": "1",
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(data)
+        )
+
+        assert is_valid is True
+        assert error_msg is None
+        assert processed_data["backup_timeout_seconds"] == 120
+        assert processed_data["backup_retry_count"] == 2
+        assert processed_data["cloud_sync_timeout_seconds"] == 300
+        assert processed_data["cloud_sync_retry_count"] == 1
 
     def test_validate_cron_expression_valid(
         self, schedule_service: ScheduleService

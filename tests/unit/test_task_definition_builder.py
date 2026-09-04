@@ -138,6 +138,20 @@ class TestTaskDefinitionBuilder:
 
         assert task == expected
 
+    def test_build_backup_task_with_retry_timeout(
+        self, task_builder: TaskDefinitionBuilder
+    ) -> None:
+        """Test building backup task with retry and timeout values."""
+        task = task_builder.build_backup_task(
+            "test-repo",
+            timeout=120,
+            retry_count=2,
+        )
+
+        assert task.type == TaskTypeEnum.BACKUP
+        assert task.timeout == 120
+        assert task.retry_count == 2
+
     async def test_build_prune_task_from_config_simple_strategy(
         self,
         task_builder: TaskDefinitionBuilder,
@@ -405,6 +419,21 @@ class TestTaskDefinitionBuilder:
         )
 
         assert task == expected
+
+    def test_build_cloud_sync_task_with_retry_timeout(
+        self, task_builder: TaskDefinitionBuilder
+    ) -> None:
+        """Test building cloud sync task with retry and timeout values."""
+        task = task_builder.build_cloud_sync_task(
+            "test-repo",
+            cloud_sync_config_id=123,
+            timeout=300,
+            retry_count=1,
+        )
+
+        assert task.type == TaskTypeEnum.CLOUD_SYNC
+        assert task.timeout == 300
+        assert task.retry_count == 1
 
     async def test_build_notification_task(
         self,

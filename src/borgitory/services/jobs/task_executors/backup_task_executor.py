@@ -9,6 +9,7 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
 )
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.services.jobs.broadcaster.event_type import EventType
@@ -141,14 +142,65 @@ class BackupTaskExecutor:
                 additional_args=additional_args,
                 environment_overrides=env_overrides,
             )
-            process = await self.job_executor.start_process(
-                borg_command.command, borg_command.environment
-            )
+            timeout_value = params.get("timeout")
+            timeout_seconds = int(str(timeout_value)) if timeout_value else None
+            retry_count_value = params.get("retry_count")
+            retry_count = int(str(retry_count_value)) if retry_count_value else 0
+            total_attempts = max(1, retry_count + 1)
 
-            # Monitor the process (outside context manager since it's long-running)
-            result = await self.job_executor.monitor_process_output(
-                process, output_callback=task_output_callback
-            )
+            result = None
+            for attempt in range(1, total_attempts + 1):
+                if total_attempts > 1:
+                    task_output_callback(
+                        f"Backup attempt {attempt} of {total_attempts} started"
+                    )
+
+                process = await self.job_executor.start_process(
+                    borg_command.command, borg_command.environment
+                )
+
+                try:
+                    if timeout_seconds:
+                        result = await asyncio.wait_for(
+                            self.job_executor.monitor_process_output(
+                                process, output_callback=task_output_callback
+                            ),
+                            timeout=float(timeout_seconds),
+                        )
+                    else:
+                        result = await self.job_executor.monitor_process_output(
+                            process, output_callback=task_output_callback
+                        )
+                except asyncio.TimeoutError:
+                    await self.job_executor.terminate_process(process)
+                    timeout_error = (
+                        f"Backup timed out after {timeout_seconds}s "
+                        f"(attempt {attempt}/{total_attempts})"
+                    )
+                    task_output_callback(timeout_error)
+                    logger.warning(timeout_error)
+                    if attempt < total_attempts:
+                        continue
+                    result = None
+
+                if result and result.return_code == 0:
+                    break
+
+                if attempt < total_attempts:
+                    task_output_callback(
+                        f"Backup attempt {attempt} failed, retrying..."
+                    )
+
+            if result is None:
+                result = ProcessResult(
+                    return_code=124,
+                    stdout=b"",
+                    stderr=b"",
+                    error=(
+                        f"Backup timed out after {timeout_seconds}s "
+                        f"for all {total_attempts} attempt(s)"
+                    ),
+                )
 
             logger.info(
                 f"Backup process completed with return code: {result.return_code}"

@@ -13,6 +13,7 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
 )
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
+from borgitory.protocols.command_protocols import ProcessResult
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -116,13 +117,68 @@ class CloudSyncTaskExecutor:
             )
             return True
 
-        result = await self.job_executor.execute_cloud_sync_task(
-            repository_path=str(repository_path or ""),
-            cloud_sync_config_id=cloud_sync_config_id,
-            session_maker=self.session_maker,
-            cloud_sync_service=self.cloud_sync_service,
-            output_callback=task_output_callback,
-        )
+        timeout_value = params.get("timeout")
+        timeout_seconds = int(str(timeout_value)) if timeout_value else None
+        retry_count_value = params.get("retry_count")
+        retry_count = int(str(retry_count_value)) if retry_count_value else 0
+        total_attempts = max(1, retry_count + 1)
+
+        result = None
+        for attempt in range(1, total_attempts + 1):
+            if total_attempts > 1:
+                task_output_callback(
+                    f"Cloud sync attempt {attempt} of {total_attempts} started"
+                )
+
+            try:
+                if timeout_seconds:
+                    result = await asyncio.wait_for(
+                        self.job_executor.execute_cloud_sync_task(
+                            repository_path=str(repository_path or ""),
+                            cloud_sync_config_id=cloud_sync_config_id,
+                            session_maker=self.session_maker,
+                            cloud_sync_service=self.cloud_sync_service,
+                            output_callback=task_output_callback,
+                        ),
+                        timeout=float(timeout_seconds),
+                    )
+                else:
+                    result = await self.job_executor.execute_cloud_sync_task(
+                        repository_path=str(repository_path or ""),
+                        cloud_sync_config_id=cloud_sync_config_id,
+                        session_maker=self.session_maker,
+                        cloud_sync_service=self.cloud_sync_service,
+                        output_callback=task_output_callback,
+                    )
+            except asyncio.TimeoutError:
+                timeout_error = (
+                    f"Cloud sync timed out after {timeout_seconds}s "
+                    f"(attempt {attempt}/{total_attempts})"
+                )
+                task_output_callback(timeout_error)
+                logger.warning(timeout_error)
+                if attempt < total_attempts:
+                    continue
+                result = None
+
+            if result and result.return_code == 0:
+                break
+
+            if attempt < total_attempts:
+                task_output_callback(
+                    f"Cloud sync attempt {attempt} failed, retrying..."
+                )
+
+        if result is None:
+            result = ProcessResult(
+                return_code=124,
+                stdout=b"",
+                stderr=b"",
+                error=(
+                    f"Cloud sync timed out after {timeout_seconds}s "
+                    f"for all {total_attempts} attempt(s)"
+                ),
+            )
 
         task.return_code = result.return_code
         task.status = (
