@@ -43,10 +43,10 @@ jobs:
         fetch-depth: 2
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Build test image
-      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
       with:
         context: .
         target: test
@@ -175,7 +175,7 @@ jobs:
 
     - name: Upload unit test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         flags: unit
         name: unit-tests
@@ -183,7 +183,7 @@ jobs:
 
     - name: Upload unit test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         flags: unit
         name: unit-tests-results
@@ -238,7 +238,7 @@ jobs:
 
     - name: Upload integration test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         flags: integration
         name: integration-tests
@@ -246,7 +246,7 @@ jobs:
 
     - name: Upload integration test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         flags: integration
         name: integration-tests-results
@@ -301,7 +301,7 @@ jobs:
 
     - name: Upload e2e test coverage to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         flags: e2e
         name: e2e-tests
@@ -309,7 +309,7 @@ jobs:
 
     - name: Upload e2e test results to Codecov
       if: always() && matrix.arch == 'x86_64'
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         flags: e2e
         name: e2e-tests-results
@@ -425,10 +425,10 @@ jobs:
         fetch-depth: 2
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Build production image
-      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
       with:
         context: .
         platforms: ${{ matrix.platform }}
