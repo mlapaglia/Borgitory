@@ -19,6 +19,25 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+NO_WORK_ERROR_MESSAGE = (
+    "Source path is required unless the schedule runs a prune, check, or cloud sync"
+)
+
+
+def schedule_has_work(
+    source_path: Optional[str],
+    prune_config_id: Optional[int],
+    check_config_id: Optional[int],
+    cloud_sync_config_id: Optional[int],
+) -> bool:
+    """A schedule without a source path is maintenance-only and needs at least one maintenance task."""
+    if source_path and source_path.strip():
+        return True
+    return any(
+        config_id is not None
+        for config_id in (prune_config_id, check_config_id, cloud_sync_config_id)
+    )
+
 
 @dataclass
 class ScheduleOperationResult:
@@ -146,6 +165,7 @@ class ScheduleService:
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
         patterns: Optional[str] = None,
+        check_config_id: Optional[int] = None,
     ) -> ScheduleOperationResult:
         """
         Create a new schedule.
@@ -164,6 +184,13 @@ class ScheduleService:
                     success=False, error_message="Repository not found"
                 )
 
+            if not schedule_has_work(
+                source_path, prune_config_id, check_config_id, cloud_sync_config_id
+            ):
+                return ScheduleOperationResult(
+                    success=False, error_message=NO_WORK_ERROR_MESSAGE
+                )
+
             # Validate cron expression
             validation_result = self.validate_cron_expression(cron_expression)
             if validation_result.is_error:
@@ -180,6 +207,7 @@ class ScheduleService:
             db_schedule.enabled = True
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
             db_schedule.prune_config_id = prune_config_id
+            db_schedule.check_config_id = check_config_id
             db_schedule.notification_config_id = notification_config_id
             db_schedule.pre_job_hooks = pre_job_hooks
             db_schedule.post_job_hooks = post_job_hooks
@@ -231,6 +259,17 @@ class ScheduleService:
             # Update fields
             for field, value in update_data.items():
                 setattr(schedule, field, value)
+
+            if not schedule_has_work(
+                schedule.source_path,
+                schedule.prune_config_id,
+                schedule.check_config_id,
+                schedule.cloud_sync_config_id,
+            ):
+                await db.rollback()
+                return ScheduleOperationResult(
+                    success=False, error_message=NO_WORK_ERROR_MESSAGE
+                )
 
             await db.commit()
             await db.refresh(schedule)
@@ -428,9 +467,10 @@ class ScheduleService:
                 "name": name,
                 "repository_id": repository_id,
                 "cron_expression": cron_expression,
-                "source_path": json_data.get("source_path", ""),
+                "source_path": (json_data.get("source_path") or "").strip(),
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "prune_config_id": safe_int(json_data.get("prune_config_id")),
+                "check_config_id": safe_int(json_data.get("check_config_id")),
                 "notification_config_id": safe_int(
                     json_data.get("notification_config_id")
                 ),
@@ -438,6 +478,14 @@ class ScheduleService:
                 "post_job_hooks": safe_json_string(json_data.get("post_job_hooks")),
                 "patterns": safe_json_string(json_data.get("patterns")),
             }
+
+            if not schedule_has_work(
+                processed_data["source_path"],
+                processed_data["prune_config_id"],
+                processed_data["check_config_id"],
+                processed_data["cloud_sync_config_id"],
+            ):
+                return False, {}, NO_WORK_ERROR_MESSAGE
 
             return True, processed_data, None
 
