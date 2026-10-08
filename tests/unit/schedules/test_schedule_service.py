@@ -8,8 +8,11 @@ from sqlalchemy import select
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from borgitory.services.scheduling.schedule_service import ScheduleService
-from borgitory.models.database import Schedule, Repository
+from borgitory.services.scheduling.schedule_service import (
+    NO_WORK_ERROR_MESSAGE,
+    ScheduleService,
+)
+from borgitory.models.database import Schedule, Repository, RepositoryCheckConfig
 
 
 @pytest.fixture
@@ -40,6 +43,19 @@ async def sample_repository(test_db: AsyncSession) -> Repository:
     await test_db.commit()
     await test_db.refresh(repository)
     return repository
+
+
+@pytest.fixture
+async def sample_check_config(test_db: AsyncSession) -> RepositoryCheckConfig:
+    """Create a repository check policy for testing."""
+    check_config = RepositoryCheckConfig()
+    check_config.name = "weekly-full-check"
+    check_config.check_type = "full"
+
+    test_db.add(check_config)
+    await test_db.commit()
+    await test_db.refresh(check_config)
+    return check_config
 
 
 class TestScheduleService:
@@ -311,6 +327,108 @@ class TestScheduleService:
         assert result.schedule is None
         assert result.error_message is not None
         assert "Schedule not found" in result.error_message
+
+    async def test_create_check_only_schedule_saves_check_config(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        sample_check_config: RepositoryCheckConfig,
+    ) -> None:
+        """A schedule with no source path and a check policy is saved with its check."""
+        result = await service.create_schedule(
+            db=test_db,
+            name="weekly-check",
+            repository_id=sample_repository.id,
+            cron_expression="0 2 * * 6",
+            source_path="",
+            check_config_id=sample_check_config.id,
+        )
+
+        assert result.success is True
+        assert result.schedule is not None
+        assert result.schedule.source_path == ""
+        assert result.schedule.check_config_id == sample_check_config.id
+
+    async def test_create_schedule_without_work_rejected(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        mock_scheduler_service: AsyncMock,
+    ) -> None:
+        """A schedule with no source path and no maintenance tasks is rejected."""
+        result = await service.create_schedule(
+            db=test_db,
+            name="does-nothing",
+            repository_id=sample_repository.id,
+            cron_expression="0 2 * * *",
+            source_path="",
+        )
+
+        assert result.success is False
+        assert result.error_message == NO_WORK_ERROR_MESSAGE
+        mock_scheduler_service.add_schedule.assert_not_called()
+
+    async def test_update_schedule_to_check_only(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        sample_check_config: RepositoryCheckConfig,
+    ) -> None:
+        """A backup schedule can become check-only by clearing its source path."""
+        schedule = Schedule()
+        schedule.name = "backup"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = True
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+
+        result = await service.update_schedule(
+            schedule.id,
+            test_db,
+            {"source_path": "", "check_config_id": sample_check_config.id},
+        )
+
+        assert result.success is True
+        assert result.schedule is not None
+        assert result.schedule.source_path == ""
+        assert result.schedule.check_config_id == sample_check_config.id
+
+    async def test_update_schedule_without_work_rejected(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        mock_scheduler_service: AsyncMock,
+    ) -> None:
+        """Clearing the source path of a schedule with no maintenance tasks is rejected."""
+        schedule = Schedule()
+        schedule.name = "backup"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = True
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+        schedule_id = schedule.id
+
+        result = await service.update_schedule(
+            schedule_id, test_db, {"source_path": ""}
+        )
+
+        assert result.success is False
+        assert result.error_message == NO_WORK_ERROR_MESSAGE
+        mock_scheduler_service.update_schedule.assert_not_called()
+
+        reloaded = await service.get_schedule_by_id(schedule_id, test_db)
+        assert reloaded is not None
+        assert reloaded.source_path == "/data"
 
     async def test_toggle_schedule_enable(
         self,

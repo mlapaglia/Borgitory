@@ -60,6 +60,7 @@
                     <div class="flex items-center justify-between mb-2">
                         <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Output:</h5>
                         <button hx-post="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/copy-output"
+                                type="button"
                                 hx-swap="none"
                                 class="text-xs text-blue-600 hover:text-blue-800">
                             Copy

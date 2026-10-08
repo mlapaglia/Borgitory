@@ -48,7 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "debugpy>=1.8.20",
-    "djlint>=1.36.4",
+    "djlint>=1.46.4",
     "httpx>=0.28.1",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
@@ -57,7 +57,6 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-playwright>=0.7.2",
     "ruff>=0.15.0",
-    "sqlalchemy[mypy]>=2.0.46",
     "types-python-dateutil>=2.9.0.20260124",
     "types-aiofiles>=25.1.0.20251011",
 ]
@@ -217,7 +216,6 @@ files = ["src"]
 # Plugins
 plugins = [
     "pydantic.mypy",
-    "sqlalchemy.ext.mypy.plugin",
 ]
 
 [tool.pydantic-mypy]

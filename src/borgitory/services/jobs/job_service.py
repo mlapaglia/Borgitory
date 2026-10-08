@@ -60,9 +60,17 @@ class JobService:
         self.job_manager = job_manager
 
     async def create_backup_job(
-        self, db: AsyncSession, backup_request: BackupRequest, job_type: JobType
+        self,
+        db: AsyncSession,
+        backup_request: BackupRequest,
+        job_type: JobType,
+        include_backup: bool = True,
     ) -> JobCreationResponse:
-        """Create a backup job with optional cleanup and check tasks"""
+        """Create a backup job with optional cleanup and check tasks.
+
+        With include_backup=False only the maintenance tasks (hooks, prune, check,
+        cloud sync, notification) are created and the source path and patterns are ignored.
+        """
         result = await db.execute(
             select(Repository).where(Repository.id == backup_request.repository_id)
         )
@@ -77,7 +85,7 @@ class JobService:
 
         # Convert patterns JSON to Borg command format
         patterns = []
-        if backup_request.patterns:
+        if include_backup and backup_request.patterns:
             try:
                 import json
 
@@ -123,18 +131,20 @@ class JobService:
             except Exception as e:
                 logger.warning(f"Failed to parse patterns: {str(e)}")
 
-        backup_params: ConfigDict = {
-            "source_path": backup_request.source_path,
-            "compression": backup_request.compression,
-            "dry_run": backup_request.dry_run,
-            "ignore_lock": backup_request.ignore_lock,
-            "patterns": patterns,
-        }
+        backup_params: Optional[ConfigDict] = None
+        if include_backup:
+            backup_params = {
+                "source_path": backup_request.source_path,
+                "compression": backup_request.compression,
+                "dry_run": backup_request.dry_run,
+                "ignore_lock": backup_request.ignore_lock,
+                "patterns": patterns,
+            }
 
         task_definitions = await builder.build_task_list(
             db=db,
             repository_name=repository.name,
-            include_backup=True,
+            include_backup=include_backup,
             backup_params=backup_params,
             prune_config_id=backup_request.prune_config_id,
             check_config_id=backup_request.check_config_id,

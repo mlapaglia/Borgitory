@@ -39,6 +39,7 @@
                     </div>
                     <div class="flex-shrink-0 flex space-x-2">
                         <button hx-post="/api/repositories/{{ repository.id }}/archives/{{ archive.name }}/contents/load-with-spinner"
+                                type="button"
                                 hx-target="#archive-browser-container"
                                 hx-swap="innerHTML"
                                 onclick="document.getElementById('archive-contents-modal').classList.remove('hidden')"
@@ -46,6 +47,7 @@
                             View Contents
                         </button>
                         <button hx-delete="/api/repositories/{{ repository.id }}/archives/{{ archive.name }}"
+                                type="button"
                                 hx-target="#archives-list"
                                 hx-swap="innerHTML"
                                 hx-confirm="Are you sure you want to delete archive '{{ archive.name }}'? This action cannot be undone."

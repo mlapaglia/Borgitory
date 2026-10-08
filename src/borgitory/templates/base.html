@@ -34,7 +34,7 @@
         function toggleDarkMode() {
             const html = document.documentElement;
             const isDark = html.classList.contains('dark');
-            
+
             if (isDark) {
                 html.classList.remove('dark');
                 localStorage.setItem('darkMode', 'false');
@@ -47,14 +47,14 @@
         function initializeDarkMode() {
             const savedMode = localStorage.getItem('darkMode');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            
+
             if (savedMode === 'true' || (savedMode === null && prefersDark)) {
                 document.documentElement.classList.add('dark');
             }
         }
 
         initializeDarkMode();
-        
+
         // HTMX-compatible mobile sidebar close function
         window.htmxCloseMobileSidebar = function() {
             const sidebar = document.getElementById('sidebar');
@@ -63,7 +63,7 @@
             const closeIcon = document.getElementById('close-icon');
             const button = document.getElementById('mobile-menu-button');
             const body = document.body;
-            
+
             sidebar.classList.remove('mobile-open');
             overlay.classList.add('hidden');
             overlay.classList.remove('show');
@@ -83,6 +83,7 @@
                     <div class="flex items-center">
                         <!-- Hamburger Menu Button (Mobile Only) -->
                         <button id="mobile-menu-button"
+                                type="button"
                                 hx-on:click=" document.getElementById('sidebar').classList.toggle('mobile-open'); document.getElementById('sidebar-overlay').classList.toggle('hidden'); document.getElementById('sidebar-overlay').classList.toggle('show'); document.getElementById('hamburger-icon').classList.toggle('hidden'); document.getElementById('close-icon').classList.toggle('hidden'); document.body.classList.toggle('mobile-sidebar-open'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); "
                                 class="lg:hidden mr-3 p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                                 aria-expanded="false"
@@ -122,6 +123,7 @@
                                 Welcome, <span class="font-medium">{{ current_user.username }}</span>
                             </span>
                             <button onclick="logout()"
+                                    type="button"
                                     class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors">
                                 Logout
                             </button>
@@ -140,18 +142,18 @@
         function getBrowserTimezoneOffset() {
             return new Date().getTimezoneOffset();
         }
-        
+
         function setCookie(name, value, days = 30) {
             const expires = new Date();
             expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
             document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
         }
-        
+
         function setupTimezoneCookie() {
             const timezoneOffset = getBrowserTimezoneOffset();
             setCookie('browser_timezone_offset', timezoneOffset.toString());
         }
-        
+
         // Set timezone cookie when DOM is ready
         document.addEventListener('DOMContentLoaded', setupTimezoneCookie);
         </script>
@@ -179,7 +181,7 @@
                 document.body.appendChild(tempContainer);
                 target = tempContainer;
             }
-            
+
             htmx.ajax('GET', `/api/shared/notification?type=${type}&message=${encodeURIComponent(message)}`, {
                 target: target,
                 swap: 'innerHTML'
@@ -193,7 +195,7 @@
                     method: 'POST',
                     credentials: 'include'
                 });
-                
+
                 if (response.ok) {
                     showHTMXNotification('Logged out successfully', 'success');
                     setTimeout(() => {
@@ -216,7 +218,7 @@
             }
         });
 
-        
+
         // Close sidebar when clicking outside on mobile
         document.addEventListener('click', function(event) {
             const sidebar = document.getElementById('sidebar');
@@ -224,12 +226,12 @@
             const isClickInsideSidebar = sidebar && sidebar.contains(event.target);
             const isClickOnButton = button && button.contains(event.target);
             const isMobile = window.innerWidth < 1024;
-            
+
             if (isMobile && !isClickInsideSidebar && !isClickOnButton && sidebar.classList.contains('mobile-open')) {
                 htmxCloseMobileSidebar();
             }
         });
-        
+
         // Close sidebar on window resize to desktop
         window.addEventListener('resize', function() {
             const sidebar = document.getElementById('sidebar');
@@ -237,7 +239,7 @@
                 htmxCloseMobileSidebar();
             }
         });
-        
+
         // Handle escape key to close sidebar
         document.addEventListener('keydown', function(event) {
             const sidebar = document.getElementById('sidebar');
@@ -245,7 +247,7 @@
                 htmxCloseMobileSidebar();
             }
         });
-        
+
         // Global click handler to close autocomplete dropdowns
         document.addEventListener('click', function(event) {
             // Check if click is outside any autocomplete component
@@ -257,8 +259,8 @@
                 });
             }
         });
-        
-        
+
+
         </script>
         <!-- Archive Contents Modal -->
         {% include "partials/archives/contents_modal.html" %}

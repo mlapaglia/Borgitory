@@ -16,8 +16,13 @@
                 </svg>
                 <span class="text-green-700">Cleanup job started successfully!</span>
             </div>
-            <button data-close class="text-green-400 hover:text-green-600">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button type="button"
+                    data-close
+                    class="text-green-400 hover:text-green-600">
+                <svg class="w-4 h-4"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
                     </path>
                 </svg>
@@ -54,7 +59,8 @@
                                hx-target="#strategy-fields-container"
                                hx-trigger="change, load"
                                hx-swap="innerHTML">
-                        <label for="strategy-simple" class="ml-2 block text-sm text-gray-700">
+                        <label for="strategy-simple"
+                               class="ml-2 block text-sm text-gray-700">
                             Simple: Keep archives within time period
                         </label>
                     </div>
@@ -68,7 +74,8 @@
                                hx-target="#strategy-fields-container"
                                hx-trigger="change"
                                hx-swap="innerHTML">
-                        <label for="strategy-advanced" class="ml-2 block text-sm text-gray-700">
+                        <label for="strategy-advanced"
+                               class="ml-2 block text-sm text-gray-700">
                             Advanced: Granular retention schedule
                         </label>
                     </div>

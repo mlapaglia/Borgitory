@@ -3,7 +3,10 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from borgitory.services.scheduling.schedule_service import ScheduleService
+from borgitory.services.scheduling.schedule_service import (
+    NO_WORK_ERROR_MESSAGE,
+    ScheduleService,
+)
 
 
 class TestScheduleValidationService:
@@ -50,6 +53,7 @@ class TestScheduleValidationService:
             "source_path": "/data",
             "cloud_sync_config_id": 2,
             "prune_config_id": 3,
+            "check_config_id": None,
             "notification_config_id": 4,
             "pre_job_hooks": None,
             "post_job_hooks": None,
@@ -64,9 +68,10 @@ class TestScheduleValidationService:
             "name": "Test Schedule",
             "repository_id": "1",
             "cron_expression": "*/5 * * * *",
-            "source_path": "",
+            "source_path": "/data",
             "cloud_sync_config_id": "",
             "prune_config_id": "",
+            "check_config_id": "",
             "notification_config_id": "",
         }
 
@@ -80,14 +85,56 @@ class TestScheduleValidationService:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "*/5 * * * *",
-            "source_path": "",
+            "source_path": "/data",
             "cloud_sync_config_id": None,
             "prune_config_id": None,
+            "check_config_id": None,
             "notification_config_id": None,
             "pre_job_hooks": None,
             "post_job_hooks": None,
             "patterns": None,
         }
+
+    def test_validate_schedule_creation_data_check_only_schedule(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """An empty source path is allowed when the schedule runs a check."""
+        check_only_data = {
+            "name": "Weekly Check",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * 6",
+            "source_path": "",
+            "check_config_id": "5",
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(check_only_data)
+        )
+
+        assert is_valid is True
+        assert error_msg is None
+        assert processed_data["source_path"] == ""
+        assert processed_data["check_config_id"] == 5
+
+    def test_validate_schedule_creation_data_no_work_rejected(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """An empty source path with no maintenance tasks is rejected."""
+        no_work_data = {
+            "name": "Empty Schedule",
+            "repository_id": "1",
+            "cron_expression": "0 2 * * *",
+            "source_path": "   ",
+            "notification_config_id": "4",
+        }
+
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(no_work_data)
+        )
+
+        assert is_valid is False
+        assert processed_data == {}
+        assert error_msg == NO_WORK_ERROR_MESSAGE
 
     def test_validate_schedule_creation_data_missing_name(
         self, schedule_service: ScheduleService
@@ -211,6 +258,7 @@ class TestScheduleValidationService:
             "name": "  Test Schedule  ",
             "repository_id": "1",
             "cron_expression": "  0 2 * * *  ",
+            "source_path": "  /data  ",
         }
 
         is_valid, processed_data, error_msg = (
@@ -221,6 +269,7 @@ class TestScheduleValidationService:
         assert error_msg is None
         assert processed_data["name"] == "Test Schedule"
         assert processed_data["cron_expression"] == "0 2 * * *"
+        assert processed_data["source_path"] == "/data"
 
     def test_validate_schedule_creation_data_complex_cron_expressions(
         self, schedule_service: ScheduleService
@@ -240,6 +289,7 @@ class TestScheduleValidationService:
                 "name": "Test Schedule",
                 "repository_id": "1",
                 "cron_expression": cron_expr,
+                "source_path": "/data",
             }
 
             is_valid, processed_data, error_msg = (
@@ -267,6 +317,7 @@ class TestScheduleValidationService:
                 "name": "Test Schedule",
                 "repository_id": "1",
                 "cron_expression": "0 2 * * *",
+                "source_path": "/data",
                 "cloud_sync_config_id": input_value,
             }
 

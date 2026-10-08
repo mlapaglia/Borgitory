@@ -49,10 +49,11 @@
         <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
             Private Key (optional if using password)
         </label>
+        {% set private_key_placeholder = "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----" %}
         <textarea name="provider_config[private_key]"
                   rows="6"
                   class="input-modern mt-1"
-                  placeholder="{% if config %}Current value will be used if left empty{% else %}-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----{% endif %}">{{ config.private_key or '' if config else '' }}</textarea>
+                  placeholder="{% if config %}Current value will be used if left empty{% else %}{{ private_key_placeholder }}{% endif %}">{{ config.private_key or '' if config else '' }}</textarea>
         {% if config %}
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                 Current private key will be used if left empty.

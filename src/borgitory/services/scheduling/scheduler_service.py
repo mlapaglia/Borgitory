@@ -21,6 +21,7 @@ from borgitory.models.enums import JobType
 from borgitory.models.job_results import JobCreationResult
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.scheduling.cron_utils import normalize_cron_for_apscheduler
+from borgitory.services.scheduling.schedule_service import schedule_has_work
 from borgitory.protocols import JobManagerProtocol
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,19 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.error(f"SCHEDULER: Repository not found for schedule {schedule_id}")
             return
 
+        include_backup = bool(schedule.source_path and schedule.source_path.strip())
+        if not include_backup and not schedule_has_work(
+            schedule.source_path,
+            schedule.prune_config_id,
+            schedule.check_config_id,
+            schedule.cloud_sync_config_id,
+        ):
+            logger.warning(
+                f"SCHEDULER: Schedule {schedule_id} has no source path and no prune, "
+                "check, or cloud sync configured; nothing to run"
+            )
+            return
+
         logger.info(f"SCHEDULER: Found repository '{repository.name}'")
 
         schedule.last_run = now_utc()
@@ -83,9 +97,11 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.info(f"  - source_path: {schedule.source_path}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
+            # Maintenance-only schedules have no source path; BackupRequest requires an
+            # absolute path, so fall back to its default, which is ignored without a backup task.
             backup_request = BackupRequest(
                 repository_id=repository.id,
-                source_path=schedule.source_path,
+                source_path=schedule.source_path if include_backup else "/",
                 compression=CompressionType.ZSTD,
                 dry_run=False,
                 prune_config_id=schedule.prune_config_id,
@@ -98,7 +114,12 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             )
 
             backup_result = await job_service.create_backup_job(
-                db, backup_request, JobType.SCHEDULED_BACKUP
+                db,
+                backup_request,
+                JobType.SCHEDULED_BACKUP
+                if include_backup
+                else JobType.SCHEDULED_MAINTENANCE,
+                include_backup=include_backup,
             )
 
             if isinstance(backup_result, JobCreationResult):
