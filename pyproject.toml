@@ -48,7 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "debugpy>=1.8.20",
-    "djlint>=1.36.4",
+    "djlint>=1.46.4",
     "httpx>=0.28.1",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",

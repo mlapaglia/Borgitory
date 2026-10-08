@@ -43,12 +43,14 @@
                 </div>
                 <div class="flex flex-col space-y-2 ml-4">
                     <button hx-get="/api/schedules/{{ schedule.id }}/edit"
+                            type="button"
                             hx-target="#schedule-form-container"
                             hx-swap="innerHTML"
                             class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500">
                         Edit
                     </button>
                     <button hx-put="/api/schedules/{{ schedule.id }}/toggle"
+                            type="button"
                             hx-target="#schedules-list"
                             hx-swap="innerHTML"
                             hx-indicator="this"
@@ -57,6 +59,7 @@
                         <span class="hidden [.htmx-request_&]:inline">{{ 'Disabling...' if schedule.enabled else 'Enabling...' }}</span>
                     </button>
                     <button hx-delete="/api/schedules/{{ schedule.id }}"
+                            type="button"
                             hx-target="#schedule-status"
                             hx-swap="innerHTML"
                             hx-indicator="this"
@@ -66,6 +69,7 @@
                         <span class="hidden [.htmx-request_&]:inline">Deleting...</span>
                     </button>
                     <button hx-post="/api/schedules/{{ schedule.id }}/run"
+                            type="button"
                             hx-target="#schedule-status"
                             hx-swap="innerHTML"
                             hx-indicator="this"
