@@ -10,10 +10,6 @@ from typing import List
 from unittest.mock import Mock
 from borgitory.services.cloud_providers.registry import ProviderRegistry
 from borgitory.services.cloud_providers.registry_factory import RegistryFactory
-from borgitory.services.notifications.registry import NotificationProviderRegistry
-from borgitory.services.notifications.registry_factory import (
-    NotificationRegistryFactory,
-)
 from borgitory.services.jobs.job_models import JobManagerDependencies
 from borgitory.services.jobs.job_executor import JobExecutor
 
@@ -132,7 +128,6 @@ def isolated_job_dependencies() -> JobManagerDependencies:
         db_session_factory=lambda: Mock(),
         subprocess_executor=Mock(),
         rclone_service=Mock(),
-        http_client_factory=Mock(),
         encryption_service=Mock(),
         storage_factory=Mock(),
     )
@@ -151,87 +146,3 @@ def job_executor_with_registry() -> tuple[JobExecutor, ProviderRegistry]:
     executor = JobExecutor()
 
     return executor, registry
-
-
-# Notification Registry Fixtures
-
-
-@pytest.fixture
-def notification_registry_factory() -> NotificationRegistryFactory:
-    """
-    Provide a NotificationRegistryFactory instance for testing.
-
-    Returns:
-        NotificationRegistryFactory: Factory for creating test registries
-    """
-    return NotificationRegistryFactory()
-
-
-@pytest.fixture
-def clean_notification_registry(
-    notification_registry_factory: NotificationRegistryFactory,
-) -> NotificationProviderRegistry:
-    """
-    Create a fresh, empty notification registry for testing.
-
-    This fixture provides a completely clean registry with no providers registered.
-    Use this when you need to test registry behavior from scratch.
-
-    Args:
-        notification_registry_factory: Factory instance from DI
-
-    Returns:
-        NotificationProviderRegistry: Empty registry instance
-    """
-    return notification_registry_factory.create_test_registry([])
-
-
-@pytest.fixture
-def notification_registry(
-    notification_registry_factory: NotificationRegistryFactory,
-) -> NotificationProviderRegistry:
-    """
-    Create a notification registry with all production providers for testing.
-
-    This fixture provides a registry with all available notification providers registered.
-    Use this when you need to test functionality that depends on provider availability.
-
-    Args:
-        notification_registry_factory: Factory instance from DI
-
-    Returns:
-        NotificationProviderRegistry: Registry with all providers
-    """
-    return notification_registry_factory.create_production_registry()
-
-
-@pytest.fixture
-def pushover_only_notification_registry(
-    notification_registry_factory: NotificationRegistryFactory,
-) -> NotificationProviderRegistry:
-    """
-    Create a notification registry with only Pushover provider for focused testing.
-
-    Args:
-        notification_registry_factory: Factory instance from DI
-
-    Returns:
-        NotificationProviderRegistry: Registry with only Pushover provider
-    """
-    return notification_registry_factory.create_test_registry(["pushover"])
-
-
-@pytest.fixture
-def discord_only_notification_registry(
-    notification_registry_factory: NotificationRegistryFactory,
-) -> NotificationProviderRegistry:
-    """
-    Create a notification registry with only Discord provider for focused testing.
-
-    Args:
-        notification_registry_factory: Factory instance from DI
-
-    Returns:
-        NotificationProviderRegistry: Registry with only Discord provider
-    """
-    return notification_registry_factory.create_test_registry(["discord"])

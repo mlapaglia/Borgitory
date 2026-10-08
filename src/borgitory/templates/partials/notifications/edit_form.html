@@ -3,10 +3,17 @@
     <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">
         Edit Notification Configuration
     </h3>
+    {% if edit_view.migration_error %}
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-md p-3 mb-4 text-sm text-yellow-800 dark:text-yellow-200">
+            <p class="font-medium">This notification needs to be re-configured</p>
+            <p class="mt-1">{{ edit_view.migration_error }}</p>
+        </div>
+    {% endif %}
     <form hx-put="/api/notifications/{{ config.id }}"
           hx-target="#notification-status"
           class="space-y-4"
           id="notification-edit-form">
+        <input type="hidden" name="config_id" value="{{ config.id }}">
         <div>
             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">Name</label>
             <input type="text"
@@ -16,39 +23,33 @@
                    placeholder="My Phone"
                    class="input-modern mt-1">
         </div>
-        <!-- Provider field (read-only for edit) -->
-        <div>
-            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Provider Type
-            </label>
-            <input type="text"
-                   value="{{ config.provider|title }}"
-                   disabled
-                   class="input-modern mt-1 bg-gray-100 dark:bg-gray-700">
-            <input type="hidden" name="provider" value="{{ config.provider }}">
-            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                Provider type cannot be changed when editing
-            </p>
+        {% include "partials/notifications/service_select.html" %}
+        <!-- Service fields, pre-filled with the stored non-secret values -->
+        <div id="notification-fields-container"
+             {% if selected_service %}hx-get="/api/notifications/service-fields?service={{ selected_service | urlencode }}&config_id={{ config.id }}" hx-trigger="load" hx-swap="innerHTML"{% endif %}>
         </div>
-        <!-- Provider Fields Container -->
-        <div id="provider-fields-container">
-            {% if provider_template %}
-                {% include provider_template %}
-            {% endif %}
-            <div class="flex space-x-2 mt-4">
-                <button type="submit"
-                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                    Update Configuration
-                </button>
-                <button type="button"
-                        hx-get="/api/notifications/form"
-                        hx-target="#notification-form-container"
-                        hx-swap="innerHTML"
-                        class="px-4 py-2 text-sm text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 focus:ring-2 focus:ring-gray-500">
-                    Cancel
-                </button>
-            </div>
+        <div class="flex space-x-2">
+            <button type="submit"
+                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                Update Configuration
+            </button>
+            <button type="button"
+                    hx-post="/api/notifications/test"
+                    hx-include="closest form"
+                    hx-target="#notification-test-status"
+                    hx-indicator="this"
+                    class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 [&.htmx-request]:opacity-50">
+                <span class="[.htmx-request_&]:hidden">Send Test</span>
+                <span class="hidden [.htmx-request_&]:inline">Sending...</span>
+            </button>
+            <button type="button"
+                    hx-get="/api/notifications/form"
+                    hx-target="#notification-form-container"
+                    hx-swap="innerHTML"
+                    class="px-4 py-2 text-sm text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 focus:ring-2 focus:ring-gray-500">
+                Cancel
+            </button>
         </div>
+        <div id="notification-test-status"></div>
     </form>
-    <div id="notification-status" class="mt-4"></div>
 </div>

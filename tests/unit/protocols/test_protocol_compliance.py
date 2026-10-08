@@ -214,20 +214,15 @@ class TestProtocolCompliance:
         assert hasattr(NotificationService, "send_notification"), (
             "NotificationService should have send_notification method"
         )
-        assert hasattr(NotificationService, "test_connection"), (
-            "NotificationService should have test_connection method"
+        assert hasattr(NotificationService, "send_test"), (
+            "NotificationService should have send_test method"
         )
 
-        # Check instantiation with proper dependencies
-        from borgitory.dependencies import (
-            get_http_client,
-            get_notification_provider_factory,
+        from borgitory.services.notifications.apprise_catalog import (
+            get_apprise_catalog,
         )
 
-        # Create the service with proper DI
-        http_client = get_http_client()
-        provider_factory = get_notification_provider_factory(http_client)
-        service = NotificationService(provider_factory=provider_factory)
+        service = NotificationService(catalog=get_apprise_catalog())
         assert service is not None
 
     def test_job_manager_basic_compliance(self) -> None:

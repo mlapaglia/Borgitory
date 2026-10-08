@@ -84,9 +84,6 @@ class JobManagerFactory:
                 get_hook_execution_service,
                 get_notification_service_singleton,
             )
-            from borgitory.services.notifications.providers.discord_provider import (
-                HttpClient,
-            )
 
             file_service = get_file_service(command_executor, platform_service)
             rclone_service = get_rclone_service(command_executor, file_service)
@@ -113,7 +110,6 @@ class JobManagerFactory:
                 database_manager=database_manager,
                 async_session_maker=async_session_maker,
                 rclone_service=rclone_service,
-                http_client_factory=lambda: HttpClient(),  # type: ignore
                 encryption_service=encryption_service,
                 storage_factory=storage_factory,
                 provider_registry=get_provider_registry(
@@ -133,7 +129,6 @@ class JobManagerFactory:
             database_manager=custom_dependencies.database_manager,
             async_session_maker=custom_dependencies.async_session_maker,
             rclone_service=custom_dependencies.rclone_service,
-            http_client_factory=custom_dependencies.http_client_factory,
             encryption_service=custom_dependencies.encryption_service,
             storage_factory=custom_dependencies.storage_factory,
             provider_registry=custom_dependencies.provider_registry,
@@ -200,10 +195,6 @@ class JobManagerFactory:
             async_session_maker=async_session_maker,
         )
 
-        from borgitory.services.notifications.providers.discord_provider import (
-            HttpClient,
-        )
-
         file_service = get_file_service(command_executor, platform_service)
         rclone_service = get_rclone_service(command_executor, file_service)
         encryption_service = get_encryption_service()
@@ -229,7 +220,6 @@ class JobManagerFactory:
             database_manager=database_manager,
             async_session_maker=async_session_maker,
             rclone_service=rclone_service,
-            http_client_factory=lambda: HttpClient(),  # type: ignore
             encryption_service=encryption_service,
             storage_factory=storage_factory,
             provider_registry=get_provider_registry(
@@ -249,7 +239,6 @@ class JobManagerFactory:
         mock_subprocess: Optional[Callable[..., Any]] = None,
         mock_async_session_maker: Optional[async_sessionmaker[AsyncSession]] = None,
         mock_rclone_service: Optional[RcloneService] = None,
-        mock_http_client: Optional[Callable[[], Any]] = None,
         config: Optional[JobManagerConfig] = None,
     ) -> JobManagerDependencies:
         """Create dependencies with mocked services for testing"""
@@ -273,7 +262,6 @@ class JobManagerFactory:
         mock_provider_registry = Mock()
         mock_notification_service = Mock()
         mock_hook_execution_service = Mock()
-        mock_http_client_factory = mock_http_client or Mock()
         mock_cloud_sync_service = Mock()
 
         test_deps = JobManagerDependencies(
@@ -284,7 +272,6 @@ class JobManagerFactory:
             database_manager=mock_database_manager,
             async_session_maker=session_maker_mock,
             rclone_service=rclone_mock,
-            http_client_factory=mock_http_client_factory,
             encryption_service=mock_encryption_service,
             storage_factory=mock_storage_factory,
             provider_registry=mock_provider_registry,

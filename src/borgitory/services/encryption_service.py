@@ -23,6 +23,18 @@ class EncryptionService:
     Uses the application's cipher suite for consistent encryption across all domains.
     """
 
+    def encrypt_value(self, value: str) -> str:
+        """Encrypt a single string value."""
+        from borgitory.models.database import get_cipher_suite
+
+        return get_cipher_suite().encrypt(value.encode()).decode()
+
+    def decrypt_value(self, value: str) -> str:
+        """Decrypt a single value produced by encrypt_value."""
+        from borgitory.models.database import get_cipher_suite
+
+        return get_cipher_suite().decrypt(value.encode()).decode()
+
     def encrypt_sensitive_fields(
         self,
         config: ConfigDict,

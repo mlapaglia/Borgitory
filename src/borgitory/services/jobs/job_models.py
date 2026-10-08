@@ -43,7 +43,6 @@ if TYPE_CHECKING:
         NotificationService as ApplicationScopedNotificationService,
     )
     from borgitory.services.hooks.hook_execution_service import HookExecutionService
-    from borgitory.services.notifications.providers.discord_provider import HttpClient
 
 
 class TaskTypeEnum(str, Enum):
@@ -75,7 +74,6 @@ class TaskStatusEnum(str, Enum):
 if TYPE_CHECKING:
     from borgitory.protocols.command_protocols import ProcessExecutorProtocol
     from borgitory.dependencies import ApplicationScopedNotificationService
-    from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.services.cloud_providers.cloud_sync_service import StorageFactory
     from borgitory.services.encryption_service import EncryptionService
     from borgitory.services.cloud_providers.registry import ProviderRegistry
@@ -117,7 +115,6 @@ class JobManagerDependencies:
     database_manager: JobDatabaseManagerProtocol
     async_session_maker: async_sessionmaker[AsyncSession]
     rclone_service: "RcloneService"
-    http_client_factory: Callable[[], "HttpClient"]
     encryption_service: "EncryptionService"
     storage_factory: "StorageFactory"
     provider_registry: "ProviderRegistry"

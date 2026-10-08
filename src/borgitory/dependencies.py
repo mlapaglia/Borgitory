@@ -26,12 +26,6 @@ from borgitory.services.cloud_providers.registry import get_metadata
 from borgitory.services.path.platform_service import PlatformService
 
 if TYPE_CHECKING:
-    from borgitory.services.notifications.registry import NotificationProviderRegistry
-    from borgitory.services.notifications.registry_factory import (
-        NotificationRegistryFactory,
-    )
-    from borgitory.services.notifications.service import NotificationProviderFactory
-    from borgitory.services.notifications.providers.discord_provider import HttpClient
     from borgitory.config.command_runner_config import CommandRunnerConfig
     from borgitory.config.job_manager_config import JobManagerEnvironmentConfig
     from borgitory.services.jobs.job_models import JobManagerConfig
@@ -54,6 +48,10 @@ from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.jobs.job_service import JobService
 from borgitory.services.jobs.job_manager import JobManager
 from borgitory.services.recovery_service import RecoveryService
+from borgitory.services.notifications.apprise_catalog import (
+    AppriseCatalog,
+    get_apprise_catalog,
+)
 from borgitory.services.notifications.service import NotificationService
 from borgitory.services.notifications.config_service import NotificationConfigService
 from borgitory.services.jobs.job_stream_service import JobStreamService
@@ -293,31 +291,14 @@ def get_simple_command_runner(
     return SimpleCommandRunner(config=config, executor=executor)
 
 
-def get_http_client() -> "HttpClient":
+def get_apprise_catalog_dependency() -> AppriseCatalog:
     """
-    Provide HTTP client instance with proper FastAPI dependency injection.
+    Provide the cached Apprise service catalog.
 
     Returns:
-        HttpClient: New AiohttpClient instance for each request
+        AppriseCatalog: Application-wide catalog of supported notification services
     """
-    from borgitory.services.notifications.providers.discord_provider import (
-        AiohttpClient,
-    )
-
-    return AiohttpClient()
-
-
-def get_notification_provider_factory(
-    http_client: "HttpClient" = Depends(get_http_client),
-) -> "NotificationProviderFactory":
-    """
-    Provide NotificationProviderFactory with injected HTTP client.
-
-    Following the exact pattern of cloud providers' StorageFactory.
-    """
-    from borgitory.services.notifications.service import NotificationProviderFactory
-
-    return NotificationProviderFactory(http_client=http_client)
+    return get_apprise_catalog()
 
 
 @lru_cache()
@@ -327,32 +308,24 @@ def get_notification_service_singleton() -> NotificationService:
 
     Use for singletons, direct instantiation, tests, and JobManager.
     For FastAPI endpoints use get_notification_service with Depends() instead.
-    This is the singleton version that resolves dependencies directly.
 
     Returns:
         NotificationService: Cached singleton instance
     """
-    from borgitory.services.notifications.service import NotificationService
-
-    http_client = get_http_client()
-    provider_factory = get_notification_provider_factory(http_client)
-    return NotificationService(provider_factory=provider_factory)
+    return NotificationService(catalog=get_apprise_catalog())
 
 
 def get_notification_service(
-    provider_factory: "NotificationProviderFactory" = Depends(
-        get_notification_provider_factory
-    ),
+    catalog: AppriseCatalog = Depends(get_apprise_catalog_dependency),
 ) -> NotificationService:
     """
     Provide NotificationService with FastAPI dependency injection.
 
     Use for FastAPI endpoints with Depends(get_notification_service).
     For direct calls or singletons use get_notification_service_singleton() instead.
-    This function should only be called by FastAPI's DI system.
 
     Args:
-        provider_factory: Injected by FastAPI DI system
+        catalog: Injected by FastAPI DI system
 
     Returns:
         NotificationService: New instance with injected dependencies
@@ -360,15 +333,14 @@ def get_notification_service(
     Raises:
         RuntimeError: If called directly with Depends object
     """
-    # Add runtime check to catch misuse
-    if hasattr(provider_factory, "dependency"):
+    if hasattr(catalog, "dependency"):
         raise RuntimeError(
             "get_notification_service() was called directly with a Depends object. "
             "This indicates a bug in the dependency injection setup. "
             "Use get_notification_service_singleton() for direct calls instead."
         )
 
-    return NotificationService(provider_factory=provider_factory)
+    return NotificationService(catalog=catalog)
 
 
 def get_notification_config_service(
@@ -771,7 +743,6 @@ def get_job_manager_singleton() -> "JobManagerProtocol":
         hook_execution_service=hook_execution_service,
         cloud_sync_service=cloud_sync_service,
         async_session_maker=async_session_maker,
-        http_client_factory=lambda: HttpClient(),  # type: ignore
     )
 
     # Use the factory to ensure all dependencies are properly initialized
@@ -967,45 +938,7 @@ NotificationConfigServiceDep = Annotated[
 ]
 
 
-def get_notification_registry_factory() -> "NotificationRegistryFactory":
-    """
-    Provide a NotificationRegistryFactory instance with proper FastAPI dependency injection.
-
-    Returns:
-        NotificationRegistryFactory: Factory for creating registries
-    """
-    from borgitory.services.notifications.registry_factory import (
-        NotificationRegistryFactory,
-    )
-
-    return NotificationRegistryFactory()
-
-
-def get_notification_provider_registry(
-    factory: "NotificationRegistryFactory" = Depends(get_notification_registry_factory),
-) -> "NotificationProviderRegistry":
-    """
-    Provide a NotificationProviderRegistry instance with proper FastAPI dependency injection.
-
-    Args:
-        factory: NotificationRegistryFactory instance from DI
-
-    Returns:
-        NotificationProviderRegistry: Registry with all production providers registered
-    """
-    return factory.create_production_registry()
-
-
-NotificationRegistryFactoryDep = Annotated[
-    "NotificationRegistryFactory", Depends(get_notification_registry_factory)
-]
-NotificationProviderRegistryDep = Annotated[
-    "NotificationProviderRegistry", Depends(get_notification_provider_registry)
-]
-HttpClientDep = Annotated["HttpClient", Depends(get_http_client)]
-NotificationProviderFactoryDep = Annotated[
-    "NotificationProviderFactory", Depends(get_notification_provider_factory)
-]
+AppriseCatalogDep = Annotated[AppriseCatalog, Depends(get_apprise_catalog_dependency)]
 CloudProviderServiceFactoryDep = Annotated[
     "CloudProviderServiceFactory", Depends(get_cloud_provider_service_factory)
 ]

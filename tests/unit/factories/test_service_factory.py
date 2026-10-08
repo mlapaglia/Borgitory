@@ -11,7 +11,6 @@ from typing import Any, Optional
 
 from borgitory.factories.service_factory import (
     ServiceFactory,
-    NotificationServiceFactory,
     CloudProviderServiceFactory,
 )
 
@@ -128,47 +127,6 @@ class TestServiceFactory:
         assert implementations["mock1"] == MockNotificationService
 
 
-class TestNotificationServiceFactory:
-    """Test the NotificationServiceFactory."""
-
-    def test_factory_has_default_implementations(self) -> None:
-        """Test that factory comes with default implementations."""
-        # Create factory with injected dependency - no more service locator!
-        mock_http_client = Mock()
-        factory = NotificationServiceFactory(http_client=mock_http_client)
-
-        implementations = factory.list_implementations()
-        assert "provider_based" in implementations
-        assert factory.get_default_implementation() == "provider_based"
-
-    def test_create_notification_service(self) -> None:
-        """Test creating a notification service."""
-        # Create factory with injected dependency - clean and simple!
-        mock_http_client = Mock()
-        factory = NotificationServiceFactory(http_client=mock_http_client)
-
-        service = factory.create_notification_service("provider_based")
-
-        assert service is not None
-        # Should have the methods from NotificationServiceProtocol
-        assert hasattr(service, "send_notification")
-        assert hasattr(service, "test_connection")
-        assert hasattr(service, "prepare_config_for_storage")
-        assert hasattr(service, "load_config_from_storage")
-
-    def test_create_default_service(self) -> None:
-        """Test creating default notification service."""
-        # Create factory with injected dependency - no more service locator!
-        mock_http_client = Mock()
-        factory = NotificationServiceFactory(http_client=mock_http_client)
-
-        service = factory.create_notification_service()
-
-        assert service is not None
-        assert hasattr(service, "send_notification")
-        assert service.__class__.__name__ == "NotificationService"
-
-
 class TestCloudProviderServiceFactory:
     """Test the CloudProviderServiceFactory."""
 
@@ -228,19 +186,6 @@ class TestCloudProviderServiceFactory:
 
 class TestFactoryIntegration:
     """Integration tests for factory system."""
-
-    def test_notification_factory_creates_protocol_compliant_services(self) -> None:
-        """Test that notification factory creates protocol-compliant services."""
-        # Create factory with injected dependency - clean and simple!
-        mock_http_client = Mock()
-        factory = NotificationServiceFactory(http_client=mock_http_client)
-        service = factory.create_notification_service()
-
-        # Test that service satisfies the protocol interface
-        assert hasattr(service, "send_notification")
-        assert hasattr(service, "test_connection")
-        assert hasattr(service, "prepare_config_for_storage")
-        assert hasattr(service, "load_config_from_storage")
 
     def test_cloud_sync_factory_creates_protocol_compliant_services(self) -> None:
         """Test that cloud sync factory creates protocol-compliant services."""

@@ -1,4 +1,4 @@
-{% if not configs %}
+{% if not summaries %}
     <div class="text-gray-600 dark:text-gray-400 text-sm py-4 text-center">
         <p>No notification configurations.</p>
         <p class="mt-1">
@@ -6,7 +6,8 @@
         </p>
     </div>
 {% else %}
-    {% for config in configs %}
+    {% for summary in summaries %}
+        {% set config = summary.config %}
         <div class="border border-gray-600 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800 mb-3">
             <div class="flex justify-between items-start">
                 <div class="flex-1">
@@ -15,14 +16,18 @@
                         <span class="ml-2 px-2 py-1 text-xs rounded-full {{ 'bg-green-100 text-green-800' if config.enabled else 'bg-red-100 text-red-800' }}">
                             {{ 'Enabled' if config.enabled else 'Disabled' }}
                         </span>
+                        {% if summary.needs_attention %}
+                            <span class="ml-2 px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800"
+                                  title="{{ summary.needs_attention }}">Needs attention</span>
+                        {% endif %}
                     </div>
                     <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                         <div>
-                            <strong>Provider:</strong> {{ config.provider.title() }}
+                            <strong>Service:</strong> {{ summary.service_name }}
                         </div>
-                        <div>
-                            <strong>Notifications:</strong> {{ config.notification_desc }}
-                        </div>
+                        {% if summary.needs_attention %}
+                            <div class="text-xs text-yellow-700 dark:text-yellow-300">{{ summary.needs_attention }}</div>
+                        {% endif %}
                         <div class="text-xs text-gray-600 dark:text-gray-400">
                             Created: {{ config.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) }}
                         </div>
