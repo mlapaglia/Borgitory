@@ -33,6 +33,9 @@
                 {% set placeholder = "/path/to/data" %}
                 {% set required = false %}
                 {% include "partials/shared/path_autocomplete.html" %}
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Leave empty to run only the selected prune, check, or cloud sync tasks (no backup)
+                </p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -69,7 +72,7 @@
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Automatically prune old archives after each scheduled backup
+                    Automatically prune old archives on each scheduled run
                 </p>
             </div>
             <div>
@@ -85,7 +88,7 @@
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Automatically backup to cloud after each scheduled Borg backup
+                    Automatically sync to cloud on each scheduled run
                 </p>
             </div>
             <div>
@@ -101,7 +104,7 @@
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Verify repository integrity after each scheduled backup
+                    Verify repository integrity on each scheduled run
                 </p>
             </div>
             <div>

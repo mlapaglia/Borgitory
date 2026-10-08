@@ -67,7 +67,8 @@
                         <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Live Output:</h5>
                         <div class="flex items-center">
                             <div class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                            <span class="text-xs text-green-600" sse-swap="status">Streaming</span>
+                            <span class="text-xs text-green-600"
+                                  sse-swap="status">Streaming</span>
                         </div>
                     </div>
                     <div class="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto"
@@ -90,6 +91,7 @@
                         <div class="flex items-center justify-between mb-2">
                             <h5 class="text-xs font-medium text-gray-700 dark:text-gray-300">Output:</h5>
                             <button hx-post="/api/jobs/{{ job.id }}/tasks/{{ task.task_order }}/copy-output"
+                                    type="button"
                                     hx-swap="none"
                                     class="text-xs text-blue-600 hover:text-blue-800">
                                 Copy
