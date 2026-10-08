@@ -3,7 +3,7 @@ from datetime import datetime
 import uuid
 from borgitory.utils.datetime_utils import now_utc, ensure_utc
 import traceback
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -103,7 +103,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
                 repository_id=repository.id,
                 source_path=schedule.source_path if include_backup else "/",
                 compression=CompressionType.ZSTD,
-                dry_run=False,
+                dry_run=schedule.dry_run,
                 prune_config_id=schedule.prune_config_id,
                 check_config_id=schedule.check_config_id,
                 cloud_sync_config_id=schedule.cloud_sync_config_id,
@@ -221,9 +221,15 @@ class SchedulerService:
 
         async with async_session_maker() as db:
             try:
-                result = await db.execute(select(Schedule).where(Schedule.enabled))
+                result = await db.execute(
+                    select(Schedule).where(
+                        Schedule.enabled, Schedule.cron_expression.is_not(None)
+                    )
+                )
                 schedules = result.scalars().all()
                 for schedule in schedules:
+                    if schedule.cron_expression is None:
+                        continue
                     job_id = await self._add_schedule_internal(
                         schedule.id,
                         schedule.name,
@@ -330,14 +336,20 @@ class SchedulerService:
             logger.warning(f"Job {job_id} not found when trying to remove")
 
     async def update_schedule(
-        self, schedule_id: int, schedule_name: str, cron_expression: str, enabled: bool
+        self,
+        schedule_id: int,
+        schedule_name: str,
+        cron_expression: Optional[str],
+        enabled: bool,
     ) -> None:
-        """Update an existing scheduled backup job"""
+        """Update an existing scheduled backup job. Manual-only schedules (no cron) are not registered."""
         try:
             await self.remove_schedule(schedule_id)
-            if enabled:
+            if enabled and cron_expression:
                 await self.add_schedule(schedule_id, schedule_name, cron_expression)
                 logger.info(f"Updated and enabled schedule {schedule_id}")
+            elif enabled:
+                logger.info(f"Schedule {schedule_id} is manual only")
             else:
                 logger.info(f"Schedule {schedule_id} disabled")
         except Exception as e:

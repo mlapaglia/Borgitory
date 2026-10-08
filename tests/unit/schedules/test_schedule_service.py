@@ -13,6 +13,7 @@ from borgitory.services.scheduling.schedule_service import (
     ScheduleService,
 )
 from borgitory.models.database import Schedule, Repository, RepositoryCheckConfig
+from borgitory.utils.datetime_utils import now_utc
 
 
 @pytest.fixture
@@ -316,6 +317,88 @@ class TestScheduleService:
 
         # Verify scheduler was updated
         mock_scheduler_service.update_schedule.assert_called_once()
+
+    async def test_create_manual_only_schedule(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        mock_scheduler_service: AsyncMock,
+    ) -> None:
+        """A schedule without a cron expression is saved but never registered."""
+        result = await service.create_schedule(
+            db=test_db,
+            name="manual-schedule",
+            repository_id=sample_repository.id,
+            cron_expression=None,
+            source_path="/backup",
+            dry_run=True,
+        )
+
+        assert result.success is True
+        assert result.schedule is not None
+        assert result.schedule.cron_expression is None
+        assert result.schedule.is_manual_only is True
+        assert result.schedule.dry_run is True
+        mock_scheduler_service.add_schedule.assert_not_called()
+
+    async def test_update_schedule_to_manual_only_clears_next_run(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        mock_scheduler_service: AsyncMock,
+    ) -> None:
+        """Switching to manual only unregisters the job and clears next_run."""
+        schedule = Schedule()
+        schedule.name = "cron-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = True
+        schedule.next_run = now_utc()
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+
+        result = await service.update_schedule(
+            schedule.id, test_db, {"cron_expression": None}
+        )
+
+        assert result.success is True
+        assert result.schedule is not None
+        assert result.schedule.cron_expression is None
+        assert result.schedule.next_run is None
+        mock_scheduler_service.update_schedule.assert_called_once_with(
+            schedule.id, "cron-schedule", None, True
+        )
+
+    async def test_update_disabled_schedule_still_updates_scheduler(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        mock_scheduler_service: AsyncMock,
+    ) -> None:
+        """Editing a disabled schedule calls the scheduler so it stays unregistered."""
+        schedule = Schedule()
+        schedule.name = "disabled-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = False
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+
+        result = await service.update_schedule(
+            schedule.id, test_db, {"cron_expression": "0 4 * * *"}
+        )
+
+        assert result.success is True
+        mock_scheduler_service.update_schedule.assert_called_once_with(
+            schedule.id, "disabled-schedule", "0 4 * * *", False
+        )
 
     async def test_update_schedule_not_found(
         self, service: ScheduleService, test_db: AsyncSession

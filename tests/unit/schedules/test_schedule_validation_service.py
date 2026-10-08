@@ -26,6 +26,38 @@ class TestScheduleValidationService:
         """Create a ScheduleService instance with mocked dependencies."""
         return ScheduleService(mock_scheduler_service)
 
+    def test_validate_schedule_creation_data_manual_only(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """manual_only clears the cron expression and skips cron validation."""
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(
+                {
+                    "name": "Manual Backup",
+                    "repository_id": "1",
+                    "manual_only": "true",
+                    "source_path": "/data",
+                    "dry_run": "on",
+                }
+            )
+        )
+
+        assert is_valid is True
+        assert error_msg is None
+        assert processed_data["cron_expression"] is None
+        assert processed_data["dry_run"] is True
+
+    def test_validate_schedule_creation_data_missing_cron_not_manual(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """Without manual_only, a missing cron expression is still an error."""
+        is_valid, _, error_msg = schedule_service.validate_schedule_creation_data(
+            {"name": "Backup", "repository_id": "1", "source_path": "/data"}
+        )
+
+        assert is_valid is False
+        assert error_msg == "Cron expression is required"
+
     def test_validate_schedule_creation_data_valid_input(
         self, schedule_service: ScheduleService
     ) -> None:
@@ -58,6 +90,7 @@ class TestScheduleValidationService:
             "pre_job_hooks": None,
             "post_job_hooks": None,
             "patterns": None,
+            "dry_run": False,
         }
 
     def test_validate_schedule_creation_data_minimal_valid_input(
@@ -93,6 +126,7 @@ class TestScheduleValidationService:
             "pre_job_hooks": None,
             "post_job_hooks": None,
             "patterns": None,
+            "dry_run": False,
         }
 
     def test_validate_schedule_creation_data_check_only_schedule(

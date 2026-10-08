@@ -153,6 +153,7 @@ class JobService:
             notification_config_id=backup_request.notification_config_id,
             pre_job_hooks=backup_request.pre_job_hooks,
             post_job_hooks=backup_request.post_job_hooks,
+            dry_run=backup_request.dry_run,
         )
 
         # Create composite job using unified manager
