@@ -456,6 +456,7 @@ class TestExecuteScheduledBackup:
         schedule.pre_job_hooks = None
         schedule.post_job_hooks = None
         schedule.patterns = None
+        schedule.dry_run = False
         schedule.last_run = None
         return schedule
 
@@ -525,8 +526,42 @@ class TestExecuteScheduledBackup:
         assert backup_request.source_path == "/data/backup"
         assert backup_request.prune_config_id == 2
         assert backup_request.check_config_id == 3
+        assert backup_request.dry_run is False
         assert call_args.args[2] == JobType.SCHEDULED_BACKUP
         assert call_args.kwargs["include_backup"] is True
+
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_backup_dry_run(
+        self,
+        mock_schedule: Mock,
+        mock_repository: Mock,
+    ) -> None:
+        """A dry-run schedule creates a dry-run backup request."""
+        mock_schedule.repository = mock_repository
+        mock_schedule.dry_run = True
+        mock_db = self._make_mock_db_session(mock_schedule)
+        mock_job_service = Mock()
+        mock_job_service.create_backup_job = AsyncMock(
+            return_value=JobCreationResult(job_id=uuid.uuid4(), status="started")
+        )
+        mock_scheduler = Mock()
+        mock_scheduler.job_service = mock_job_service
+
+        with (
+            patch(
+                "borgitory.dependencies.get_scheduler_service_singleton",
+                return_value=mock_scheduler,
+            ),
+            patch(
+                "borgitory.models.database.async_session_maker",
+            ) as mock_session_maker,
+        ):
+            mock_session_maker.return_value = mock_db
+
+            await execute_scheduled_backup(1)
+
+        backup_request = mock_job_service.create_backup_job.call_args.args[1]
+        assert backup_request.dry_run is True
 
     @pytest.mark.asyncio
     async def test_execute_scheduled_backup_check_only_schedule(

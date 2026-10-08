@@ -101,6 +101,7 @@ async def create_schedule(
         pre_job_hooks=schedule.pre_job_hooks,
         post_job_hooks=schedule.post_job_hooks,
         patterns=schedule.patterns,
+        dry_run=schedule.dry_run,
     )
 
     if result.is_error or not result.schedule:
@@ -264,6 +265,8 @@ async def update_schedule(
     """Update a schedule"""
     try:
         json_data = await request.json()
+        # The edit form omits unchecked checkboxes, so a missing dry_run means unchecked
+        json_data.setdefault("dry_run", False)
 
         schedule_update = ScheduleUpdate(**json_data)
         update_data = schedule_update.model_dump(exclude_unset=True)

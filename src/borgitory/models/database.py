@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Uuid,
+    false,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -234,9 +235,13 @@ class Schedule(Base):
         Integer, ForeignKey("repositories.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    cron_expression: Mapped[str] = mapped_column(String, nullable=False)
+    # None means the schedule is manual only and runs only via "Run Now"
+    cron_expression: Mapped[str | None] = mapped_column(String, nullable=True)
     source_path: Mapped[str] = mapped_column(String, nullable=False, default="/data")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    dry_run: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
@@ -267,6 +272,10 @@ class Schedule(Base):
     notification_config: Mapped["NotificationConfig"] = relationship(
         "NotificationConfig"
     )
+
+    @property
+    def is_manual_only(self) -> bool:
+        return self.cron_expression is None
 
 
 class User(Base):
