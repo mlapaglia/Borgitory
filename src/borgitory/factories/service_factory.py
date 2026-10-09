@@ -20,7 +20,6 @@ from abc import ABC
 import logging
 
 
-from borgitory.protocols.notification_protocols import NotificationServiceProtocol
 from borgitory.protocols.cloud_protocols import CloudSyncConfigServiceProtocol
 
 if TYPE_CHECKING:
@@ -97,46 +96,6 @@ class ServiceFactory(Generic[P], ABC):
     def get_default_implementation(self) -> Optional[str]:
         """Get the default implementation name."""
         return self._default_implementation
-
-
-class NotificationServiceFactory(ServiceFactory[NotificationServiceProtocol]):
-    """Factory for creating notification services with proper dependency injection."""
-
-    def __init__(self, http_client: Any) -> None:
-        super().__init__()
-        # Inject dependencies instead of using service locator
-        self._http_client = http_client
-        self._register_default_implementations()
-
-    def _register_default_implementations(self) -> None:
-        """Register default notification service implementations."""
-        from borgitory.services.notifications.service import (
-            NotificationService,
-            NotificationProviderFactory,
-        )
-
-        def create_notification_service(
-            encryption_service: Optional[Any] = None,
-        ) -> NotificationServiceProtocol:
-            """Factory function to create NotificationService."""
-            provider_factory = NotificationProviderFactory(
-                http_client=self._http_client
-            )
-            return NotificationService(
-                provider_factory=provider_factory, encryption_service=encryption_service
-            )
-
-        self.register_implementation(
-            "provider_based", create_notification_service, set_as_default=True
-        )
-
-    def create_notification_service(
-        self,
-        service_type: str = "provider_based",
-        encryption_service: Optional["EncryptionService"] = None,
-    ) -> NotificationServiceProtocol:
-        """Create a notification service."""
-        return self.create_service(service_type, encryption_service=encryption_service)
 
 
 class CloudProviderServiceFactory(ServiceFactory[CloudSyncConfigServiceProtocol]):

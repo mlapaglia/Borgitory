@@ -1,0 +1,118 @@
+{# Generic Apprise service fields, generated from the service's Apprise metadata #}
+{% macro render_field(field) %}
+    {% set input_name = "fields[" ~ field.key ~ "]" %}
+    {% set input_id = "notification-field-" ~ field.key %}
+    {% set has_stored_secret = field.private and field.key in stored_private_keys %}
+    {% set is_required = field.required and not has_stored_secret %}
+    {% set current = field_values.get(field.key, "") %}
+    <div>
+        <label for="{{ input_id }}"
+               class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            {{ field.label }}
+            {% if field.required %}<span class="text-red-500">*</span>{% endif %}
+        </label>
+        {% if field.kind == "choice" %}
+            <select id="{{ input_id }}"
+                    name="{{ input_name }}"
+                    class="select-modern w-full mt-1"
+                    {% if is_required %}required{% endif %}>
+                {% if not field.required %}
+                    <option value="">
+                        Default{% if field.default is not none %} ({{ field.default }}){% endif %}
+                    </option>
+                {% endif %}
+                {% for value, label in field.choices %}
+                    <option value="{{ value }}"
+                            {% if current == value or (not current and field.required and field.default == value) %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        {% elif field.kind == "bool" %}
+            <select id="{{ input_id }}"
+                    name="{{ input_name }}"
+                    class="select-modern w-full mt-1">
+                <option value="">
+                    Default{% if field.default is not none %} ({{ field.default }}){% endif %}
+                </option>
+                <option value="yes"
+                        {% if current == "yes" %}selected{% endif %}>Yes</option>
+                <option value="no"
+                        {% if current == "no" %}selected{% endif %}>No</option>
+            </select>
+        {% elif field.private %}
+            <input id="{{ input_id }}"
+                   type="password"
+                   name="{{ input_name }}"
+                   value=""
+                   autocomplete="new-password"
+                   {% if has_stored_secret %}placeholder="•••••• unchanged — leave blank to keep"{% endif %}
+                   class="input-modern mt-1"
+                   {% if is_required %}required{% endif %}>
+        {% elif field.kind in ("int", "float") %}
+            <input id="{{ input_id }}"
+                   type="number"
+                   name="{{ input_name }}"
+                   value="{{ current }}"
+                   {% if field.min is not none %}min="{{ field.min | int if field.kind == 'int' else field.min }}"{% endif %}
+                   {% if field.max is not none %}max="{{ field.max | int if field.kind == 'int' else field.max }}"{% endif %}
+                   {% if field.kind == "float" %}step="any"{% endif %}
+                   {% if field.default is not none %}placeholder="{{ field.default }}"{% endif %}
+                   class="input-modern mt-1"
+                   {% if is_required %}required{% endif %}>
+        {% else %}
+            <input id="{{ input_id }}"
+                   type="text"
+                   name="{{ input_name }}"
+                   value="{{ current }}"
+                   {% if field.default is not none %}placeholder="{{ field.default }}"{% endif %}
+                   class="input-modern mt-1"
+                   {% if is_required %}required{% endif %}>
+        {% endif %}
+        {% if field.kind == "list" %}
+            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Separate multiple values with commas</p>
+        {% endif %}
+    </div>
+{% endmacro %}
+<div class="space-y-4">
+    <div class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+        <p>
+            Fill in the fields for {{ service.name }}.
+            {% if service.setup_url %}
+                <a href="{{ service.setup_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="text-blue-600 dark:text-blue-400 hover:underline">Setup guide</a>
+            {% endif %}
+        </p>
+        {% if service.templates | length > 1 %}
+            <details>
+                <summary class="cursor-pointer">Supported combinations</summary>
+                <ul class="mt-1 ml-4 list-disc font-mono break-all">
+                    {% for template in service.templates %}<li>{{ template }}</li>{% endfor %}
+                </ul>
+            </details>
+        {% endif %}
+    </div>
+    {% for field in service.tokens %}{{ render_field(field) }}{% endfor %}
+    {% if service.basic_args %}
+        <details class="border dark:border-gray-600 rounded-md p-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">
+                {{ service.name }} options
+            </summary>
+            <div class="space-y-4 mt-3">
+                {% for field in service.basic_args %}{{ render_field(field) }}{% endfor %}
+            </div>
+        </details>
+    {% endif %}
+    {% if service.advanced_args %}
+        <details class="border dark:border-gray-600 rounded-md p-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">
+                Advanced delivery options
+            </summary>
+            <div class="space-y-4 mt-3">
+                {% for field in service.advanced_args %}{{ render_field(field) }}{% endfor %}
+            </div>
+        </details>
+    {% endif %}
+</div>

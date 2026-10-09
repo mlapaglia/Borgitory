@@ -28,10 +28,7 @@ from .repository_protocols import (
 )
 
 # Notification protocols
-from .notification_protocols import (
-    NotificationServiceProtocol,
-    NotificationConfigServiceProtocol,
-)
+from .notification_protocols import NotificationServiceProtocol
 
 # Cloud service protocols
 from .cloud_protocols import (
@@ -63,7 +60,6 @@ __all__ = [
     "RepositoryServiceProtocol",
     # Notification protocols
     "NotificationServiceProtocol",
-    "NotificationConfigServiceProtocol",
     # Cloud protocols
     "CloudStorageProtocol",
     "CloudSyncServiceProtocol",

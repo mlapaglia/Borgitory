@@ -15,29 +15,26 @@
                    placeholder="My Phone"
                    class="input-modern mt-1">
         </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Provider Type
-            </label>
-            <select name="provider"
-                    id="provider-select"
-                    class="select-modern w-full"
-                    hx-get="/api/notifications/provider-fields"
-                    hx-target="#provider-fields-container"
-                    hx-trigger="change"
-                    hx-swap="innerHTML"
-                    hx-include="this">
-                <option value="">Select Notification Type</option>
-                {% for provider in supported_providers %}
-                    <option value="{{ provider.value }}">{{ provider.label }}</option>
-                {% endfor %}
-            </select>
+        {% with selected_service="", config=None %}
+            {% include "partials/notifications/service_select.html" %}
+        {% endwith %}
+        <!-- Service fields are loaded when a service is selected -->
+        <div id="notification-fields-container"></div>
+        <div class="flex space-x-2">
+            <button type="submit"
+                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                Add Notification
+            </button>
+            <button type="button"
+                    hx-post="/api/notifications/test"
+                    hx-include="closest form"
+                    hx-target="#notification-test-status"
+                    hx-indicator="this"
+                    class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 [&.htmx-request]:opacity-50">
+                <span class="[.htmx-request_&]:hidden">Send Test</span>
+                <span class="hidden [.htmx-request_&]:inline">Sending...</span>
+            </button>
         </div>
-        <!-- Dynamic Provider Fields Container -->
-        <div id="provider-fields-container"
-             hx-get="/api/notifications/provider-fields"
-             hx-trigger="load"
-             hx-swap="innerHTML"></div>
+        <div id="notification-test-status"></div>
     </form>
-    <div id="notification-status" class="mt-4"></div>
 </div>

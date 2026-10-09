@@ -48,15 +48,12 @@ class TestJobManagerTaskExecution:
                 pass
 
         # Create notification service using proper DI
-        from borgitory.dependencies import (
-            get_http_client,
-            get_notification_provider_factory,
+        from borgitory.services.notifications.apprise_catalog import (
+            get_apprise_catalog,
         )
         from borgitory.services.notifications.service import NotificationService
 
-        http_client = get_http_client()
-        factory = get_notification_provider_factory(http_client)
-        notification_service = NotificationService(provider_factory=factory)
+        notification_service = NotificationService(catalog=get_apprise_catalog())
 
         # Import cloud sync dependencies for complete testing
         from borgitory.dependencies import (
@@ -937,15 +934,18 @@ class TestJobManagerTaskExecution:
         job_manager_with_mocks.output_manager.create_job_output(job_id)
 
         # Configure mock notification service
-        mock_notification_service.load_config_from_storage.return_value = {
-            "user_key": "u" + "x" * 29,
-            "app_token": "a" + "x" * 29,
-        }
-
+        from borgitory.services.notifications.apprise_storage import (
+            StoredAppriseConfig,
+        )
         from borgitory.services.notifications.types import NotificationResult
 
+        mock_notification_service.load_config_from_storage.return_value = (
+            StoredAppriseConfig(
+                mode="service", service="pover", service_name="Pushover"
+            )
+        )
         mock_notification_service.send_notification.return_value = NotificationResult(
-            success=True, provider="pushover", message="Message sent successfully"
+            success=True, message="Message sent successfully"
         )
 
         success = await job_manager_with_mocks.notification_executor.execute_notification_task(
@@ -959,6 +959,9 @@ class TestJobManagerTaskExecution:
 
         # Verify notification service was called
         mock_notification_service.send_notification.assert_called_once()
+        assert "Sending notification via Pushover to test-notification" in (
+            task.output_lines
+        )
 
     async def test_execute_notification_task_no_config(
         self, job_manager_with_mocks: JobManager
