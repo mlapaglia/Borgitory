@@ -3,6 +3,7 @@ Tests for notification API endpoints - HTMX responses for Apprise configurations
 Business logic tests are in tests/unit/notifications.
 """
 
+import re
 from unittest.mock import AsyncMock, patch
 from urllib.parse import unquote
 
@@ -371,6 +372,21 @@ class TestEditConfig:
             assert DISCORD_WEBHOOK_ID not in content
         assert "leave blank to keep" in fields_response.text
         assert 'value="Borgitory"' in fields_response.text
+
+    async def test_edit_form_loads_fields_into_its_own_container(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        """The fields loader must not inherit the form's hx-target (#notification-status)."""
+        config = await _add(test_db, create_notification_config("target-check"))
+
+        response = await async_client.get(f"/api/notifications/{config.id}/edit")
+
+        container = re.search(
+            r'<div id="notification-fields-container"[^>]*>', response.text
+        )
+        assert container is not None
+        assert 'hx-trigger="load"' in container.group(0)
+        assert 'hx-target="this"' in container.group(0)
 
     async def test_edit_form_for_other_service_is_blank(
         self, async_client: AsyncClient, test_db: AsyncSession
