@@ -37,6 +37,10 @@ class SFTPStorageConfig(CloudStorageConfig):
     private_key: Optional[str] = None
     remote_path: str = Field(..., min_length=1)
     host_key_checking: bool = Field(default=True)
+    disable_server_side_checksums: bool = Field(
+        default=False,
+        description="Disable MD5/SHA1 hash commands on the remote server. Required for restricted SFTP servers (e.g. Ugreen NAS) that do not allow remote command execution.",
+    )
 
     @field_validator("host")
     @classmethod
@@ -147,6 +151,7 @@ class SFTPStorage(CloudStorage):
                 password=self._config.password,
                 private_key=self._config.private_key,
                 path_prefix=remote_path,
+                disable_hashcheck=self._config.disable_server_side_checksums,
             ):
                 if not progress_callback:
                     continue
@@ -279,6 +284,7 @@ class SFTPStorage(CloudStorage):
                 "port": "port",
                 "password": "password",
                 "private_key": "private_key",
+                "disable_server_side_checksums": "disable_hashcheck",
             },
             required_params=["repository", "host", "username"],
             optional_params={
@@ -341,6 +347,7 @@ class SFTPStorage(CloudStorage):
         password: Optional[str] = None,
         private_key: Optional[str] = None,
         path_prefix: str = "",
+        disable_hashcheck: bool = False,
     ) -> AsyncGenerator[ProgressData, None]:
         """Sync a Borg repository to SFTP using Rclone with SFTP backend"""
 
@@ -358,6 +365,9 @@ class SFTPStorage(CloudStorage):
             "1s",
             "--verbose",
         ]
+
+        if disable_hashcheck:
+            command.append("--sftp-disable-hashcheck")
 
         try:
             async with self._build_sftp_flags(
@@ -437,6 +447,7 @@ class SFTPStorage(CloudStorage):
         port: int = 22,
         password: Optional[str] = None,
         private_key: Optional[str] = None,
+        disable_hashcheck: bool = False,
     ) -> ConnectionTestResult:
         """Test SFTP connection by listing remote directory"""
         try:
@@ -602,6 +613,7 @@ class SFTPStorage(CloudStorage):
             "port": "port",
             "password": "password",
             "private_key": "private_key",
+            "disable_server_side_checksums": "disable_hashcheck",
         },
         required_params=["repository", "host", "username"],
         optional_params={
