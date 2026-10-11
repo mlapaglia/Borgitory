@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from borgitory.api.auth import get_current_user
 from borgitory.dependencies import (
     ProviderRegistryDep,
-    NotificationProviderRegistryDep,
+    AppriseCatalogDep,
     get_templates,
 )
 from borgitory.models.database import User
@@ -144,31 +144,16 @@ async def get_jobs_tab(
 @router.get("/notifications", response_class=HTMLResponse)
 async def get_notifications_tab(
     request: Request,
-    notification_registry: NotificationProviderRegistryDep,
+    catalog: AppriseCatalogDep,
     current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
-    # Generate supported providers list directly from registry
-    provider_info = notification_registry.get_all_provider_info()
-    logger.info(f"Provider info from registry: {provider_info}")
-    supported_providers = []
-    for provider_name, info in provider_info.items():
-        supported_providers.append(
-            {
-                "value": provider_name,
-                "label": info.label,
-                "description": info.description,
-            }
-        )
-        supported_providers = sorted(supported_providers, key=lambda x: str(x["value"]))
-    logger.info(f"Supported providers for template: {supported_providers}")
-
     return _render_tab_with_nav(
         request,
         "partials/notifications/tab.html",
         "notifications",
         {
             "current_user": current_user,
-            "supported_providers": supported_providers,
+            "service_groups": catalog.grouped(),
         },
     )
 

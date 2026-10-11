@@ -19,6 +19,7 @@ class JobType(StrEnum):
 
     MANUAL_BACKUP = "Manual Backup"
     SCHEDULED_BACKUP = "Scheduled Backup"
+    SCHEDULED_MAINTENANCE = "Scheduled Maintenance"
     PRUNE = "Prune"
     CHECK = "Check"
     BACKUP = "Backup"

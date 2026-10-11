@@ -541,6 +541,75 @@ class TestTaskDefinitionBuilder:
         assert TaskTypeEnum.COMPACT in task_types
         assert TaskTypeEnum.CLOUD_SYNC in task_types
 
+    async def test_build_task_list_dry_run_propagates_to_prune_config(
+        self,
+        task_builder: TaskDefinitionBuilder,
+        mock_db: AsyncSession,
+        mock_prune_config: MagicMock,
+    ) -> None:
+        """A dry run simulates prune from config and skips compact and cloud sync"""
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_prune_config
+        mock_db.execute.return_value = mock_result  # type: ignore[attr-defined]
+
+        tasks = await task_builder.build_task_list(
+            mock_db,
+            repository_name="test-repo",
+            include_backup=True,
+            backup_params={"source_path": "/data", "dry_run": True},
+            prune_config_id=1,
+            include_cloud_sync=True,
+            cloud_sync_config_id=1,
+            dry_run=True,
+        )
+
+        task_types = [task.type for task in tasks]
+        assert task_types == [TaskTypeEnum.BACKUP, TaskTypeEnum.PRUNE]
+        assert tasks[0].parameters["dry_run"] is True
+        assert tasks[1].parameters["dry_run"] is True
+
+    async def test_build_task_list_dry_run_without_backup(
+        self,
+        task_builder: TaskDefinitionBuilder,
+        mock_db: AsyncSession,
+        mock_prune_config: MagicMock,
+    ) -> None:
+        """A dry-run maintenance-only job still simulates the prune"""
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_prune_config
+        mock_db.execute.return_value = mock_result  # type: ignore[attr-defined]
+
+        tasks = await task_builder.build_task_list(
+            mock_db,
+            repository_name="test-repo",
+            include_backup=False,
+            prune_config_id=1,
+            dry_run=True,
+        )
+
+        assert len(tasks) == 1
+        assert tasks[0].type == TaskTypeEnum.PRUNE
+        assert tasks[0].parameters["dry_run"] is True
+
+    async def test_build_task_list_prune_request_dry_run_skips_compact(
+        self, task_builder: TaskDefinitionBuilder, mock_db: AsyncSession
+    ) -> None:
+        """A dry-run prune request does not compact afterwards"""
+        prune_request = MagicMock(spec=PruneRequest)
+        prune_request.strategy = "simple"
+        prune_request.keep_within_days = 14
+        prune_request.dry_run = True
+        prune_request.compact_after = True
+
+        tasks = await task_builder.build_task_list(
+            mock_db,
+            repository_name="test-repo",
+            include_backup=False,
+            prune_request=prune_request,
+        )
+
+        assert [task.type for task in tasks] == [TaskTypeEnum.PRUNE]
+
     async def test_build_task_list_prune_request_over_config(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncSession
     ) -> None:
@@ -548,7 +617,7 @@ class TestTaskDefinitionBuilder:
         prune_request = MagicMock(spec=PruneRequest)
         prune_request.strategy = "simple"
         prune_request.keep_within_days = 14
-        prune_request.dry_run = True
+        prune_request.dry_run = False
         prune_request.compact_after = True
 
         tasks = await task_builder.build_task_list(
@@ -562,7 +631,7 @@ class TestTaskDefinitionBuilder:
         assert len(tasks) == 2  # prune + compact
         prune_task = tasks[0]
         assert prune_task.type == TaskTypeEnum.PRUNE
-        assert prune_task.parameters["dry_run"] is True
+        assert prune_task.parameters["dry_run"] is False
         assert prune_task.parameters["keep_within"] == "14d"
         compact_task = tasks[1]
         assert compact_task.type == TaskTypeEnum.COMPACT

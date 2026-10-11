@@ -1,0 +1,42 @@
+{# Apprise service dropdown; expects service_groups, selected_service and optional config #}
+<div>
+    <label for="notification-service-select"
+           class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+        Notification Service
+    </label>
+    <select name="service"
+            id="notification-service-select"
+            class="select-modern w-full mt-1"
+            required
+            hx-get="/api/notifications/service-fields"
+            hx-target="#notification-fields-container"
+            hx-trigger="change"
+            hx-swap="innerHTML"
+            hx-include="this"
+            {% if config %}hx-vals='{"config_id": "{{ config.id }}"}'{% endif %}>
+        <option value="">Select a notification service</option>
+        {% for group in service_groups %}
+            <optgroup label="{{ group.label }}">
+                {% for service in group.services %}
+                    <option value="{{ service.id }}"
+                            {% if service.id == selected_service %}selected{% endif %}>
+                        {{ service.name }}
+                    </option>
+                {% endfor %}
+            </optgroup>
+        {% endfor %}
+        <optgroup label="Other">
+            <option value="__manual__"
+                    {% if selected_service == "__manual__" %}selected{% endif %}>
+                Custom Apprise URL
+            </option>
+        </optgroup>
+    </select>
+    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+        Notifications are delivered by
+        <a href="https://github.com/caronc/apprise"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="text-blue-600 dark:text-blue-400 hover:underline">Apprise</a>.
+    </p>
+</div>

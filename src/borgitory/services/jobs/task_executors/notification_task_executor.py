@@ -37,7 +37,7 @@ class NotificationTaskExecutor:
     async def execute_notification_task(
         self, job: BorgJob, task: BorgJobTask, task_index: int = 0
     ) -> bool:
-        """Execute a notification task using the new provider-based system"""
+        """Execute a notification task using Apprise"""
         params = task.parameters
 
         notification_config_id = params.get("notification_config_id") or params.get(
@@ -59,8 +59,6 @@ class NotificationTaskExecutor:
                 from borgitory.services.notifications.types import (
                     NotificationMessage,
                     NotificationType,
-                    NotificationPriority,
-                    NotificationConfig as NotificationConfigType,
                 )
                 from sqlalchemy import select
 
@@ -84,25 +82,17 @@ class NotificationTaskExecutor:
                     return True
 
                 try:
-                    decrypted_config = (
-                        self.notification_service.load_config_from_storage(
-                            config.provider, config.provider_config
-                        )
+                    stored_config = self.notification_service.load_config_from_storage(
+                        config.provider, config.provider_config
                     )
                 except Exception as e:
                     logger.error(f"Failed to load notification config: {e}")
                     task.status = TaskStatusEnum.FAILED
                     task.return_code = 1
-                    task.error = f"Failed to load configuration: {str(e)}"
+                    task.error = (
+                        f"Notification '{config.name}' must be re-configured: {str(e)}"
+                    )
                     return False
-
-                # Create notification config object
-                notification_config = NotificationConfigType(
-                    provider=config.provider,
-                    config=dict(decrypted_config),  # Cast to dict[str, object]
-                    name=config.name,
-                    enabled=config.enabled,
-                )
 
                 result = await db.execute(
                     select(Repository).where(Repository.id == job.repository_id)
@@ -114,14 +104,13 @@ class NotificationTaskExecutor:
                 else:
                     repository_name = "Unknown"
 
-                title, message, notification_type_str, priority_value = (
+                title, message, notification_type_str = (
                     self._generate_notification_content(job, repository_name)
                 )
 
                 title_param = params.get("title")
                 message_param = params.get("message")
                 type_param = params.get("type")
-                priority_param = params.get("priority")
 
                 if title_param is not None:
                     title = str(title_param)
@@ -129,11 +118,6 @@ class NotificationTaskExecutor:
                     message = str(message_param)
                 if type_param is not None:
                     notification_type_str = str(type_param)
-                if priority_param is not None:
-                    try:
-                        priority_value = int(str(priority_param))
-                    except ValueError, TypeError:
-                        pass
 
                 try:
                     notification_type = NotificationType(
@@ -142,51 +126,35 @@ class NotificationTaskExecutor:
                 except ValueError:
                     notification_type = NotificationType.INFO
 
-                try:
-                    priority = NotificationPriority(
-                        int(str(priority_value)) if priority_value else 0
-                    )
-                except ValueError:
-                    priority = NotificationPriority.NORMAL
-
                 notification_message = NotificationMessage(
                     title=str(title),
                     message=str(message),
                     notification_type=notification_type,
-                    priority=priority,
                 )
 
-                task.output_lines.append(
-                    f"Sending {config.provider} notification to {config.name}"
-                )
+                sending_line = f"Sending notification via {stored_config.service_name} to {config.name}"
+                task.output_lines.append(sending_line)
                 task.output_lines.append(f"Title: {title}")
                 task.output_lines.append(f"Message: {message}")
                 task.output_lines.append(f"Type: {notification_type.value}")
-                task.output_lines.append(f"Priority: {priority.value}")
 
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
                     job_id=job.id,
-                    data={
-                        "line": f"Sending {config.provider} notification to {config.name}",
-                        "task_index": task_index,
-                    },
+                    data={"line": sending_line, "task_index": task_index},
                 )
 
                 notification_result = await self.notification_service.send_notification(
-                    notification_config, notification_message
+                    stored_config, notification_message
                 )
 
                 if notification_result.success:
                     result_message = "✓ Notification sent successfully"
-                    task.output_lines.append(result_message)
-                    if notification_result.message:
-                        task.output_lines.append(
-                            f"Response: {notification_result.message}"
-                        )
                 else:
                     result_message = f"✗ Failed to send notification: {notification_result.error or notification_result.message}"
-                    task.output_lines.append(result_message)
+                task.output_lines.append(result_message)
+                for detail in notification_result.details:
+                    task.output_lines.append(f"  {detail}")
 
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
@@ -215,16 +183,16 @@ class NotificationTaskExecutor:
 
     def _generate_notification_content(
         self, job: BorgJob, repository_name: str = "Unknown"
-    ) -> Tuple[str, str, str, int]:
+    ) -> Tuple[str, str, str]:
         """
-        Generate notification title, message, type, and priority based on job status.
+        Generate notification title, message, and type based on job status.
 
         Args:
             job: The job to generate notification content for
             repository_name: Name of the repository to include in the notification
 
         Returns:
-            Tuple of (title, message, type, priority_value)
+            Tuple of (title, message, type)
         """
         failed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.FAILED]
         completed_tasks = [t for t in job.tasks if t.status == TaskStatusEnum.COMPLETED]
@@ -260,7 +228,7 @@ class NotificationTaskExecutor:
                     f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
                     f"Job ID: {job.id}"
                 )
-            return title, message, "error", 1
+            return title, message, "error"
 
         elif failed_tasks:
             failed_task_types = [t.task_type for t in failed_tasks]
@@ -271,7 +239,7 @@ class NotificationTaskExecutor:
                 f"Tasks Completed: {len(completed_tasks)}, Skipped: {len(skipped_tasks)}, Total: {len(job.tasks)}\n"
                 f"Job ID: {job.id}"
             )
-            return title, message, "warning", 0
+            return title, message, "warning"
 
         else:
             title = "✅ Backup Job Completed Successfully"
@@ -282,4 +250,4 @@ class NotificationTaskExecutor:
                 f", Total: {len(job.tasks)}\n"
                 f"Job ID: {job.id}"
             )
-            return title, message, "success", 0
+            return title, message, "success"

@@ -75,7 +75,11 @@ class TaskDefinitionBuilder:
         )
 
     async def build_prune_task_from_config(
-        self, db: AsyncSession, prune_config_id: int, repository_name: str
+        self,
+        db: AsyncSession,
+        prune_config_id: int,
+        repository_name: str,
+        dry_run: bool = False,
     ) -> Optional[TaskDefinition]:
         """
         Build a prune task definition from a stored prune configuration.
@@ -83,6 +87,7 @@ class TaskDefinitionBuilder:
         Args:
             prune_config_id: ID of the prune configuration
             repository_name: Name of the repository for display
+            dry_run: Whether to only simulate the prune
 
         Returns:
             Task definition dictionary or None if config not found
@@ -96,7 +101,7 @@ class TaskDefinitionBuilder:
             return None
 
         parameters: ConfigDict = {
-            "dry_run": False,
+            "dry_run": dry_run,
             "show_list": prune_config.show_list,
             "show_stats": prune_config.show_stats,
             "save_space": prune_config.save_space,
@@ -150,6 +155,13 @@ class TaskDefinitionBuilder:
             type=TaskTypeEnum.PRUNE,
             name=f"Prune {repository_name}",
             parameters=parameters,
+        )
+
+    @staticmethod
+    def _should_compact_after_prune(prune_task: TaskDefinition) -> bool:
+        """Compact only after a real prune; a dry-run prune deletes nothing."""
+        return bool(prune_task.parameters.get("compact_after", False)) and not bool(
+            prune_task.parameters.get("dry_run", False)
         )
 
     def build_compact_task(self, repository_name: str) -> TaskDefinition:
@@ -387,6 +399,7 @@ class TaskDefinitionBuilder:
         notification_config_id: Optional[int] = None,
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
+        dry_run: bool = False,
     ) -> List[TaskDefinition]:
         """
         Build a complete list of task definitions for a job.
@@ -406,6 +419,8 @@ class TaskDefinitionBuilder:
             notification_config_id: ID for notification task
             pre_job_hooks: JSON string of pre-job hook configurations
             post_job_hooks: JSON string of post-job hook configurations
+            dry_run: Simulate the job: prune from config runs with --dry-run,
+                and compact and cloud sync are skipped
 
         Returns:
             List of task definition dictionaries
@@ -454,15 +469,15 @@ class TaskDefinitionBuilder:
                 prune_request, repository_name
             )
             tasks.append(prune_task)
-            if prune_task.parameters.get("compact_after", False):
+            if self._should_compact_after_prune(prune_task):
                 tasks.append(self.build_compact_task(repository_name))
         elif prune_config_id:
             prune_task_result = await self.build_prune_task_from_config(
-                db, prune_config_id, repository_name
+                db, prune_config_id, repository_name, dry_run=dry_run
             )
             if prune_task_result:
                 tasks.append(prune_task_result)
-                if prune_task_result.parameters.get("compact_after", False):
+                if self._should_compact_after_prune(prune_task_result):
                     tasks.append(self.build_compact_task(repository_name))
 
         if check_request:
@@ -476,7 +491,7 @@ class TaskDefinitionBuilder:
             if check_task:
                 tasks.append(check_task)
 
-        if include_cloud_sync:
+        if include_cloud_sync and not dry_run:
             tasks.append(
                 self.build_cloud_sync_task(repository_name, cloud_sync_config_id)
             )

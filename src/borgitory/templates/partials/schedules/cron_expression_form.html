@@ -18,11 +18,15 @@
                class="input-modern mt-1">
     </div>
 {% endif %}
-<input type="hidden"
-       name="cron_expression"
-       id="cron-expression"
-       value="{{ cron_expression }}"
-       required>
+{% if is_manual %}
+    <input type="hidden" name="manual_only" value="true">
+{% else %}
+    <input type="hidden"
+           name="cron_expression"
+           id="cron-expression"
+           value="{{ cron_expression }}"
+           required>
+{% endif %}
 <div id="cron-description" class="mt-2">
     {% if description %}
         <div class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800">

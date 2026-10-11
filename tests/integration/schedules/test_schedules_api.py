@@ -403,6 +403,124 @@ class TestSchedulesAPI:
         assert schedule.name == "updated-schedule"
         assert schedule.cron_expression == "0 3 * * *"
 
+    async def test_create_manual_only_schedule(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """A manual_only schedule is saved without a cron and never registered."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "External Drive",
+                "repository_id": sample_repository.id,
+                "manual_only": "true",
+                "source_path": "/data",
+                "dry_run": "on",
+            },
+        )
+
+        assert response.status_code == 200
+        assert "scheduleUpdate" in response.headers.get("HX-Trigger", "")
+
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "External Drive")
+        )
+        created = result.scalar_one()
+        assert created.cron_expression is None
+        assert created.dry_run is True
+        setup_test_dependencies["scheduler_service"].add_schedule.assert_not_called()
+
+    async def test_manual_only_schedule_list_and_edit(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """Manual-only schedules render a Manual badge, no toggle, and a manual edit form."""
+        schedule = Schedule()
+        schedule.name = "manual-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = None
+        schedule.source_path = "/data"
+        schedule.dry_run = True
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+
+        list_response = await async_client.get("/api/schedules/html")
+        assert list_response.status_code == 200
+        assert "Manual only" in list_response.text
+        assert "Manual (Run Now)" in list_response.text
+        assert "Dry run" in list_response.text
+        assert f"/api/schedules/{schedule.id}/toggle" not in list_response.text
+        assert f"/api/schedules/{schedule.id}/run" in list_response.text
+
+        edit_response = await async_client.get(f"/api/schedules/{schedule.id}/edit")
+        assert edit_response.status_code == 200
+        assert 'name="manual_only"' in edit_response.text
+        assert 'value="None"' not in edit_response.text
+
+    async def test_update_schedule_manual_only_round_trip(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """A schedule can switch to manual only and back to a cron expression."""
+        schedule = Schedule()
+        schedule.name = "switching-schedule"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_path = "/data"
+        schedule.enabled = True
+        schedule.dry_run = True
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={"name": "switching-schedule", "manual_only": "true"},
+        )
+        assert response.status_code == 200
+        await test_db.refresh(schedule)
+        assert schedule.cron_expression is None
+        # The edit form omits an unchecked dry_run checkbox
+        assert schedule.dry_run is False
+
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={
+                "name": "switching-schedule",
+                "cron_expression": "0 4 * * *",
+                "dry_run": "on",
+            },
+        )
+        assert response.status_code == 200
+        await test_db.refresh(schedule)
+        assert schedule.cron_expression == "0 4 * * *"
+        assert schedule.dry_run is True
+
+    async def test_cron_expression_form_manual_preset(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        async_client: AsyncClient,
+    ) -> None:
+        """The manual preset renders a manual_only flag instead of a cron input."""
+        response = await async_client.get(
+            "/api/schedules/cron-expression-form?preset=manual"
+        )
+
+        assert response.status_code == 200
+        assert 'name="manual_only"' in response.text
+        assert 'name="cron_expression"' not in response.text
+        assert "Runs only when you click Run Now" in response.text
+
     async def test_toggle_schedule_success(
         self,
         setup_test_dependencies: dict[str, Any],

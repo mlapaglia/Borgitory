@@ -280,15 +280,19 @@ class Job(JobBase):
 
 class ScheduleBase(BaseModel):
     name: str = Field(min_length=1, max_length=128, description="Schedule name")
-    cron_expression: str = Field(
+    cron_expression: Optional[str] = Field(
+        None,
         min_length=5,
-        description="Cron expression (e.g., '0 2 * * *' for daily at 2 AM)",
+        description="Cron expression (e.g., '0 2 * * *' for daily at 2 AM); "
+        "None for a manual-only schedule",
     )
 
     @field_validator("cron_expression")
     @classmethod
-    def validate_cron_expression(cls, v: str) -> str:
+    def validate_cron_expression(cls, v: Optional[str]) -> Optional[str]:
         """Basic cron expression validation"""
+        if v is None:
+            return v
         parts = v.strip().split()
         if len(parts) != 5:
             raise ValueError(
@@ -313,6 +317,14 @@ class ScheduleCreate(ScheduleBase):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+    dry_run: bool = False
+
+    @field_validator("dry_run", mode="before")
+    @classmethod
+    def validate_dry_run(cls, v: Union[str, bool, int, None]) -> bool:
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v)
 
     @field_validator("cloud_sync_config_id", mode="before")
     @classmethod
@@ -394,9 +406,30 @@ class ScheduleUpdate(BaseModel):
     check_config_id: Optional[int] = None
     notification_config_id: Optional[int] = None
     enabled: Optional[bool] = None
+    dry_run: Optional[bool] = None
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def apply_manual_only(cls, data: object) -> object:
+        """A truthy manual_only flag clears the cron expression (manual-only schedule)"""
+        if isinstance(data, dict) and "manual_only" in data:
+            data = dict(data)
+            manual_only = data.pop("manual_only")
+            if str(manual_only).lower() in ("true", "1", "yes", "on"):
+                data["cron_expression"] = None
+        return data
+
+    @field_validator("dry_run", mode="before")
+    @classmethod
+    def validate_dry_run_update(cls, v: Union[str, bool, int, None]) -> Optional[bool]:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return bool(v)
 
     @field_validator("pre_job_hooks", mode="before")
     @classmethod
@@ -488,6 +521,7 @@ class Schedule(ScheduleBase):
     repository_id: int = Field(gt=0)
     source_path: str = Field(default="/", pattern=ABSOLUTE_PATH_PATTERN)
     enabled: bool
+    dry_run: bool = False
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
     created_at: datetime

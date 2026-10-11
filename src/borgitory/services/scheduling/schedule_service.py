@@ -19,6 +19,32 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+NO_WORK_ERROR_MESSAGE = (
+    "Source path is required unless the schedule runs a prune, check, or cloud sync"
+)
+
+
+def is_truthy(value: Any) -> bool:
+    """Interpret a form value (e.g. a json-enc checkbox) as a boolean."""
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    return bool(value)
+
+
+def schedule_has_work(
+    source_path: Optional[str],
+    prune_config_id: Optional[int],
+    check_config_id: Optional[int],
+    cloud_sync_config_id: Optional[int],
+) -> bool:
+    """A schedule without a source path is maintenance-only and needs at least one maintenance task."""
+    if source_path and source_path.strip():
+        return True
+    return any(
+        config_id is not None
+        for config_id in (prune_config_id, check_config_id, cloud_sync_config_id)
+    )
+
 
 @dataclass
 class ScheduleOperationResult:
@@ -138,7 +164,7 @@ class ScheduleService:
         db: AsyncSession,
         name: str,
         repository_id: int,
-        cron_expression: str,
+        cron_expression: Optional[str],
         source_path: str,
         cloud_sync_config_id: Optional[int] = None,
         prune_config_id: Optional[int] = None,
@@ -146,9 +172,11 @@ class ScheduleService:
         pre_job_hooks: Optional[str] = None,
         post_job_hooks: Optional[str] = None,
         patterns: Optional[str] = None,
+        check_config_id: Optional[int] = None,
+        dry_run: bool = False,
     ) -> ScheduleOperationResult:
         """
-        Create a new schedule.
+        Create a new schedule. A None cron_expression creates a manual-only schedule.
 
         Returns:
             ScheduleOperationResult with success status, schedule, and optional error message
@@ -164,12 +192,19 @@ class ScheduleService:
                     success=False, error_message="Repository not found"
                 )
 
-            # Validate cron expression
-            validation_result = self.validate_cron_expression(cron_expression)
-            if validation_result.is_error:
+            if not schedule_has_work(
+                source_path, prune_config_id, check_config_id, cloud_sync_config_id
+            ):
                 return ScheduleOperationResult(
-                    success=False, error_message=validation_result.error_message
+                    success=False, error_message=NO_WORK_ERROR_MESSAGE
                 )
+
+            if cron_expression is not None:
+                validation_result = self.validate_cron_expression(cron_expression)
+                if validation_result.is_error:
+                    return ScheduleOperationResult(
+                        success=False, error_message=validation_result.error_message
+                    )
 
             # Create schedule
             db_schedule = Schedule()
@@ -178,8 +213,10 @@ class ScheduleService:
             db_schedule.cron_expression = cron_expression
             db_schedule.source_path = source_path
             db_schedule.enabled = True
+            db_schedule.dry_run = dry_run
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
             db_schedule.prune_config_id = prune_config_id
+            db_schedule.check_config_id = check_config_id
             db_schedule.notification_config_id = notification_config_id
             db_schedule.pre_job_hooks = pre_job_hooks
             db_schedule.post_job_hooks = post_job_hooks
@@ -188,6 +225,9 @@ class ScheduleService:
             db.add(db_schedule)
             await db.commit()
             await db.refresh(db_schedule)
+
+            if db_schedule.cron_expression is None:
+                return ScheduleOperationResult(success=True, schedule=db_schedule)
 
             # Add to scheduler
             try:
@@ -232,21 +272,38 @@ class ScheduleService:
             for field, value in update_data.items():
                 setattr(schedule, field, value)
 
+            if not schedule_has_work(
+                schedule.source_path,
+                schedule.prune_config_id,
+                schedule.check_config_id,
+                schedule.cloud_sync_config_id,
+            ):
+                await db.rollback()
+                return ScheduleOperationResult(
+                    success=False, error_message=NO_WORK_ERROR_MESSAGE
+                )
+
             await db.commit()
             await db.refresh(schedule)
 
-            # Update the scheduler if enabled
-            if schedule.enabled:
-                try:
-                    await self.scheduler_service.update_schedule(
-                        schedule_id,
-                        schedule.name,
-                        schedule.cron_expression,
-                        schedule.enabled,
-                    )
-                except Exception:
-                    # If scheduler update fails, we still want to return the updated schedule
-                    pass
+            try:
+                await self.scheduler_service.update_schedule(
+                    schedule_id,
+                    schedule.name,
+                    schedule.cron_expression,
+                    schedule.enabled,
+                )
+            except Exception:
+                # If scheduler update fails, we still want to return the updated schedule
+                pass
+
+            # Disabled and manual-only schedules have no scheduler job, so no next run
+            if (
+                not schedule.enabled or schedule.cron_expression is None
+            ) and schedule.next_run is not None:
+                schedule.next_run = None
+                await db.commit()
+                await db.refresh(schedule)
 
             return ScheduleOperationResult(success=True, schedule=schedule)
 
@@ -273,6 +330,8 @@ class ScheduleService:
                 )
 
             schedule.enabled = not schedule.enabled
+            if not schedule.enabled:
+                schedule.next_run = None
             await db.commit()
 
             # Update scheduler
@@ -380,19 +439,21 @@ class ScheduleService:
             tuple: (is_valid, processed_data, error_message)
         """
         try:
-            # Validate cron expression
-            cron_expression = json_data.get("cron_expression", "").strip()
-            if not cron_expression:
-                return False, {}, "Cron expression is required"
+            # Manual-only schedules have no cron expression
+            cron_expression: Optional[str] = None
+            if not is_truthy(json_data.get("manual_only")):
+                cron_expression = (json_data.get("cron_expression") or "").strip()
+                if not cron_expression:
+                    return False, {}, "Cron expression is required"
 
-            # Check if cron expression has correct number of parts
-            cron_parts = cron_expression.split()
-            if len(cron_parts) != 5:
-                return (
-                    False,
-                    {},
-                    f"Cron expression must have 5 parts (minute hour day month weekday), but got {len(cron_parts)} parts: '{cron_expression}'",
-                )
+                # Check if cron expression has correct number of parts
+                cron_parts = cron_expression.split()
+                if len(cron_parts) != 5:
+                    return (
+                        False,
+                        {},
+                        f"Cron expression must have 5 parts (minute hour day month weekday), but got {len(cron_parts)} parts: '{cron_expression}'",
+                    )
 
             # Validate repository ID
             repository_id = json_data.get("repository_id")
@@ -428,16 +489,26 @@ class ScheduleService:
                 "name": name,
                 "repository_id": repository_id,
                 "cron_expression": cron_expression,
-                "source_path": json_data.get("source_path", ""),
+                "source_path": (json_data.get("source_path") or "").strip(),
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "prune_config_id": safe_int(json_data.get("prune_config_id")),
+                "check_config_id": safe_int(json_data.get("check_config_id")),
                 "notification_config_id": safe_int(
                     json_data.get("notification_config_id")
                 ),
                 "pre_job_hooks": safe_json_string(json_data.get("pre_job_hooks")),
                 "post_job_hooks": safe_json_string(json_data.get("post_job_hooks")),
                 "patterns": safe_json_string(json_data.get("patterns")),
+                "dry_run": is_truthy(json_data.get("dry_run")),
             }
+
+            if not schedule_has_work(
+                processed_data["source_path"],
+                processed_data["prune_config_id"],
+                processed_data["check_config_id"],
+                processed_data["cloud_sync_config_id"],
+            ):
+                return False, {}, NO_WORK_ERROR_MESSAGE
 
             return True, processed_data, None
 

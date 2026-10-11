@@ -1,13 +1,14 @@
 import os
 import sys
 from logging.config import fileConfig
-from typing import Optional, Literal
+from typing import Optional
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy.schema import SchemaItem
 
 from alembic import context
+from alembic.runtime.environment import NameFilterType
 
 # Add the project root and src directory to the Python path
 sys.path.insert(0, os.path.abspath("."))
@@ -41,14 +42,7 @@ target_metadata = Base.metadata
 def include_object(
     object: SchemaItem,
     name: Optional[str],
-    type_: Literal[
-        "schema",
-        "table",
-        "column",
-        "index",
-        "unique_constraint",
-        "foreign_key_constraint",
-    ],
+    type_: NameFilterType,
     reflected: bool,
     compare_to: Optional[SchemaItem],
 ) -> bool:

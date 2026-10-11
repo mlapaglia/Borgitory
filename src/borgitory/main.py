@@ -14,6 +14,7 @@ from borgitory.models.database import User, async_session_maker
 from borgitory.utils.template_paths import get_static_directory, get_template_directory
 from borgitory.utils.security import get_or_generate_secret_key
 from borgitory.models.database import init_db
+from borgitory.services.notifications.apprise_catalog import get_apprise_catalog
 from borgitory.api import (
     repositories,
     jobs,
@@ -44,6 +45,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+logging.getLogger("apprise").setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -58,6 +60,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("SECRET_KEY initialized")
 
         await init_db()
+
+        try:
+            catalog = get_apprise_catalog()
+            logger.info(f"Loaded {len(catalog)} Apprise notification services")
+        except Exception as e:
+            logger.error(f"Failed to load Apprise notification services: {e}")
 
         try:
             async with async_session_maker() as session:

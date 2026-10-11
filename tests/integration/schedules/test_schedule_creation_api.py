@@ -5,11 +5,12 @@ from typing import Any, Dict, AsyncGenerator
 from unittest.mock import AsyncMock
 from urllib.parse import unquote
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from borgitory.main import app
-from borgitory.models.database import Repository
+from borgitory.models.database import Repository, RepositoryCheckConfig, Schedule
 from borgitory.dependencies import (
     get_schedule_service,
     get_configuration_service,
@@ -99,6 +100,56 @@ class TestScheduleCreationAPI:
             "Schedule created successfully" in html_content
             or "Daily Backup" in html_content
         )
+
+    async def test_create_check_only_schedule(
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: Dict[str, Any],
+        test_db: AsyncSession,
+    ) -> None:
+        """Test creating a schedule with no source path that only runs a check."""
+        check_config = RepositoryCheckConfig()
+        check_config.name = "weekly-full-check"
+        check_config.check_type = "full"
+        test_db.add(check_config)
+        await test_db.commit()
+
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "Weekly Check",
+                "repository_id": setup_dependencies["repository"].id,
+                "cron_expression": "0 2 * * 6",
+                "source_path": "",
+                "check_config_id": str(check_config.id),
+            },
+        )
+
+        assert response.status_code == 200
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "Weekly Check")
+        )
+        schedule = result.scalar_one()
+        assert schedule.source_path == ""
+        assert schedule.check_config_id == check_config.id
+
+    async def test_create_schedule_without_source_or_maintenance(
+        self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]
+    ) -> None:
+        """Test creating a schedule that would do nothing is rejected."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "Does Nothing",
+                "repository_id": setup_dependencies["repository"].id,
+                "cron_expression": "0 2 * * *",
+                "source_path": "",
+            },
+        )
+
+        assert response.status_code == 200
+        error_message = extract_error_message(response.text)
+        assert "Source path is required" in error_message
 
     async def test_create_schedule_missing_name(
         self, async_client: AsyncClient, setup_dependencies: Dict[str, Any]

@@ -189,6 +189,23 @@ class TestSchedulerService:
             # Should not add when disabled
             mock_add.assert_not_called()
 
+    async def test_update_schedule_manual_only(self) -> None:
+        """An enabled manual-only schedule (no cron) is removed and not re-added"""
+        self.scheduler_service._running = True
+
+        with (
+            patch.object(
+                self.scheduler_service, "remove_schedule", new_callable=AsyncMock
+            ) as mock_remove,
+            patch.object(
+                self.scheduler_service, "add_schedule", new_callable=AsyncMock
+            ) as mock_add,
+        ):
+            await self.scheduler_service.update_schedule(123, "Manual", None, True)
+
+            mock_remove.assert_called_once_with(123)
+            mock_add.assert_not_called()
+
     async def test_get_scheduled_jobs(self) -> None:
         """Test getting scheduled jobs"""
         self.scheduler_service._running = True

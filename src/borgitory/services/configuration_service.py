@@ -29,11 +29,16 @@ class ScheduleFormData(TypedDict):
     check_configs: List[RepositoryCheckConfig]
 
 
+MANUAL_ONLY_PRESET = "manual"
+MANUAL_ONLY_DESCRIPTION = "Runs only when you click Run Now"
+
+
 class CronFormContext(TypedDict):
     """Type definition for cron form context data"""
 
     preset: str
     is_custom: bool
+    is_manual: bool
     cron_expression: str
     description: str
 
@@ -109,15 +114,21 @@ class ConfigurationService:
         Returns:
             Dict containing form context data
         """
+        is_manual = preset == MANUAL_ONLY_PRESET
         context = {
             "preset": preset,
             "is_custom": preset == "custom",
-            "cron_expression": preset if preset != "custom" and preset else "",
+            "is_manual": is_manual,
+            "cron_expression": preset
+            if preset not in ("custom", MANUAL_ONLY_PRESET) and preset
+            else "",
             "description": "",
         }
 
         # Get human readable description for preset
-        if preset and preset != "custom":
+        if is_manual:
+            context["description"] = MANUAL_ONLY_DESCRIPTION
+        elif preset and preset != "custom":
             preset_descriptions = self.get_cron_preset_descriptions()
             context["description"] = preset_descriptions.get(preset, "")
 

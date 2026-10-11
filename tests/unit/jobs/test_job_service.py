@@ -133,6 +133,45 @@ class TestJobService:
         assert task_definitions[1].type == "prune"
         assert task_definitions[1].parameters["keep_within"] == "30d"
 
+    async def test_create_backup_job_without_backup_task(
+        self, test_db: AsyncSession
+    ) -> None:
+        """Test a maintenance-only job contains the check task but no backup task."""
+        repository = Repository()
+        repository.name = "test-repo"
+        repository.path = "/tmp/test-repo"
+        repository.set_passphrase("test-passphrase")
+        check_config = RepositoryCheckConfig()
+        check_config.name = "weekly-check"
+        check_config.check_type = "full"
+        check_config.enabled = True
+        test_db.add_all([repository, check_config])
+        await test_db.commit()
+
+        self.mock_job_manager.create_composite_job.return_value = "job-456"
+
+        backup_request = BackupRequest(
+            repository_id=repository.id,
+            check_config_id=check_config.id,
+            patterns='[{"name": "skip", "expression": "*.tmp", "pattern_type": "exclude", "style": "sh"}]',
+        )
+
+        result = await self.job_service.create_backup_job(
+            db=test_db,
+            backup_request=backup_request,
+            job_type=JobType.SCHEDULED_MAINTENANCE,
+            include_backup=False,
+        )
+
+        assert isinstance(result, JobCreationResult)
+        assert result.job_id == "job-456"
+
+        call_args = self.mock_job_manager.create_composite_job.call_args
+        assert call_args.kwargs["job_type"] == JobType.SCHEDULED_MAINTENANCE
+        task_definitions = call_args.kwargs["task_definitions"]
+        assert [task.type for task in task_definitions] == ["check"]
+        assert task_definitions[0].parameters["check_type"] == "full"
+
     async def test_create_backup_job_repository_not_found(
         self, test_db: AsyncSession
     ) -> None:

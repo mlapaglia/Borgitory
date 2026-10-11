@@ -33,6 +33,9 @@
                 {% set placeholder = "/path/to/data" %}
                 {% set required = false %}
                 {% include "partials/shared/path_autocomplete.html" %}
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Leave empty to run only the selected prune, check, or cloud sync tasks (no backup)
+                </p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -51,6 +54,7 @@
                     <option value="0 2 1,15 * *">Twice monthly (1st and 15th) at 2:00 AM</option>
                     <option value="0 2 */2 * *">Every 2 days at 2:00 AM</option>
                     <option value="custom">Custom (cron expression)</option>
+                    <option value="manual">Manual only (Run Now)</option>
                 </select>
             </div>
             <div id="cron-expression-container">
@@ -69,7 +73,7 @@
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Automatically prune old archives after each scheduled backup
+                    Automatically prune old archives on each scheduled run
                 </p>
             </div>
             <div>
@@ -85,7 +89,7 @@
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Automatically backup to cloud after each scheduled Borg backup
+                    Automatically sync to cloud on each scheduled run
                 </p>
             </div>
             <div>
@@ -101,7 +105,7 @@
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Verify repository integrity after each scheduled backup
+                    Verify repository integrity on each scheduled run
                 </p>
             </div>
             <div>
@@ -120,6 +124,19 @@
                     Get notified when scheduled backup completes or fails
                 </p>
             </div>
+            <div>
+                <div class="flex items-center">
+                    <input type="checkbox"
+                           name="dry_run"
+                           id="schedule-dry-run"
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="schedule-dry-run"
+                           class="ml-2 block text-sm text-gray-900 dark:text-gray-100">Dry Run</label>
+                </div>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    Simulates the backup and prune without changing the repository; compact and cloud sync are skipped. Files that would be backed up appear in the job output.
+                </p>
+            </div>
             <!-- Advanced Options: Pre/Post Job Hooks -->
             <div class="border-t pt-4 mt-4">
                 <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
@@ -136,7 +153,8 @@
                                     hx-post="/api/schedules/hooks/hooks-modal"
                                     hx-include="#pre-hooks-data, #post-hooks-data"
                                     hx-target="#modal-container">
-                                <span class="flex-1 px-4 py-2 text-left" id="hooks-button-text">Pre/Post Job Hooks</span>
+                                <span class="flex-1 px-4 py-2 text-left"
+                                      id="hooks-button-text">Pre/Post Job Hooks</span>
                                 <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
                                       id="hooks-count-badge">0</span>
                             </button>
@@ -145,14 +163,24 @@
                                     hx-post="/api/schedules/patterns/patterns-modal"
                                     hx-include="#patterns_field"
                                     hx-target="#modal-container">
-                                <span class="flex-1 px-4 py-2 text-left" id="patterns-button-text">Configure Patterns</span>
+                                <span class="flex-1 px-4 py-2 text-left"
+                                      id="patterns-button-text">Configure Patterns</span>
                                 <span class="flex items-center justify-center px-3 bg-gray-100 dark:bg-gray-700 border-l border-gray-300 dark:border-gray-600 text-xs font-medium min-w-[2rem]"
                                       id="patterns-count-badge">0</span>
                             </button>
                             <!-- Hidden fields for form submission -->
-                            <input type="hidden" name="pre_job_hooks" id="pre-hooks-data" value="">
-                            <input type="hidden" name="post_job_hooks" id="post-hooks-data" value="">
-                            <input type="hidden" name="patterns" id="patterns_field" value="">
+                            <input type="hidden"
+                                   name="pre_job_hooks"
+                                   id="pre-hooks-data"
+                                   value="">
+                            <input type="hidden"
+                                   name="post_job_hooks"
+                                   id="post-hooks-data"
+                                   value="">
+                            <input type="hidden"
+                                   name="patterns"
+                                   id="patterns_field"
+                                   value="">
                         </div>
                     </div>
                 </div>
