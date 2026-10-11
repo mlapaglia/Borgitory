@@ -13,6 +13,9 @@ from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProt
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides_from_data,
+)
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 from borgitory.utils.security import create_borg_command
 
@@ -60,7 +63,7 @@ class BackupTaskExecutor:
                 repo_data.get("passphrase") or params.get("passphrase") or ""
             )
 
-            cache_dir = repo_data.get("cache_dir")
+            env_overrides = build_repository_env_overrides_from_data(repo_data)
 
             def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
@@ -128,15 +131,11 @@ class BackupTaskExecutor:
                         str(repository_path),
                         passphrase,
                         task_output_callback,
+                        environment_overrides=env_overrides,
                     )
                 except Exception as e:
                     logger.warning(f"Break-lock failed, continuing with backup: {e}")
                     task_output_callback(f"Warning: Break-lock failed: {e}")
-
-            # Prepare environment overrides for cache directory
-            env_overrides: dict[str, str] = {}
-            if cache_dir and isinstance(cache_dir, str):
-                env_overrides["BORG_CACHE_DIR"] = cache_dir
 
             borg_command = create_borg_command(
                 base_command="borg create",
@@ -217,6 +216,7 @@ class BackupTaskExecutor:
         passphrase: str,
         output_callback: Optional[Callable[[str], None]] = None,
         keyfile_path: Optional[str] = None,
+        environment_overrides: Optional[Dict[str, str]] = None,
     ) -> None:
         """Execute borg break-lock command to release stale repository locks"""
         try:
@@ -231,6 +231,7 @@ class BackupTaskExecutor:
                 passphrase=passphrase,
                 keyfile_path=keyfile_path,
                 additional_args=[],
+                environment_overrides=environment_overrides,
             )
             process = await self.job_executor.start_process(
                 borg_command.command, borg_command.environment

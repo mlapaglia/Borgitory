@@ -331,7 +331,10 @@ class TestCompactTaskExecutor:
         }
 
         async def mock_compact_with_callback(
-            repository_path: str, passphrase: str, output_callback
+            repository_path: str,
+            passphrase: str,
+            output_callback,
+            environment_overrides=None,
         ) -> ProcessResult:
             output_callback("Compacting segments...")
             output_callback("Compacting complete")
@@ -391,7 +394,10 @@ class TestCompactTaskExecutor:
         captured_passphrase = None
 
         async def mock_compact_capture_params(
-            repository_path: str, passphrase: str, output_callback
+            repository_path: str,
+            passphrase: str,
+            output_callback,
+            environment_overrides=None,
         ) -> ProcessResult:
             nonlocal captured_path, captured_passphrase
             captured_path = repository_path
