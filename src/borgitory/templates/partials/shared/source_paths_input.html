@@ -1,0 +1,19 @@
+<!-- Multiple source path inputs -->
+<!-- Usage: set id_prefix, paths (list), and optional placeholder before including -->
+{% set source_path_placeholder = placeholder | default('/path/to/data') %}
+<!-- Always submit source_paths so clearing every row is sent as an empty list -->
+<input type="hidden" name="source_paths" value="" />
+<div id="{{ id_prefix }}-rows" class="space-y-2">
+    {% for path in (paths or [""]) %}
+        {% set input_id = id_prefix ~ "-" ~ loop.index0 %}
+        {% set input_value = path %}
+        {% set placeholder = source_path_placeholder %}
+        {% include "partials/shared/source_path_row.html" %}
+    {% endfor %}
+</div>
+<button type="button"
+        class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+        hx-get="/api/repositories/directories/source-path-row"
+        hx-vals='{"id_prefix": "{{ id_prefix }}", "placeholder": "{{ source_path_placeholder }}"}'
+        hx-target="#{{ id_prefix }}-rows"
+        hx-swap="beforeend">+ Add Path</button>

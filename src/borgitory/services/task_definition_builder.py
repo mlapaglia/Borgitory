@@ -38,7 +38,7 @@ class TaskDefinitionBuilder:
     def build_backup_task(
         self,
         repository_name: str,
-        source_path: str = "/data",
+        source_paths: Optional[List[str]] = None,
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
@@ -49,7 +49,7 @@ class TaskDefinitionBuilder:
 
         Args:
             repository_name: Name of the repository for display
-            source_path: Path to backup from
+            source_paths: Paths to backup from (defaults to ["/data"])
             compression: Compression algorithm to use
             dry_run: Whether this is a dry run
             ignore_lock: Whether to run 'borg break-lock' before backup
@@ -58,7 +58,7 @@ class TaskDefinitionBuilder:
             Task definition dictionary
         """
         parameters: ConfigDict = {
-            "source_path": source_path,
+            "source_paths": list(source_paths) if source_paths else ["/data"],
             "compression": compression,
             "dry_run": dry_run,
             "ignore_lock": ignore_lock,
@@ -410,7 +410,7 @@ class TaskDefinitionBuilder:
         Args:
             repository_name: Name of the repository
             include_backup: Whether to include a backup task
-            backup_params: Parameters for backup task (source_path, compression, etc.)
+            backup_params: Parameters for backup task (source_paths, compression, etc.)
             prune_config_id: ID for prune task from borgitory.config
             prune_request: Request object for manual prune task
             check_config_id: ID for check task from borgitory.config
@@ -434,7 +434,11 @@ class TaskDefinitionBuilder:
 
         if include_backup:
             if backup_params:
-                source_path = str(backup_params.get("source_path", "/data"))
+                source_paths_value = backup_params.get("source_paths")
+                if isinstance(source_paths_value, list) and source_paths_value:
+                    source_paths = [str(path) for path in source_paths_value]
+                else:
+                    source_paths = ["/data"]
                 compression = str(backup_params.get("compression", "zstd"))
                 dry_run = bool(backup_params.get("dry_run", False))
                 ignore_lock = bool(backup_params.get("ignore_lock", False))
@@ -447,7 +451,7 @@ class TaskDefinitionBuilder:
                     patterns = []
             else:
                 # Use defaults when no backup_params provided
-                source_path = "/data"
+                source_paths = ["/data"]
                 compression = "zstd"
                 dry_run = False
                 ignore_lock = False
@@ -456,7 +460,7 @@ class TaskDefinitionBuilder:
             tasks.append(
                 self.build_backup_task(
                     repository_name,
-                    source_path,
+                    source_paths,
                     compression,
                     dry_run,
                     ignore_lock,

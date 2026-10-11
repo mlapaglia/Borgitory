@@ -62,9 +62,9 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.error(f"SCHEDULER: Repository not found for schedule {schedule_id}")
             return
 
-        include_backup = bool(schedule.source_path and schedule.source_path.strip())
+        include_backup = bool(schedule.source_paths)
         if not include_backup and not schedule_has_work(
-            schedule.source_path,
+            schedule.source_paths,
             schedule.prune_config_id,
             schedule.check_config_id,
             schedule.cloud_sync_config_id,
@@ -94,14 +94,14 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.info("SCHEDULER: Creating scheduled backup via JobService")
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
-            logger.info(f"  - source_path: {schedule.source_path}")
+            logger.info(f"  - source_paths: {schedule.source_paths}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
-            # Maintenance-only schedules have no source path; BackupRequest requires an
-            # absolute path, so fall back to its default, which is ignored without a backup task.
+            # Maintenance-only schedules have no source paths; BackupRequest requires at least
+            # one absolute path, so fall back to "/", which is ignored without a backup task.
             backup_request = BackupRequest(
                 repository_id=repository.id,
-                source_path=schedule.source_path if include_backup else "/",
+                source_paths=schedule.source_paths if include_backup else ["/"],
                 compression=CompressionType.ZSTD,
                 dry_run=schedule.dry_run,
                 prune_config_id=schedule.prune_config_id,

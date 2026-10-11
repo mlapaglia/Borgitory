@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class BackupParams:
     """Parameters for backup tasks."""
 
-    source_path: str
+    source_paths: List[str]
     compression: str
     dry_run: bool
     ignore_lock: bool
@@ -134,7 +134,7 @@ class JobService:
         backup_params: Optional[ConfigDict] = None
         if include_backup:
             backup_params = {
-                "source_path": backup_request.source_path,
+                "source_paths": backup_request.source_paths,
                 "compression": backup_request.compression,
                 "dry_run": backup_request.dry_run,
                 "ignore_lock": backup_request.ignore_lock,

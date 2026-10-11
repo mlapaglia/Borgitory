@@ -1,3 +1,4 @@
+import re
 from typing import Any, Generator
 import pytest
 from datetime import datetime
@@ -135,7 +136,7 @@ class TestSchedulesAPI:
             "name": "Test Schedule",
             "repository_id": sample_repository.id,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
         }
 
         response = await async_client.post("/api/schedules/", json=schedule_data)
@@ -165,7 +166,7 @@ class TestSchedulesAPI:
             "name": "Test Schedule",
             "repository_id": 999,  # Non-existent repository
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
         }
 
         response = await async_client.post("/api/schedules/", json=schedule_data)
@@ -187,7 +188,7 @@ class TestSchedulesAPI:
             "name": "Test Schedule",
             "repository_id": sample_repository.id,
             "cron_expression": "invalid cron",
-            "source_path": "/data",
+            "source_paths": ["/data"],
         }
 
         response = await async_client.post("/api/schedules/", json=schedule_data)
@@ -210,13 +211,13 @@ class TestSchedulesAPI:
         schedule1.name = "schedule-1"
         schedule1.repository_id = sample_repository.id
         schedule1.cron_expression = "0 2 * * *"
-        schedule1.source_path = "/data1"
+        schedule1.source_paths = ["/data1"]
 
         schedule2 = Schedule()
         schedule2.name = "schedule-2"
         schedule2.repository_id = sample_repository.id
         schedule2.cron_expression = "0 3 * * *"
-        schedule2.source_path = "/data2"
+        schedule2.source_paths = ["/data2"]
         test_db.add_all([schedule1, schedule2])
         await test_db.commit()
 
@@ -242,7 +243,7 @@ class TestSchedulesAPI:
             schedule.name = f"schedule-{i}"
             schedule.repository_id = sample_repository.id
             schedule.cron_expression = "0 2 * * *"
-            schedule.source_path = f"/data{i}"
+            schedule.source_paths = [f"/data{i}"]
             test_db.add(schedule)
         await test_db.commit()
 
@@ -316,7 +317,7 @@ class TestSchedulesAPI:
         schedule1.name = "schedule-1"
         schedule1.repository_id = sample_repository.id
         schedule1.cron_expression = "0 2 * * *"
-        schedule1.source_path = "/data1"
+        schedule1.source_paths = ["/data1"]
         test_db.add(schedule1)
         await test_db.commit()
 
@@ -357,7 +358,7 @@ class TestSchedulesAPI:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = ["/data"]
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -381,7 +382,7 @@ class TestSchedulesAPI:
         schedule.name = "original-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = ["/data"]
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)
@@ -417,7 +418,7 @@ class TestSchedulesAPI:
                 "name": "External Drive",
                 "repository_id": sample_repository.id,
                 "manual_only": "true",
-                "source_path": "/data",
+                "source_paths": ["/data"],
                 "dry_run": "on",
             },
         )
@@ -445,7 +446,7 @@ class TestSchedulesAPI:
         schedule.name = "manual-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = None
-        schedule.source_path = "/data"
+        schedule.source_paths = ["/data"]
         schedule.dry_run = True
         test_db.add(schedule)
         await test_db.commit()
@@ -476,7 +477,7 @@ class TestSchedulesAPI:
         schedule.name = "switching-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = ["/data"]
         schedule.enabled = True
         schedule.dry_run = True
         test_db.add(schedule)
@@ -506,6 +507,152 @@ class TestSchedulesAPI:
         assert schedule.cron_expression == "0 4 * * *"
         assert schedule.dry_run is True
 
+    async def test_create_schedule_multiple_source_paths(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """Multiple source paths are stored in order, ignoring blanks and duplicates."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "multi-path",
+                "repository_id": sample_repository.id,
+                "cron_expression": "0 2 * * *",
+                "source_paths": ["", "/appdata/one", " /appdata/two ", "/appdata/one"],
+            },
+        )
+
+        assert response.status_code == 200
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "multi-path")
+        )
+        created = result.scalar_one()
+        assert created.source_paths == ["/appdata/one", "/appdata/two"]
+
+    async def test_create_schedule_single_source_path_string(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """json-enc sends a single repeated field as a string rather than a list."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "single-path",
+                "repository_id": sample_repository.id,
+                "cron_expression": "0 2 * * *",
+                "source_paths": "/data",
+            },
+        )
+
+        assert response.status_code == 200
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "single-path")
+        )
+        assert result.scalar_one().source_paths == ["/data"]
+
+    async def test_create_schedule_relative_source_path_rejected(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """Relative source paths are rejected."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "relative-path",
+                "repository_id": sample_repository.id,
+                "cron_expression": "0 2 * * *",
+                "source_paths": ["/data", "relative/path"],
+            },
+        )
+
+        assert response.status_code == 200
+        assert "absolute%20path" in response.text
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "relative-path")
+        )
+        assert result.scalar_one_or_none() is None
+
+    async def test_update_schedule_source_paths_round_trip(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """The edit form renders each path, and updates replace or clear the list."""
+        prune_config = PruneConfig()
+        prune_config.name = "edit-paths-prune"
+        prune_config.strategy = "simple"
+        prune_config.keep_daily = 7
+        prune_config.enabled = True
+        test_db.add(prune_config)
+        await test_db.commit()
+        await test_db.refresh(prune_config)
+
+        schedule = Schedule()
+        schedule.name = "edit-paths"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_paths = ["/appdata/one", "/appdata/two"]
+        schedule.prune_config_id = prune_config.id
+        schedule.enabled = True
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+
+        edit_response = await async_client.get(f"/api/schedules/{schedule.id}/edit")
+        assert edit_response.status_code == 200
+        assert 'value="/appdata/one"' in edit_response.text
+        assert 'value="/appdata/two"' in edit_response.text
+        assert edit_response.text.count('name="source_paths"') == 3  # hidden + 2 rows
+
+        # The edit form always submits the hidden blank entry alongside the rows
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={"name": "edit-paths", "source_paths": ["", "/appdata/three"]},
+        )
+        assert response.status_code == 200
+        await test_db.refresh(schedule)
+        assert schedule.source_paths == ["/appdata/three"]
+
+        # Removing every row leaves only the hidden blank entry: maintenance only
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={"name": "edit-paths", "source_paths": ""},
+        )
+        assert response.status_code == 200
+        await test_db.refresh(schedule)
+        assert schedule.source_paths == []
+
+    async def test_source_path_row_has_unique_input_id(
+        self,
+        async_client: AsyncClient,
+    ) -> None:
+        """Each added source path row gets a unique input id for its autocomplete."""
+        url = "/api/repositories/directories/source-path-row?id_prefix=schedule-source-path"
+        first = await async_client.get(url)
+        second = await async_client.get(url)
+
+        assert first.status_code == 200
+        assert 'name="source_paths"' in first.text
+        assert "data-source-path-row" in first.text
+
+        def input_id(html: str) -> str:
+            match = re.search(r'id="(schedule-source-path-[0-9a-f]{8})"', html)
+            assert match is not None
+            return match.group(1)
+
+        assert input_id(first.text) != input_id(second.text)
+
     async def test_cron_expression_form_manual_preset(
         self,
         setup_test_dependencies: dict[str, Any],
@@ -533,7 +680,7 @@ class TestSchedulesAPI:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = ["/data"]
         schedule.enabled = False
         test_db.add(schedule)
         await test_db.commit()
@@ -572,7 +719,7 @@ class TestSchedulesAPI:
         schedule.name = "test-schedule"
         schedule.repository_id = sample_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/data"
+        schedule.source_paths = ["/data"]
         test_db.add(schedule)
         await test_db.commit()
         await test_db.refresh(schedule)

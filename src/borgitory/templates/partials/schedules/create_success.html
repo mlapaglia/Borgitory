@@ -14,17 +14,22 @@
     const form = document.querySelector('form[hx-post="/api/schedules/"]');
     if (form) {
         form.reset();
-        
+
         // Clear custom form elements
         const preset = document.getElementById('schedule-preset');
         const cronExpression = document.getElementById('cron-expression');
         const customCron = document.getElementById('custom-cron');
         const cronDescription = document.getElementById('cron-description');
-        
+
         if (preset) preset.value = '';
         if (cronExpression) cronExpression.value = '';
         if (customCron) customCron.classList.add('hidden');
         if (cronDescription) cronDescription.classList.add('hidden');
+
+        // Collapse added source path rows back to a single row
+        form.querySelectorAll('[data-source-path-row]').forEach((row, index) => {
+            if (index > 0) row.remove();
+        });
     }
 })();
 </script>

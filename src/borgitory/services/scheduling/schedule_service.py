@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from borgitory.models.database import Schedule, Repository
+from borgitory.models.schemas import normalize_source_paths
 from borgitory.services.scheduling.cron_utils import normalize_cron_for_apscheduler
 
 if TYPE_CHECKING:
@@ -19,9 +20,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-NO_WORK_ERROR_MESSAGE = (
-    "Source path is required unless the schedule runs a prune, check, or cloud sync"
-)
+NO_WORK_ERROR_MESSAGE = "At least one source path is required unless the schedule runs a prune, check, or cloud sync"
 
 
 def is_truthy(value: Any) -> bool:
@@ -32,13 +31,13 @@ def is_truthy(value: Any) -> bool:
 
 
 def schedule_has_work(
-    source_path: Optional[str],
+    source_paths: Optional[list[str]],
     prune_config_id: Optional[int],
     check_config_id: Optional[int],
     cloud_sync_config_id: Optional[int],
 ) -> bool:
-    """A schedule without a source path is maintenance-only and needs at least one maintenance task."""
-    if source_path and source_path.strip():
+    """A schedule without source paths is maintenance-only and needs at least one maintenance task."""
+    if source_paths and any(path.strip() for path in source_paths):
         return True
     return any(
         config_id is not None
@@ -165,7 +164,7 @@ class ScheduleService:
         name: str,
         repository_id: int,
         cron_expression: Optional[str],
-        source_path: str,
+        source_paths: list[str],
         cloud_sync_config_id: Optional[int] = None,
         prune_config_id: Optional[int] = None,
         notification_config_id: Optional[int] = None,
@@ -193,7 +192,7 @@ class ScheduleService:
                 )
 
             if not schedule_has_work(
-                source_path, prune_config_id, check_config_id, cloud_sync_config_id
+                source_paths, prune_config_id, check_config_id, cloud_sync_config_id
             ):
                 return ScheduleOperationResult(
                     success=False, error_message=NO_WORK_ERROR_MESSAGE
@@ -211,7 +210,7 @@ class ScheduleService:
             db_schedule.name = name
             db_schedule.repository_id = repository_id
             db_schedule.cron_expression = cron_expression
-            db_schedule.source_path = source_path
+            db_schedule.source_paths = source_paths
             db_schedule.enabled = True
             db_schedule.dry_run = dry_run
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
@@ -273,7 +272,7 @@ class ScheduleService:
                 setattr(schedule, field, value)
 
             if not schedule_has_work(
-                schedule.source_path,
+                schedule.source_paths,
                 schedule.prune_config_id,
                 schedule.check_config_id,
                 schedule.cloud_sync_config_id,
@@ -485,11 +484,16 @@ class ScheduleService:
                     return None
                 return str(value).strip()
 
+            try:
+                source_paths = normalize_source_paths(json_data.get("source_paths"))
+            except ValueError as e:
+                return False, {}, str(e)
+
             processed_data = {
                 "name": name,
                 "repository_id": repository_id,
                 "cron_expression": cron_expression,
-                "source_path": (json_data.get("source_path") or "").strip(),
+                "source_paths": source_paths or [],
                 "cloud_sync_config_id": safe_int(json_data.get("cloud_sync_config_id")),
                 "prune_config_id": safe_int(json_data.get("prune_config_id")),
                 "check_config_id": safe_int(json_data.get("check_config_id")),
@@ -503,7 +507,7 @@ class ScheduleService:
             }
 
             if not schedule_has_work(
-                processed_data["source_path"],
+                processed_data["source_paths"],
                 processed_data["prune_config_id"],
                 processed_data["check_config_id"],
                 processed_data["cloud_sync_config_id"],
