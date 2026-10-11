@@ -1,4 +1,6 @@
 import logging
+import re
+import uuid
 from typing import List
 from fastapi import (
     APIRouter,
@@ -134,6 +136,7 @@ async def list_directories_autocomplete(
         if param_name in [
             "path",
             "source_path",
+            "source_paths",
             "create-path",
             "import-path",
             "backup-source-path",
@@ -184,6 +187,27 @@ async def list_directories_autocomplete(
                 "error": str(e),
             },
         )
+
+
+@router.get("/directories/source-path-row", response_class=HTMLResponse)
+async def get_source_path_row(
+    request: Request,
+    templates: TemplatesDep,
+    id_prefix: str = "source-path",
+    placeholder: str = "/path/to/data",
+    current_user: User = Depends(get_current_user),
+) -> _TemplateResponse:
+    """Render an additional source path input row with a unique input id."""
+    safe_prefix = re.sub(r"[^a-zA-Z0-9_-]", "", id_prefix) or "source-path"
+    return templates.TemplateResponse(
+        request,
+        "partials/shared/source_path_row.html",
+        {
+            "input_id": f"{safe_prefix}-{uuid.uuid4().hex[:8]}",
+            "input_value": "",
+            "placeholder": placeholder,
+        },
+    )
 
 
 @router.get("/import-form", response_class=HTMLResponse)

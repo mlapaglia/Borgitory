@@ -22,6 +22,7 @@ from typing import List, Any
 from cryptography.fernet import Fernet
 from sqlalchemy import (
     Integer,
+    JSON,
     String,
     DateTime,
     Boolean,
@@ -237,7 +238,10 @@ class Schedule(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     # None means the schedule is manual only and runs only via "Run Now"
     cron_expression: Mapped[str | None] = mapped_column(String, nullable=True)
-    source_path: Mapped[str] = mapped_column(String, nullable=False, default="/data")
+    # Empty list means the schedule runs only maintenance tasks (prune/check/sync)
+    source_paths: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     dry_run: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()

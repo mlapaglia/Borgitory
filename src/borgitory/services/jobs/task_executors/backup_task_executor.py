@@ -83,13 +83,18 @@ class BackupTaskExecutor:
                 )
 
             # Build backup command
-            source_path = params.get("source_path")
+            source_paths_value = params.get("source_paths")
+            source_paths = (
+                [str(path) for path in source_paths_value if path]
+                if isinstance(source_paths_value, list)
+                else []
+            )
             archive_name = params.get(
                 "archive_name", f"backup-{now_utc().strftime('%Y%m%d-%H%M%S')}"
             )
 
             logger.info(
-                f"Backup task parameters - source_path: {source_path}, archive_name: {archive_name}"
+                f"Backup task parameters - source_paths: {source_paths}, archive_name: {archive_name}"
             )
             logger.info(f"All task parameters: {params}")
 
@@ -111,8 +116,7 @@ class BackupTaskExecutor:
 
             additional_args.append(f"{repository_path}::{archive_name}")
 
-            if source_path:
-                additional_args.append(str(source_path))
+            additional_args.extend(source_paths)
 
             logger.info(f"Final additional_args for Borg command: {additional_args}")
 

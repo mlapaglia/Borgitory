@@ -100,7 +100,7 @@ class TestManualRunAPScheduler:
         schedule.name = "Test Schedule"
         schedule.repository_id = test_repository.id
         schedule.cron_expression = "0 2 * * *"
-        schedule.source_path = "/test/source"
+        schedule.source_paths = ["/test/source"]
         schedule.enabled = True
         test_db.add(schedule)
         await test_db.commit()
@@ -448,7 +448,7 @@ class TestExecuteScheduledBackup:
         schedule.id = 1
         schedule.name = "Test Schedule"
         schedule.repository_id = 10
-        schedule.source_path = "/data/backup"
+        schedule.source_paths = ["/data/backup"]
         schedule.cloud_sync_config_id = None
         schedule.prune_config_id = 2
         schedule.check_config_id = 3
@@ -523,7 +523,7 @@ class TestExecuteScheduledBackup:
         assert call_args.args[0] is mock_db
         backup_request = call_args.args[1]
         assert backup_request.repository_id == 10
-        assert backup_request.source_path == "/data/backup"
+        assert backup_request.source_paths == ["/data/backup"]
         assert backup_request.prune_config_id == 2
         assert backup_request.check_config_id == 3
         assert backup_request.dry_run is False
@@ -571,7 +571,7 @@ class TestExecuteScheduledBackup:
     ) -> None:
         """A schedule with no source path runs its maintenance tasks without a backup."""
         mock_schedule.repository = mock_repository
-        mock_schedule.source_path = ""
+        mock_schedule.source_paths = []
         mock_schedule.prune_config_id = None
         mock_db = self._make_mock_db_session(mock_schedule)
         mock_job_service = Mock()
@@ -610,7 +610,7 @@ class TestExecuteScheduledBackup:
     ) -> None:
         """A schedule with no source path and no maintenance tasks creates no job."""
         mock_schedule.repository = mock_repository
-        mock_schedule.source_path = ""
+        mock_schedule.source_paths = []
         mock_schedule.prune_config_id = None
         mock_schedule.check_config_id = None
         mock_schedule.cloud_sync_config_id = None

@@ -36,7 +36,7 @@ class TestScheduleValidationService:
                     "name": "Manual Backup",
                     "repository_id": "1",
                     "manual_only": "true",
-                    "source_path": "/data",
+                    "source_paths": ["/data"],
                     "dry_run": "on",
                 }
             )
@@ -52,7 +52,7 @@ class TestScheduleValidationService:
     ) -> None:
         """Without manual_only, a missing cron expression is still an error."""
         is_valid, _, error_msg = schedule_service.validate_schedule_creation_data(
-            {"name": "Backup", "repository_id": "1", "source_path": "/data"}
+            {"name": "Backup", "repository_id": "1", "source_paths": ["/data"]}
         )
 
         assert is_valid is False
@@ -66,7 +66,7 @@ class TestScheduleValidationService:
             "name": "Daily Backup",
             "repository_id": "1",
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
             "cloud_sync_config_id": "2",
             "prune_config_id": "3",
             "notification_config_id": "4",
@@ -82,7 +82,7 @@ class TestScheduleValidationService:
             "name": "Daily Backup",
             "repository_id": 1,
             "cron_expression": "0 2 * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
             "cloud_sync_config_id": 2,
             "prune_config_id": 3,
             "check_config_id": None,
@@ -101,7 +101,7 @@ class TestScheduleValidationService:
             "name": "Test Schedule",
             "repository_id": "1",
             "cron_expression": "*/5 * * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
             "cloud_sync_config_id": "",
             "prune_config_id": "",
             "check_config_id": "",
@@ -118,7 +118,7 @@ class TestScheduleValidationService:
             "name": "Test Schedule",
             "repository_id": 1,
             "cron_expression": "*/5 * * * *",
-            "source_path": "/data",
+            "source_paths": ["/data"],
             "cloud_sync_config_id": None,
             "prune_config_id": None,
             "check_config_id": None,
@@ -137,7 +137,7 @@ class TestScheduleValidationService:
             "name": "Weekly Check",
             "repository_id": "1",
             "cron_expression": "0 2 * * 6",
-            "source_path": "",
+            "source_paths": [],
             "check_config_id": "5",
         }
 
@@ -147,7 +147,7 @@ class TestScheduleValidationService:
 
         assert is_valid is True
         assert error_msg is None
-        assert processed_data["source_path"] == ""
+        assert processed_data["source_paths"] == []
         assert processed_data["check_config_id"] == 5
 
     def test_validate_schedule_creation_data_no_work_rejected(
@@ -158,7 +158,7 @@ class TestScheduleValidationService:
             "name": "Empty Schedule",
             "repository_id": "1",
             "cron_expression": "0 2 * * *",
-            "source_path": "   ",
+            "source_paths": [],
             "notification_config_id": "4",
         }
 
@@ -292,7 +292,7 @@ class TestScheduleValidationService:
             "name": "  Test Schedule  ",
             "repository_id": "1",
             "cron_expression": "  0 2 * * *  ",
-            "source_path": "  /data  ",
+            "source_paths": ["  /data  "],
         }
 
         is_valid, processed_data, error_msg = (
@@ -303,7 +303,7 @@ class TestScheduleValidationService:
         assert error_msg is None
         assert processed_data["name"] == "Test Schedule"
         assert processed_data["cron_expression"] == "0 2 * * *"
-        assert processed_data["source_path"] == "/data"
+        assert processed_data["source_paths"] == ["/data"]
 
     def test_validate_schedule_creation_data_complex_cron_expressions(
         self, schedule_service: ScheduleService
@@ -323,7 +323,7 @@ class TestScheduleValidationService:
                 "name": "Test Schedule",
                 "repository_id": "1",
                 "cron_expression": cron_expr,
-                "source_path": "/data",
+                "source_paths": ["/data"],
             }
 
             is_valid, processed_data, error_msg = (
@@ -351,7 +351,7 @@ class TestScheduleValidationService:
                 "name": "Test Schedule",
                 "repository_id": "1",
                 "cron_expression": "0 2 * * *",
-                "source_path": "/data",
+                "source_paths": ["/data"],
                 "cloud_sync_config_id": input_value,
             }
 

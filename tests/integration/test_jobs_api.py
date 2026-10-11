@@ -175,7 +175,7 @@ class TestJobsAPI:
 
         backup_request = {
             "repository_id": sample_repository.id,
-            "source_path": "/test/path",
+            "source_paths": ["/test/path"],
             "compression": "zstd",
             "dry_run": False,
         }
@@ -185,6 +185,48 @@ class TestJobsAPI:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         setup_dependencies["job_service"].create_backup_job.assert_called_once()
+
+    async def test_create_backup_multiple_source_paths(
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
+    ) -> None:
+        """All submitted source paths are passed to the backup job, blanks dropped."""
+        setup_dependencies[
+            "job_service"
+        ].create_backup_job.return_value = JobCreationResult(
+            job_id=uuid.uuid4(), status="started"
+        )
+
+        response = await async_client.post(
+            "/api/jobs/backup",
+            json={
+                "repository_id": sample_repository.id,
+                "source_paths": ["", "/appdata/one", "/appdata/two"],
+            },
+        )
+
+        assert response.status_code == 200
+        backup_request = setup_dependencies[
+            "job_service"
+        ].create_backup_job.call_args.args[1]
+        assert backup_request.source_paths == ["/appdata/one", "/appdata/two"]
+
+    async def test_create_backup_requires_source_path(
+        self,
+        async_client: AsyncClient,
+        setup_dependencies: dict[str, Mock],
+        sample_repository: Repository,
+    ) -> None:
+        """A manual backup with only blank source paths is rejected."""
+        response = await async_client.post(
+            "/api/jobs/backup",
+            json={"repository_id": sample_repository.id, "source_paths": ""},
+        )
+
+        assert response.status_code == 422
+        setup_dependencies["job_service"].create_backup_job.assert_not_called()
 
     async def test_create_backup_repository_not_found(
         self, async_client: AsyncClient, setup_dependencies: dict[str, Mock]
@@ -198,7 +240,7 @@ class TestJobsAPI:
 
         backup_request = {
             "repository_id": 999,
-            "source_path": "/test/path",
+            "source_paths": ["/test/path"],
             "compression": "zstd",
             "dry_run": False,
         }
@@ -224,7 +266,7 @@ class TestJobsAPI:
 
         backup_request = {
             "repository_id": sample_repository.id,
-            "source_path": "/test/path",
+            "source_paths": ["/test/path"],
             "compression": "zstd",
             "dry_run": False,
         }
@@ -690,7 +732,7 @@ class TestJobsAPI:
         """Test backup request validation."""
         # Test missing repository_id
         invalid_request = {
-            "source_path": "/test/path",
+            "source_paths": ["/test/path"],
             "compression": "zstd",
         }
 
@@ -700,7 +742,7 @@ class TestJobsAPI:
         # Test invalid repository_id (must be > 0)
         invalid_request = {
             "repository_id": "0",
-            "source_path": "/test/path",
+            "source_paths": ["/test/path"],
             "compression": "zstd",
         }
 

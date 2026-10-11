@@ -26,13 +26,12 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Source Path
+                    Source Paths
                 </label>
-                {% set input_id = "schedule-source-path" %}
-                {% set input_name = "source_path" %}
+                {% set id_prefix = "schedule-source-path" %}
+                {% set paths = [] %}
                 {% set placeholder = "/path/to/data" %}
-                {% set required = false %}
-                {% include "partials/shared/path_autocomplete.html" %}
+                {% include "partials/shared/source_paths_input.html" %}
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
                     Leave empty to run only the selected prune, check, or cloud sync tasks (no backup)
                 </p>

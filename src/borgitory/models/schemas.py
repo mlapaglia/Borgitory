@@ -91,6 +91,36 @@ def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
 ABSOLUTE_PATH_PATTERN = r"^/.*"
 
 
+def normalize_source_paths(v: object) -> Optional[list[str]]:
+    """Normalize source paths submitted as a single string or a list of strings.
+
+    htmx json-enc sends a repeated field as a plain string when only one value is
+    present, so both shapes are accepted. Blank entries are dropped and duplicates
+    removed while preserving order.
+    """
+    if v is None:
+        return None
+    if isinstance(v, str):
+        v = [v]
+    if not isinstance(v, (list, tuple)):
+        raise ValueError("source_paths must be a string or a list of strings")
+
+    paths: list[str] = []
+    for item in v:
+        if item is None:
+            continue
+        if not isinstance(item, str):
+            raise ValueError("source_paths entries must be strings")
+        path = item.strip()
+        if not path:
+            continue
+        if not re.match(ABSOLUTE_PATH_PATTERN, path):
+            raise ValueError(f"Source path must be an absolute path: {path}")
+        if path not in paths:
+            paths.append(path)
+    return paths
+
+
 # Enums for type safety and validation
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -309,7 +339,7 @@ class ScheduleBase(BaseModel):
 
 class ScheduleCreate(ScheduleBase):
     repository_id: int
-    source_path: Optional[str] = "/data"
+    source_paths: list[str] = Field(default_factory=list)
     cloud_sync_config_id: Optional[int] = None
     prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
@@ -318,6 +348,11 @@ class ScheduleCreate(ScheduleBase):
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
     dry_run: bool = False
+
+    @field_validator("source_paths", mode="before")
+    @classmethod
+    def validate_source_paths(cls, v: object) -> list[str]:
+        return normalize_source_paths(v) or []
 
     @field_validator("dry_run", mode="before")
     @classmethod
@@ -400,7 +435,7 @@ class ScheduleUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=128)
     cron_expression: Optional[str] = Field(None, min_length=5)
     repository_id: Optional[int] = None
-    source_path: Optional[str] = None
+    source_paths: Optional[list[str]] = None
     cloud_sync_config_id: Optional[int] = None
     prune_config_id: Optional[int] = None
     check_config_id: Optional[int] = None
@@ -410,6 +445,11 @@ class ScheduleUpdate(BaseModel):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+
+    @field_validator("source_paths", mode="before")
+    @classmethod
+    def validate_source_paths_update(cls, v: object) -> Optional[list[str]]:
+        return normalize_source_paths(v)
 
     @model_validator(mode="before")
     @classmethod
@@ -519,7 +559,7 @@ class ScheduleUpdate(BaseModel):
 class Schedule(ScheduleBase):
     id: int = Field(gt=0)
     repository_id: int = Field(gt=0)
-    source_path: str = Field(default="/", pattern=ABSOLUTE_PATH_PATTERN)
+    source_paths: list[str] = Field(default_factory=list)
     enabled: bool
     dry_run: bool = False
     last_run: Optional[datetime] = None
@@ -638,10 +678,10 @@ class NotificationConfig(NotificationConfigBase):
 
 class BackupRequest(BaseModel):
     repository_id: int = Field(gt=0)
-    source_path: str = Field(
-        default="/",
-        pattern=ABSOLUTE_PATH_PATTERN,
-        description="Absolute path to source directory",
+    source_paths: list[str] = Field(
+        default_factory=lambda: ["/"],
+        min_length=1,
+        description="Absolute paths to source directories",
     )
     compression: CompressionType = CompressionType.ZSTD
     dry_run: bool = False
@@ -653,6 +693,11 @@ class BackupRequest(BaseModel):
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
+
+    @field_validator("source_paths", mode="before")
+    @classmethod
+    def validate_source_paths(cls, v: object) -> list[str]:
+        return normalize_source_paths(v) or []
 
     @field_validator("dry_run", mode="before")
     @classmethod

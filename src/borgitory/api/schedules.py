@@ -93,7 +93,7 @@ async def create_schedule(
         name=schedule.name,
         repository_id=schedule.repository_id,
         cron_expression=schedule.cron_expression,
-        source_path=schedule.source_path or "",
+        source_paths=schedule.source_paths,
         cloud_sync_config_id=schedule.cloud_sync_config_id,
         prune_config_id=schedule.prune_config_id,
         check_config_id=schedule.check_config_id,
