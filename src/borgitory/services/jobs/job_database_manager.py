@@ -215,6 +215,8 @@ class JobDatabaseManager(JobDatabaseManagerProtocol):
                     "passphrase": repo.get_passphrase(),
                     "keyfile_content": repo.get_keyfile_content(),
                     "cache_dir": repo.cache_dir,
+                    "ssh_private_key": repo.get_ssh_private_key(),
+                    "remote_borg_path": repo.remote_borg_path,
                 }
 
         except Exception as e:

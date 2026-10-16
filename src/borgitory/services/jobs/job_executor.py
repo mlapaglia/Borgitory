@@ -211,6 +211,7 @@ class JobExecutor:
         force_prune: bool = False,
         dry_run: bool = False,
         output_callback: Optional[Callable[[str], None]] = None,
+        environment_overrides: Optional[Dict[str, str]] = None,
     ) -> ProcessResult:
         """
         Execute a borg prune task with the job executor's proper streaming
@@ -232,6 +233,7 @@ class JobExecutor:
             force_prune: Force pruning
             dry_run: Perform dry run
             output_callback: Callback for streaming output
+            environment_overrides: Per-repository env (cache dir, SSH)
 
         Returns:
             ProcessResult with execution details
@@ -273,6 +275,7 @@ class JobExecutor:
                 repository_path="",  # Path is in additional_args
                 passphrase=passphrase,
                 additional_args=additional_args,
+                environment_overrides=environment_overrides,
             )
             process = await self.start_process(
                 borg_command.command, borg_command.environment
@@ -298,6 +301,7 @@ class JobExecutor:
         repository_path: str,
         passphrase: str,
         output_callback: Optional[Callable[[str], None]] = None,
+        environment_overrides: Optional[Dict[str, str]] = None,
     ) -> ProcessResult:
         """
         Execute a borg compact task
@@ -307,6 +311,7 @@ class JobExecutor:
             passphrase: Repository passphrase
             keyfile_content: Optional keyfile content
             output_callback: Callback for streaming output
+            environment_overrides: Per-repository env (cache dir, SSH)
 
         Returns:
             ProcessResult with execution details
@@ -321,6 +326,7 @@ class JobExecutor:
                 repository_path="",
                 passphrase=passphrase,
                 additional_args=additional_args,
+                environment_overrides=environment_overrides,
             )
             process = await self.start_process(
                 borg_command.command, borg_command.environment

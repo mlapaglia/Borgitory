@@ -5,7 +5,7 @@
             <div class="border dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 <div class="flex justify-between items-start">
                     <div class="flex-1">
-                        <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ repo.name }}</h4>
+                        <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ repo.name }}{% if repo.path.startswith("ssh://") %}<span class="ml-2 inline-block px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">Remote</span>{% endif %}</h4>
                         <p class="text-sm text-gray-600 dark:text-gray-300">{{ repo.path }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Created: {{ repo.created_at | format_datetime_browser("%Y-%m-%d %H:%M", browser_tz_offset) if repo.created_at else "Unknown" }}
