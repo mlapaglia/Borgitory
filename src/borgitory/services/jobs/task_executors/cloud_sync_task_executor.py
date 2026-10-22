@@ -8,6 +8,7 @@ from typing import Dict
 from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.utils.security import is_remote_repository_path
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 from borgitory.protocols.job_event_broadcaster_protocol import (
     JobEventBroadcasterProtocol,
@@ -59,6 +60,21 @@ class CloudSyncTaskExecutor:
 
         repository_path = repo_data.get("path") or params.get("repository_path")
         passphrase = str(repo_data.get("passphrase") or params.get("passphrase") or "")
+
+        if is_remote_repository_path(str(repository_path or "")):
+            message = (
+                "Cloud sync skipped - remote repositories are already off-site; "
+                "cloud sync only applies to local repositories"
+            )
+            logger.info(message)
+            task.status = TaskStatusEnum.COMPLETED
+            task.return_code = 0
+            task.completed_at = now_utc()
+            task.output_lines.append(message)
+            asyncio.create_task(
+                self.output_manager.add_output_line(job.id, message, "stdout", {})
+            )
+            return True
 
         # Validate required parameters
         if not repository_path:

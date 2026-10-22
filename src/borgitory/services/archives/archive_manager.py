@@ -16,6 +16,9 @@ from borgitory.config.command_runner_config import CommandRunnerConfig
 from borgitory.models.database import Repository
 from borgitory.services.archives.archive_models import ArchiveEntry
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides,
+)
 from borgitory.utils.security import (
     create_borg_command,
     validate_archive_name,
@@ -220,6 +223,7 @@ class ArchiveManager:
                 passphrase=repository.get_passphrase(),
                 base_command="borg extract",
                 additional_args=borg_args,
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             logger.info(f"Extracting file {file_path} from archive {archive_name}")
@@ -314,6 +318,7 @@ class ArchiveManager:
             repository_path="",
             passphrase=repository.get_passphrase(),
             additional_args=additional_args,
+            environment_overrides=build_repository_env_overrides(repository),
         )
 
         try:
