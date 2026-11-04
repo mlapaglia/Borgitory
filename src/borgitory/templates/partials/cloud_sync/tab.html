@@ -4,6 +4,10 @@
         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             Cloud Sync Configuration
         </h2>
+        <div class="mb-4 p-3 rounded-md border border-amber-300 bg-amber-50 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+            Cloud sync mirrors your local repository files with rclone. If the local repository is corrupted or encrypted by ransomware, the next sync copies the damage to the cloud and overwrites the healthy copy.
+            For an independent off-site backup, create a separate remote repository on a borg server (for example <code>ssh://user@host/./repo</code>) and back up to it directly.
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div id="cloud-sync-form-container">{% include "partials/cloud_sync/form.html" %}</div>
             {% include "partials/cloud_sync/list.html" %}

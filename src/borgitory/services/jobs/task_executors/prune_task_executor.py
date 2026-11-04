@@ -12,6 +12,9 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides_from_data,
+)
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
 logger = logging.getLogger(__name__)
@@ -101,6 +104,9 @@ class PruneTaskExecutor:
                 force_prune=bool(params.get("force_prune", False)),
                 dry_run=bool(params.get("dry_run", False)),
                 output_callback=task_output_callback,
+                environment_overrides=build_repository_env_overrides_from_data(
+                    repo_data
+                ),
             )
 
             # Set task status based on result

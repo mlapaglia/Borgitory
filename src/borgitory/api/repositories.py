@@ -43,6 +43,7 @@ from borgitory.utils.template_responses import (
     ArchiveResponseHandler,
 )
 from borgitory.api.auth import get_current_user
+from borgitory.utils.security import is_remote_repository_path
 from borgitory.utils.path_prefix import (
     parse_path_for_autocomplete,
 )
@@ -68,6 +69,8 @@ async def create_repository(
         passphrase=repo.passphrase,
         encryption_type=repo.encryption_type,
         cache_dir=repo.cache_dir,
+        ssh_private_key=repo.ssh_private_key,
+        remote_borg_path=repo.remote_borg_path,
     )
 
     # Call business service
@@ -147,6 +150,13 @@ async def list_directories_autocomplete(
         ]:
             input_value = str(form_data.get(param_name, ""))
             break
+
+    if is_remote_repository_path(input_value):
+        return templates.TemplateResponse(
+            request,
+            "partials/shared/path_autocomplete_dropdown.html",
+            {"directories": [], "remote": True, "target_input": ""},
+        )
 
     if not input_value:
         # Always use Unix root for WSL-first approach
@@ -326,6 +336,8 @@ async def import_repository(
         encryption_type=repo.encryption_type,
         keyfile_content=repo.keyfile_content,
         cache_dir=repo.cache_dir,
+        ssh_private_key=repo.ssh_private_key,
+        remote_borg_path=repo.remote_borg_path,
     )
 
     result = await repo_svc.import_repository(import_request, db)

@@ -17,6 +17,33 @@ class BorgCommandResult:
     environment: Dict[str, str]
 
 
+REMOTE_REPOSITORY_URL_PATTERN = re.compile(
+    r"^ssh://[A-Za-z0-9._-]+@[A-Za-z0-9.-]+(:\d{1,5})?/[^\s]+$"
+)
+
+
+def is_remote_repository_path(path: Optional[str]) -> bool:
+    """Return True if the repository path points at a remote borg server over SSH."""
+    return bool(path) and isinstance(path, str) and path.startswith("ssh://")
+
+
+def validate_remote_repository_url(url: str) -> str:
+    """
+    Validate a remote borg repository URL of the form ssh://user@host[:port]/path.
+
+    Raises:
+        ValueError: If the URL is malformed
+    """
+    if not REMOTE_REPOSITORY_URL_PATTERN.match(url):
+        raise ValueError(
+            "Remote repository must be of the form ssh://user@host[:port]/path"
+        )
+    port_match = re.match(r"^ssh://[^@]+@[^:/]+:(\d+)/", url)
+    if port_match and not 1 <= int(port_match.group(1)) <= 65535:
+        raise ValueError("Remote repository port must be between 1 and 65535")
+    return url
+
+
 def sanitize_path(path: str) -> str:
     """
     Sanitize a path to prevent directory traversal and injection attacks.
@@ -49,6 +76,11 @@ def sanitize_path(path: str) -> str:
     for pattern in dangerous_patterns:
         if re.search(pattern, path):
             raise ValueError(f"Path contains dangerous pattern: {pattern}")
+
+    # Remote URLs must be passed through untouched: normpath would collapse the
+    # "//" after the scheme and the "/./" (home-relative) segment borg relies on.
+    if is_remote_repository_path(path):
+        return validate_remote_repository_url(path)
 
     # Normalize the path using Unix-style normalization (WSL-compatible)
     import posixpath
@@ -284,7 +316,7 @@ def build_secure_borg_command_with_keyfile(
     Returns:
         BorgCommandResult containing command, environment, and optional temp keyfile path
     """
-    environment_overrides = {}
+    environment_overrides = dict(environment_overrides or {})
 
     if passphrase:
         environment_overrides["BORG_PASSPHRASE"] = passphrase

@@ -4,7 +4,7 @@ Handles all repository-related business operations independent of HTTP concerns.
 """
 
 import logging
-from typing import Dict, List, Protocol, TypedDict, Union, Any
+from typing import Dict, List, Optional, Protocol, TypedDict, Union, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -41,17 +41,13 @@ from borgitory.utils.secure_path import (
     secure_isdir,
     DirectoryInfo,
 )
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides,
+)
+from borgitory.services.ssh.repository_ssh_service import delete_key_file
 from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
-
-
-def _build_repository_env_overrides(repository: Repository) -> dict[str, str]:
-    """Build environment overrides for a repository, including cache directory."""
-    env_overrides = {}
-    if repository.cache_dir:
-        env_overrides["BORG_CACHE_DIR"] = repository.cache_dir
-    return env_overrides
 
 
 class KeyfileProtocol(Protocol):
@@ -102,6 +98,7 @@ class RepositoryService:
         self, request: CreateRepositoryRequest, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Create a new Borg repository."""
+        db_repo = None
         try:
             # Validate repository doesn't already exist
             validation_errors = await self._validate_repository_creation(request, db)
@@ -119,9 +116,14 @@ class RepositoryService:
 
             db_repo.encryption_type = request.encryption_type
             db_repo.cache_dir = request.cache_dir
+            self._apply_remote_settings(
+                db_repo, request.ssh_private_key, request.remote_borg_path
+            )
+            await self._reserve_id_for_ssh_key(db_repo, db)
 
             init_result = await self.borg_service.initialize_repository(db_repo)
             if not init_result.success:
+                await self._discard_pending_repository(db_repo, db)
                 borg_error = init_result.message
                 error_message = self._parse_borg_initialization_error(borg_error)
 
@@ -167,7 +169,7 @@ class RepositoryService:
             )
 
         except Exception as e:
-            await db.rollback()
+            await self._discard_pending_repository(db_repo, db)
             error_message = f"Failed to create repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
@@ -176,6 +178,7 @@ class RepositoryService:
         self, request: ImportRepositoryRequest, db: AsyncSession
     ) -> RepositoryOperationResult:
         """Import an existing Borg repository."""
+        db_repo = None
         try:
             validation_errors = await self._validate_repository_import(request, db)
             if validation_errors:
@@ -196,14 +199,26 @@ class RepositoryService:
             if request.keyfile_content:
                 db_repo.set_keyfile_content(request.keyfile_content)
 
+            self._apply_remote_settings(
+                db_repo, request.ssh_private_key, request.remote_borg_path
+            )
+            await self._reserve_id_for_ssh_key(db_repo, db)
+
+            credentials_hint = (
+                "Please check the SSH URL, SSH private key, remote borg path, passphrase, and keyfile (if required)."
+                if db_repo.is_remote
+                else "Please check the path, passphrase, and keyfile (if required)."
+            )
+
             verification_successful = await self.borg_service.verify_repository_access(
                 db_repo
             )
 
             if not verification_successful:
+                await self._discard_pending_repository(db_repo, db)
                 return RepositoryOperationResult(
                     success=False,
-                    error_message="Failed to verify repository access. Please check the path, passphrase, and keyfile (if required).",
+                    error_message=f"Failed to verify repository access. {credentials_hint}",
                 )
 
             try:
@@ -215,9 +230,10 @@ class RepositoryService:
                 logger.warning(
                     f"Imported repository could not list archives '{request.name}'"
                 )
+                await self._discard_pending_repository(db_repo, db)
                 return RepositoryOperationResult(
                     success=False,
-                    error_message="Failed to list archives. Please check the path, passphrase, and keyfile (if required).",
+                    error_message=f"Failed to list archives. {credentials_hint}",
                 )
 
             db.add(db_repo)
@@ -232,6 +248,7 @@ class RepositoryService:
             )
 
         except Exception as e:
+            await self._discard_pending_repository(db_repo, db)
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
@@ -270,6 +287,18 @@ class RepositoryService:
 
             if "passphrase" in update_dict and update_dict["passphrase"]:
                 repository.set_passphrase(update_dict["passphrase"])
+
+            if repository.is_remote:
+                if update_dict.get("clear_ssh_private_key"):
+                    repository.set_ssh_private_key(None)
+                    delete_key_file(repository.id)
+                elif update_dict.get("ssh_private_key"):
+                    repository.set_ssh_private_key(update_dict["ssh_private_key"])
+
+                if "remote_borg_path" in update_dict:
+                    repository.remote_borg_path = (
+                        update_dict["remote_borg_path"] or None
+                    )
 
             await db.commit()
             await db.refresh(repository)
@@ -545,6 +574,7 @@ class RepositoryService:
 
             await db.delete(repository)
             await db.commit()
+            delete_key_file(request.repository_id)
 
             logger.info(f"Successfully deleted repository '{repo_name}'")
 
@@ -651,8 +681,39 @@ class RepositoryService:
 
         return errors
 
+    @staticmethod
+    def _apply_remote_settings(
+        repository: Repository,
+        ssh_private_key: Optional[str],
+        remote_borg_path: Optional[str],
+    ) -> None:
+        """Store SSH settings; they only apply to remote (ssh://) repositories."""
+        if not repository.is_remote:
+            return
+        repository.set_ssh_private_key(ssh_private_key or None)
+        repository.remote_borg_path = remote_borg_path or None
+
+    @staticmethod
+    async def _reserve_id_for_ssh_key(repository: Repository, db: AsyncSession) -> None:
+        """Flush a new remote repository so its SSH key file can be named by id."""
+        if repository.is_remote and repository.encrypted_ssh_private_key:
+            db.add(repository)
+            await db.flush()
+
+    @staticmethod
+    async def _discard_pending_repository(
+        repository: Optional[Repository], db: AsyncSession
+    ) -> None:
+        """Roll back a repository that failed creation/import and remove its key file."""
+        await db.rollback()
+        if repository is not None and repository.id is not None:
+            delete_key_file(repository.id)
+
     def _parse_borg_initialization_error(self, borg_error: str) -> str:
         """Parse Borg initialization error into user-friendly message."""
+        ssh_error = self._parse_ssh_error(borg_error)
+        if ssh_error:
+            return ssh_error
         if "Read-only file system" in borg_error:
             return "Cannot create repository: The target directory is read-only. Please choose a writable location."
         elif "Permission denied" in borg_error:
@@ -661,6 +722,25 @@ class RepositoryService:
             return "A repository already exists at this location."
         else:
             return f"Failed to initialize repository: {borg_error}"
+
+    @staticmethod
+    def _parse_ssh_error(borg_error: str) -> Optional[str]:
+        """Translate common SSH failures from a remote repository into a readable message."""
+        if "Permission denied (publickey" in borg_error:
+            return "SSH authentication failed: the server rejected the private key. Make sure its public key is in the server's authorized_keys."
+        if "Host key verification failed" in borg_error or (
+            "REMOTE HOST IDENTIFICATION HAS CHANGED" in borg_error
+        ):
+            return "SSH host key verification failed: the server's host key changed since it was first trusted. Remove the old entry from the known_hosts file in the Borgitory data directory (ssh/known_hosts) if this change is expected."
+        if "Connection refused" in borg_error or "timed out" in borg_error:
+            return "Could not connect to the SSH server. Check the host name, port, and network access."
+        if "Could not resolve hostname" in borg_error:
+            return "Could not resolve the SSH server's host name."
+        if "command not found" in borg_error or (
+            "Remote: " in borg_error and "not found" in borg_error
+        ):
+            return "Borg was not found on the remote server. Set the remote borg path (for example borg-1.4) to the borg executable on the server."
+        return None
 
     async def check_repository_lock_status(
         self, repository: Repository
@@ -672,7 +752,7 @@ class RepositoryService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--list"],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_executor.execute_command(
@@ -732,7 +812,7 @@ class RepositoryService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=[],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
             result = await self.command_executor.execute_command(
                 command=borg_command.command,
@@ -812,7 +892,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 base_command="borg info",
                 additional_args=["--json"],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
             result = await self.command_executor.execute_command(
                 command=borg_command.command,
@@ -903,7 +983,7 @@ class RepositoryService:
                 passphrase=repository.get_passphrase(),
                 base_command="borg config",
                 additional_args=["--list"],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_executor.execute_command(
@@ -951,7 +1031,7 @@ class RepositoryService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 base_command="borg key export",
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_executor.execute_command(

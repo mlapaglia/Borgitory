@@ -19,17 +19,12 @@ from borgitory.protocols import (
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides,
+)
 from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
-
-
-def _build_repository_env_overrides(repository: "Repository") -> dict[str, str]:
-    """Build environment overrides for a repository, including cache directory."""
-    env_overrides = {}
-    if repository.cache_dir:
-        env_overrides["BORG_CACHE_DIR"] = repository.cache_dir
-    return env_overrides
 
 
 class BorgService:
@@ -76,7 +71,7 @@ class BorgService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--encryption=" + repository.encryption_type.value],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_runner.run_command(
@@ -116,7 +111,7 @@ class BorgService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--json"],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_runner.run_command(
@@ -157,7 +152,7 @@ class BorgService:
                 repository_path=f"{repository.path}::{archive_name}",
                 passphrase=repository.get_passphrase(),
                 additional_args=[],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_runner.run_command(
@@ -193,6 +188,7 @@ class BorgService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--json"],
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             job_id = await self.job_manager.start_borg_command(

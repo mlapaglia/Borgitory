@@ -81,6 +81,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     borgbackup=${BORGBACKUP_VERSION} \
     fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=${PYFUSE3_VERSION} \
+    openssh-client \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /app/data

@@ -108,6 +108,7 @@ class ProcessExecutorProtocol(Protocol):
         force_prune: bool = False,
         dry_run: bool = False,
         output_callback: Optional[Callable[[str], None]] = None,
+        environment_overrides: Optional[Dict[str, str]] = None,
     ) -> "ProcessResult":
         """Execute a borg prune task."""
         ...
@@ -117,6 +118,7 @@ class ProcessExecutorProtocol(Protocol):
         repository_path: str,
         passphrase: str,
         output_callback: Optional[Callable[[str], None]] = None,
+        environment_overrides: Optional[Dict[str, str]] = None,
     ) -> "ProcessResult":
         """Execute a borg compact task."""
         ...

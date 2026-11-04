@@ -12,6 +12,9 @@ from borgitory.protocols.job_event_broadcaster_protocol import (
 from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProtocol
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides_from_data,
+)
 from borgitory.utils.security import create_borg_command
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 
@@ -91,6 +94,9 @@ class CheckTaskExecutor:
                 repository_path="",  # Already in additional_args
                 passphrase=passphrase,
                 additional_args=additional_args,
+                environment_overrides=build_repository_env_overrides_from_data(
+                    repo_data
+                ),
             )
             process = await self.job_executor.start_process(
                 borg_command.command, borg_command.environment

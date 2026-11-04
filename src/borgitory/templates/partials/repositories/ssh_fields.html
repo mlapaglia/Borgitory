@@ -1,0 +1,41 @@
+<!-- SSH settings for remote (ssh://) repositories -->
+<!-- Usage: set ssh_container_id and optionally repository, then include. Shown only for ssh:// paths. -->
+<div id="{{ ssh_container_id }}"
+     class="space-y-4 p-3 border border-gray-200 dark:border-gray-600 rounded-md"
+     {% if not (repository and repository.is_remote) %}hidden{% endif %}>
+    <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Remote Repository (SSH)</p>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            SSH Private Key
+        </label>
+        {% set private_key_placeholder = "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----" %}
+        <textarea name="ssh_private_key"
+                  rows="6"
+                  autocomplete="off"
+                  spellcheck="false"
+                  class="input-modern mt-1 font-mono text-xs"
+                  placeholder="{% if repository and repository.encrypted_ssh_private_key %}A key is saved. Leave empty to keep it.{% else %}{{ private_key_placeholder }}{% endif %}"></textarea>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Add the matching public key to the server's authorized_keys. The host key is trusted on first connection.
+        </p>
+        {% if repository and repository.encrypted_ssh_private_key %}
+            <label class="mt-2 flex items-center text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" name="clear_ssh_private_key" class="mr-2">
+                Remove the saved key
+            </label>
+        {% endif %}
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+            Remote Borg Path (Optional)
+        </label>
+        <input type="text"
+               name="remote_borg_path"
+               class="input-modern mt-1"
+               value="{{ repository.remote_borg_path or '' if repository else '' }}"
+               placeholder="borg">
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Name of the borg executable on the server, if it isn't <code>borg</code> (for example <code>borg-1.4</code> on Hetzner Storage Boxes).
+        </p>
+    </div>
+</div>
