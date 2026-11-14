@@ -176,7 +176,8 @@ class TestSshEnvironment:
         assert args[args.index("-i") + 1] == str(key_path)
         assert "BatchMode=yes" in args
         assert "StrictHostKeyChecking=accept-new" in args
-        assert f"UserKnownHostsFile={ssh_data_dir / 'ssh' / 'known_hosts'}" in args
+        assert f'UserKnownHostsFile="{ssh_data_dir / "ssh" / "known_hosts"}"' in args
+        assert "ConnectTimeout=20" in args
         assert env["BORG_REMOTE_PATH"] == "borg-1.4"
 
         assert stat.S_IMODE(os.stat(key_path).st_mode) == 0o600
@@ -207,6 +208,22 @@ class TestSshEnvironment:
 
         args = rsh_args(env)
         assert args[args.index("-i") + 1] == str(data_dir / "ssh" / "keys" / "repo_1")
+        # ssh splits UserKnownHostsFile on whitespace, so it needs its own quotes
+        assert f'UserKnownHostsFile="{data_dir / "ssh" / "known_hosts"}"' in args
+
+    def test_repository_without_id_uses_pending_key_file(
+        self, ssh_data_dir: Path
+    ) -> None:
+        env = repository_ssh_service.build_ssh_env_overrides(
+            None, REMOTE_URL, PRIVATE_KEY, None
+        )
+
+        key_path = Path(rsh_args(env)[rsh_args(env).index("-i") + 1])
+        assert key_path.name.startswith("pending_")
+        assert key_path.exists()
+
+        repository_ssh_service.delete_pending_key_file(PRIVATE_KEY)
+        assert not key_path.exists()
 
     def test_windows_paths_are_translated_for_wsl(self) -> None:
         assert (
@@ -302,11 +319,18 @@ class TestRepositoryServiceRemote:
         repository_service: RepositoryService,
         mock_borg_service: Mock,
         test_db: AsyncSession,
+        ssh_data_dir: Path,
     ) -> None:
         seen_env: Dict[str, str] = {}
+        key_existed_during_init: list[bool] = []
 
         async def init(repo: Repository) -> Mock:
+            # Nothing is written to the database while borg talks to the server
+            assert repo.id is None
+            assert repo not in test_db
             seen_env.update(build_repository_env_overrides(repo))
+            args = rsh_args(seen_env)
+            key_existed_during_init.append(Path(args[args.index("-i") + 1]).exists())
             return Mock(success=True, message="ok")
 
         mock_borg_service.initialize_repository.side_effect = init
@@ -324,8 +348,10 @@ class TestRepositoryServiceRemote:
         )
 
         assert result.success is True
+        assert key_existed_during_init == [True]
         args = rsh_args(seen_env)
-        assert Path(args[args.index("-i") + 1]).exists()
+        # The pending key file is removed once the repository is saved
+        assert not Path(args[args.index("-i") + 1]).exists()
         assert seen_env["BORG_REMOTE_PATH"] == "borg-1.4"
 
         saved = (
@@ -488,6 +514,40 @@ class TestRepositoryServiceRemote:
 
         assert result.success is True
         assert not key_path.exists()
+
+    async def test_lock_status_for_remote_repository_avoids_borg_config(
+        self, repository_service: RepositoryService
+    ) -> None:
+        repository = Repository()
+        repository.id = 1
+        repository.path = REMOTE_URL
+        execute = AsyncMock(
+            return_value=Mock(success=True, stdout="", stderr="", return_code=0)
+        )
+        repository_service.command_executor.execute_command = execute  # type: ignore[method-assign]
+
+        result = await repository_service.check_repository_lock_status(repository)
+
+        assert result["accessible"] is True
+        command = execute.call_args.kwargs["command"]
+        assert command[:2] == ["borg", "list"]
+        assert "config" not in command
+
+    async def test_config_reported_unavailable_for_remote_repository(
+        self, repository_service: RepositoryService
+    ) -> None:
+        repository = Repository()
+        repository.id = 1
+        repository.path = REMOTE_URL
+        execute = AsyncMock()
+        repository_service.command_executor.execute_command = execute  # type: ignore[method-assign]
+
+        result = await repository_service._get_borg_config(repository)
+
+        assert result["success"] is True
+        assert result["config"] == {}
+        assert "remote repositories" in result["unavailable_message"]
+        execute.assert_not_called()
 
     @pytest.mark.parametrize(
         "borg_error,expected",

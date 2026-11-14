@@ -1,8 +1,6 @@
-import asyncio
 import json
 import logging
 import re
-from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.archives.archive_models import ArchiveEntry
 from typing import List
 
@@ -191,32 +189,16 @@ class BorgService:
                 environment_overrides=build_repository_env_overrides(repository),
             )
 
-            job_id = await self.job_manager.start_borg_command(
-                result.command, env=result.environment
+            # run_command kills borg if it exceeds the timeout, so a stalled
+            # remote connection can't block verification indefinitely.
+            command_result = await self.command_runner.run_command(
+                result.command, result.environment, timeout=30
             )
-
-            max_wait = 30
-            wait_time = 0.0
-
-            while wait_time < max_wait:
-                status = self.job_manager.get_job_status(job_id)
-
-                if not status:
-                    return False
-
-                if (
-                    status.status == JobStatusEnum.COMPLETED
-                    or status.status == JobStatusEnum.FAILED
-                ):
-                    success = status.return_code == 0
-
-                    self.job_manager.cleanup_job(job_id)
-                    return bool(success)
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            return False
+            if not command_result.success:
+                logger.info(
+                    f"Repository access verification failed: {command_result.stderr.strip() or command_result.error}"
+                )
+            return bool(command_result.success)
 
         except Exception as e:
             logger.error(f"Failed to verify repository access: {e}")

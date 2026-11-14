@@ -107,7 +107,9 @@ borgitory serve --host 0.0.0.0 --port 8000
 
 ### Remote Repositories (SSH)
 
-Borgitory can back up directly to a repository on a remote borg server, such as BorgBase, a Hetzner Storage Box, or another machine running borg. This keeps an off-site copy that is a separate borg repository rather than an rclone mirror of a local one, so local corruption or ransomware does not spread to it.
+Borgitory can back up directly to a repository on a remote borg server, such as BorgBase, a Hetzner Storage Box, or another machine running borg. This keeps an off-site copy that is a separate borg repository rather than an rclone mirror of a local one, so corruption of the local repository does not spread to it. This is not full ransomware protection on its own: a backup that runs after files are encrypted stores the encrypted files, and prune can remove older clean archives. Use append-only mode (below) and a retention policy that keeps older archives.
+
+Remote repositories need an SSH client (`ssh`) on the machine running borg. The Docker image includes one; for PyPI installs, install it alongside borg (for example `sudo apt install openssh-client`).
 
 When creating or importing a repository, enter an `ssh://` URL as the path:
 
@@ -115,7 +117,7 @@ When creating or importing a repository, enter an `ssh://` URL as the path:
 - Hetzner Storage Box: `ssh://u123456@u123456.your-storagebox.de:23/./backups/repo` (set **Remote Borg Path** to `borg-1.4`)
 - Your own server: `ssh://borg@nas.example.com/./borg/repo` (`/./` means relative to the user's home directory)
 
-Paste the SSH private key into the form and add its public key to the server's `authorized_keys`. The key is stored encrypted in the database. The server's host key is trusted on first connection and saved in `<data dir>/ssh/known_hosts`. If the host key later changes on purpose, remove the old entry with `ssh-keygen -R "[host]:port" -f <data dir>/ssh/known_hosts`.
+Paste the SSH private key into the form and add its public key to the server's `authorized_keys`. The key is stored encrypted in the database. The server's host key is trusted on first connection and saved in `<data dir>/ssh/known_hosts`. If the host key later changes deliberately, remove the old entry with `ssh-keygen -R host -f <data dir>/ssh/known_hosts` for port 22, or `ssh-keygen -R "[host]:port" -f <data dir>/ssh/known_hosts` for any other port.
 
 For backups that can't be deleted from the client, restrict the key on the server to append-only mode in `authorized_keys`, for example `command="borg serve --append-only --restrict-to-path /home/borg/repo",restrict ssh-ed25519 AAAA...`. Borgitory can't enforce this itself, and in append-only mode prune and compact won't free space on the server.
 

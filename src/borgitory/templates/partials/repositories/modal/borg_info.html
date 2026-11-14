@@ -87,7 +87,7 @@
         {% endif %}
     </div>
     <!-- Repository Configuration Section -->
-    {% if config or config_error %}
+    {% if config or config_error or config_unavailable %}
         <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
             <h5 class="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
                 Repository Configuration
@@ -98,6 +98,10 @@
                         Could not load configuration
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ config_error }}</p>
+                </div>
+            {% elif config_unavailable %}
+                <div class="text-center py-2">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ config_unavailable }}</p>
                 </div>
             {% elif config %}
                 <div class="grid grid-cols-1 gap-3 text-sm">

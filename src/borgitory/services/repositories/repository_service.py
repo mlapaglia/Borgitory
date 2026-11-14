@@ -44,7 +44,10 @@ from borgitory.utils.secure_path import (
 from borgitory.services.repositories.repository_environment import (
     build_repository_env_overrides,
 )
-from borgitory.services.ssh.repository_ssh_service import delete_key_file
+from borgitory.services.ssh.repository_ssh_service import (
+    delete_key_file,
+    delete_pending_key_file,
+)
 from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
@@ -119,11 +122,9 @@ class RepositoryService:
             self._apply_remote_settings(
                 db_repo, request.ssh_private_key, request.remote_borg_path
             )
-            await self._reserve_id_for_ssh_key(db_repo, db)
 
             init_result = await self.borg_service.initialize_repository(db_repo)
             if not init_result.success:
-                await self._discard_pending_repository(db_repo, db)
                 borg_error = init_result.message
                 error_message = self._parse_borg_initialization_error(borg_error)
 
@@ -144,7 +145,6 @@ class RepositoryService:
                 keyfile_contents = keyfile_result.get("key_data")
                 if keyfile_contents:
                     db_repo.set_keyfile_content(keyfile_contents)
-                    await db.commit()
                     logger.info(
                         f"Saved keyfile contents for repository '{request.name}'"
                     )
@@ -169,10 +169,12 @@ class RepositoryService:
             )
 
         except Exception as e:
-            await self._discard_pending_repository(db_repo, db)
+            await db.rollback()
             error_message = f"Failed to create repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
+        finally:
+            self._remove_pending_key_file(db_repo)
 
     async def import_repository(
         self, request: ImportRepositoryRequest, db: AsyncSession
@@ -202,7 +204,6 @@ class RepositoryService:
             self._apply_remote_settings(
                 db_repo, request.ssh_private_key, request.remote_borg_path
             )
-            await self._reserve_id_for_ssh_key(db_repo, db)
 
             credentials_hint = (
                 "Please check the SSH URL, SSH private key, remote borg path, passphrase, and keyfile (if required)."
@@ -215,7 +216,6 @@ class RepositoryService:
             )
 
             if not verification_successful:
-                await self._discard_pending_repository(db_repo, db)
                 return RepositoryOperationResult(
                     success=False,
                     error_message=f"Failed to verify repository access. {credentials_hint}",
@@ -230,7 +230,6 @@ class RepositoryService:
                 logger.warning(
                     f"Imported repository could not list archives '{request.name}'"
                 )
-                await self._discard_pending_repository(db_repo, db)
                 return RepositoryOperationResult(
                     success=False,
                     error_message=f"Failed to list archives. {credentials_hint}",
@@ -248,10 +247,12 @@ class RepositoryService:
             )
 
         except Exception as e:
-            await self._discard_pending_repository(db_repo, db)
+            await db.rollback()
             error_message = f"Failed to import repository: {str(e)}"
             logger.error(error_message)
             return RepositoryOperationResult(success=False, error_message=error_message)
+        finally:
+            self._remove_pending_key_file(db_repo)
 
     async def update_repository(
         self, repository_id: int, update_data: RepositoryUpdate, db: AsyncSession
@@ -694,20 +695,16 @@ class RepositoryService:
         repository.remote_borg_path = remote_borg_path or None
 
     @staticmethod
-    async def _reserve_id_for_ssh_key(repository: Repository, db: AsyncSession) -> None:
-        """Flush a new remote repository so its SSH key file can be named by id."""
-        if repository.is_remote and repository.encrypted_ssh_private_key:
-            db.add(repository)
-            await db.flush()
+    def _remove_pending_key_file(repository: Optional[Repository]) -> None:
+        """
+        Remove the SSH key file used while creating/importing a repository.
 
-    @staticmethod
-    async def _discard_pending_repository(
-        repository: Optional[Repository], db: AsyncSession
-    ) -> None:
-        """Roll back a repository that failed creation/import and remove its key file."""
-        await db.rollback()
-        if repository is not None and repository.id is not None:
-            delete_key_file(repository.id)
+        The repository isn't added to the session until borg has finished, so no
+        database write transaction is held open across SSH operations; until then
+        its key file is named by content rather than by id.
+        """
+        if repository is not None and repository.is_remote:
+            delete_pending_key_file(repository.get_ssh_private_key())
 
     def _parse_borg_initialization_error(self, borg_error: str) -> str:
         """Parse Borg initialization error into user-friendly message."""
@@ -745,13 +742,22 @@ class RepositoryService:
     async def check_repository_lock_status(
         self, repository: Repository
     ) -> Dict[str, Any]:
-        """Check if a repository is currently locked by attempting a quick borg list operation."""
+        """Check if a repository is currently locked by attempting a quick borg operation."""
         try:
+            if repository.is_remote:
+                # borg config only works on local repositories; listing the most
+                # recent archive also takes the repository lock and works over SSH.
+                base_command = "borg list"
+                additional_args = ["--short", "--last", "1"]
+            else:
+                base_command = "borg config"
+                additional_args = ["--list"]
+
             borg_command = create_borg_command(
-                base_command="borg config",
+                base_command=base_command,
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
-                additional_args=["--list"],
+                additional_args=additional_args,
                 environment_overrides=build_repository_env_overrides(repository),
             )
 
@@ -873,6 +879,7 @@ class RepositoryService:
                 if not config_result.get("success")
                 else None
             )
+            result["config_unavailable"] = config_result.get("unavailable_message")
 
             return result
 
@@ -977,6 +984,12 @@ class RepositoryService:
 
     async def _get_borg_config(self, repository: Repository) -> Dict[str, Any]:
         """Get repository configuration using borg config --list command."""
+        if repository.is_remote:
+            return {
+                "success": True,
+                "config": {},
+                "unavailable_message": "Configuration isn't available for remote repositories (borg config only works on local repositories).",
+            }
         try:
             borg_command = create_borg_command(
                 repository_path=repository.path,

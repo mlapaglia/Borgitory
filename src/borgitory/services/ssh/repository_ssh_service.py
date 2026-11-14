@@ -8,6 +8,7 @@ DATA_DIR/ssh/keys so it can be referenced from BORG_RSH for the lifetime of any
 borg process (including long-running jobs).
 """
 
+import hashlib
 import logging
 import os
 import re
@@ -18,6 +19,8 @@ from borgitory.config_module import DATA_DIR
 from borgitory.utils.security import is_remote_repository_path
 
 logger = logging.getLogger(__name__)
+
+SSH_CONNECT_TIMEOUT_SECONDS = 20
 
 
 def _ssh_dir() -> str:
@@ -30,6 +33,12 @@ def known_hosts_path() -> str:
 
 def key_file_path(repository_id: int) -> str:
     return os.path.join(_ssh_dir(), "keys", f"repo_{repository_id}")
+
+
+def pending_key_file_path(ssh_private_key: str) -> str:
+    """Key file for a repository that has no id yet (create/import in progress)."""
+    digest = hashlib.sha256(normalize_private_key(ssh_private_key).encode()).hexdigest()
+    return os.path.join(_ssh_dir(), "keys", f"pending_{digest[:32]}")
 
 
 def _to_executor_path(path: str) -> str:
@@ -46,9 +55,18 @@ def normalize_private_key(ssh_private_key: str) -> str:
     return ssh_private_key.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
 
 
-def write_key_file(repository_id: int, ssh_private_key: str) -> str:
-    """Write the repository's private key to disk (0600), only if it changed."""
-    path = key_file_path(repository_id)
+def write_key_file(repository_id: Optional[int], ssh_private_key: str) -> str:
+    """
+    Write the repository's private key to disk (0600), only if it changed.
+
+    A repository without an id yet gets a pending key file, which the caller
+    removes with delete_pending_key_file once creation or import finishes.
+    """
+    path = (
+        key_file_path(repository_id)
+        if repository_id is not None
+        else pending_key_file_path(ssh_private_key)
+    )
     content = normalize_private_key(ssh_private_key).encode()
 
     if os.path.exists(path):
@@ -67,15 +85,29 @@ def write_key_file(repository_id: int, ssh_private_key: str) -> str:
     return path
 
 
-def delete_key_file(repository_id: int) -> None:
-    """Remove a repository's materialized key file, if present."""
-    path = key_file_path(repository_id)
+def _remove_key_file(path: str) -> None:
     try:
         os.remove(path)
     except FileNotFoundError:
         pass
     except OSError as e:
         logger.warning(f"Failed to remove SSH key file {path}: {e}")
+
+
+def delete_key_file(repository_id: int) -> None:
+    """Remove a repository's materialized key file, if present."""
+    _remove_key_file(key_file_path(repository_id))
+
+
+def delete_pending_key_file(ssh_private_key: Optional[str]) -> None:
+    """Remove the key file written for a repository that had no id yet, if present."""
+    if ssh_private_key:
+        _remove_key_file(pending_key_file_path(ssh_private_key))
+
+
+def _ssh_config_quote(value: str) -> str:
+    """Quote a value for ssh's own option parser, which splits on whitespace."""
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def build_ssh_env_overrides(
@@ -97,14 +129,16 @@ def build_ssh_env_overrides(
     os.makedirs(_ssh_dir(), mode=0o700, exist_ok=True)
 
     rsh = ["ssh"]
-    if ssh_private_key and repository_id is not None:
+    if ssh_private_key:
         key_path = write_key_file(repository_id, ssh_private_key)
         rsh += ["-i", _to_executor_path(key_path), "-o", "IdentitiesOnly=yes"]
     rsh += [
         "-o",
         "BatchMode=yes",
         "-o",
-        f"UserKnownHostsFile={_to_executor_path(known_hosts_path())}",
+        f"ConnectTimeout={SSH_CONNECT_TIMEOUT_SECONDS}",
+        "-o",
+        f"UserKnownHostsFile={_ssh_config_quote(_to_executor_path(known_hosts_path()))}",
         "-o",
         "StrictHostKeyChecking=accept-new",
     ]
