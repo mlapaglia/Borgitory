@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.main import app
 from borgitory.models.database import Repository
 from borgitory.services.repositories.repository_stats_service import (
+    NoArchivesError,
     RepositoryStatsService,
 )
 from borgitory.dependencies import get_db, get_repository_stats_service
@@ -144,7 +145,7 @@ class TestRepositoryStatsHTML:
         async def mock_get_stats_error(
             repo: Any, db: Any, progress_callback: Any = None
         ) -> None:
-            raise ValueError("No archives found in repository")
+            raise NoArchivesError(NoArchivesError.user_message)
 
         # Mock the dependency injection for error case
         mock_stats_service = Mock(spec=RepositoryStatsService)

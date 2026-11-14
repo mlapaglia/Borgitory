@@ -19,6 +19,20 @@ from borgitory.utils.security import create_borg_command
 logger = logging.getLogger(__name__)
 
 
+class RepositoryStatsUnavailableError(ValueError):
+    """Statistics can't be built for an expected, user-facing reason."""
+
+    user_message = "Repository statistics are unavailable."
+
+
+class NoArchivesError(RepositoryStatsUnavailableError):
+    user_message = "No archives found in repository"
+
+
+class ArchiveInfoUnavailableError(RepositoryStatsUnavailableError):
+    user_message = "Could not retrieve archive information"
+
+
 # TypedDict definitions for repository statistics
 class FileTypeTimelineData(TypedDict):
     """Internal structure for file type timeline data"""
@@ -243,7 +257,7 @@ class RepositoryStatsService:
         try:
             archives = await self.execute_borg_list(repository)
             if not archives:
-                raise ValueError("No archives found in repository")
+                raise NoArchivesError(NoArchivesError.user_message)
 
             archive_stats = []
             for i, archive in enumerate(archives):
@@ -252,7 +266,9 @@ class RepositoryStatsService:
                     archive_stats.append(archive_info)
 
             if not archive_stats:
-                raise ValueError("Could not retrieve archive information")
+                raise ArchiveInfoUnavailableError(
+                    ArchiveInfoUnavailableError.user_message
+                )
 
             archive_stats.sort(key=lambda x: str(x.get("start", "")))
 

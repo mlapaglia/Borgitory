@@ -69,9 +69,10 @@ class TestStreamingErrorHandling:
             if len(events) >= 1:
                 break
 
-        # Should handle the Mock tasks error gracefully
+        # Should handle the Mock tasks error gracefully without leaking details
         assert len(events) >= 1
-        assert "object of type 'Mock' has no len()" in events[0]
+        assert events[0].startswith("event: error")
+        assert "object of type 'Mock' has no len()" not in events[0]
 
     async def test_task_streaming_invalid_task_order(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock

@@ -280,6 +280,7 @@ def get_or_generate_secret_key(data_dir: str) -> str:
     secret_file = data_path / "secret_key"
 
     if secret_file.exists():
+        _restrict_to_owner(secret_file)
         try:
             return secret_file.read_text().strip()
         except Exception as e:
@@ -288,10 +289,23 @@ def get_or_generate_secret_key(data_dir: str) -> str:
     secret_key = secrets.token_urlsafe(32)
 
     try:
-        secret_file.write_text(secret_key)
+        # Create the file owner-read/write only so other local users can't read
+        # the key. O_EXCL fails rather than overwriting a key created concurrently.
+        fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(secret_key)
         return secret_key
     except Exception as e:
         raise Exception(f"Failed to save secret key to {secret_file}: {e}")
+
+
+def _restrict_to_owner(path: Path) -> None:
+    """Best-effort chmod 600 for key files created before permissions were enforced."""
+    try:
+        if path.stat().st_mode & 0o077:
+            os.chmod(path, 0o600)
+    except OSError as e:
+        logger.warning(f"Could not restrict permissions on {path}: {e}")
 
 
 def build_secure_borg_command_with_keyfile(
