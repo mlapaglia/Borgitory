@@ -211,19 +211,38 @@ class TestSshEnvironment:
         # ssh splits UserKnownHostsFile on whitespace, so it needs its own quotes
         assert f'UserKnownHostsFile="{data_dir / "ssh" / "known_hosts"}"' in args
 
-    def test_repository_without_id_uses_pending_key_file(
+    def test_pending_key_files_are_per_operation(self, ssh_data_dir: Path) -> None:
+        token_a = repository_ssh_service.new_pending_key_token()
+        token_b = repository_ssh_service.new_pending_key_token()
+
+        def key_path(token: str) -> Path:
+            args = rsh_args(
+                repository_ssh_service.build_ssh_env_overrides(
+                    None, REMOTE_URL, PRIVATE_KEY, None, token
+                )
+            )
+            return Path(args[args.index("-i") + 1])
+
+        path_a, path_b = key_path(token_a), key_path(token_b)
+        assert path_a != path_b
+        assert path_a.name == f"pending_{token_a}"
+
+        # Finishing one operation leaves a concurrent one using the same key intact
+        repository_ssh_service.delete_pending_key_file(token_a)
+        assert not path_a.exists()
+        assert path_b.exists()
+
+    def test_key_without_id_or_pending_token_is_rejected(
         self, ssh_data_dir: Path
     ) -> None:
-        env = repository_ssh_service.build_ssh_env_overrides(
-            None, REMOTE_URL, PRIVATE_KEY, None
-        )
+        with pytest.raises(ValueError):
+            repository_ssh_service.build_ssh_env_overrides(
+                None, REMOTE_URL, PRIVATE_KEY, None
+            )
 
-        key_path = Path(rsh_args(env)[rsh_args(env).index("-i") + 1])
-        assert key_path.name.startswith("pending_")
-        assert key_path.exists()
-
-        repository_ssh_service.delete_pending_key_file(PRIVATE_KEY)
-        assert not key_path.exists()
+    def test_pending_key_token_must_be_hex(self, ssh_data_dir: Path) -> None:
+        with pytest.raises(ValueError):
+            repository_ssh_service.pending_key_file_path("../../etc/passwd")
 
     def test_windows_paths_are_translated_for_wsl(self) -> None:
         assert (

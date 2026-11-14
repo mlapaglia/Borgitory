@@ -12,12 +12,15 @@ def _build_env_overrides(
     cache_dir: Optional[str],
     ssh_private_key: Optional[str],
     remote_borg_path: Optional[str],
+    pending_key_token: Optional[str] = None,
 ) -> dict[str, str]:
     env_overrides: dict[str, str] = {}
     if cache_dir:
         env_overrides["BORG_CACHE_DIR"] = cache_dir
     env_overrides.update(
-        build_ssh_env_overrides(repository_id, path, ssh_private_key, remote_borg_path)
+        build_ssh_env_overrides(
+            repository_id, path, ssh_private_key, remote_borg_path, pending_key_token
+        )
     )
     return env_overrides
 
@@ -30,6 +33,7 @@ def build_repository_env_overrides(repository: Repository) -> dict[str, str]:
         repository.cache_dir,
         repository.get_ssh_private_key(),
         repository.remote_borg_path,
+        repository.pending_ssh_key_token,
     )
 
 

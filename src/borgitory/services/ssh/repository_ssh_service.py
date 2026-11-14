@@ -8,11 +8,11 @@ DATA_DIR/ssh/keys so it can be referenced from BORG_RSH for the lifetime of any
 borg process (including long-running jobs).
 """
 
-import hashlib
 import logging
 import os
 import re
 import shlex
+import uuid
 from typing import Optional
 
 from borgitory.config_module import DATA_DIR
@@ -35,10 +35,15 @@ def key_file_path(repository_id: int) -> str:
     return os.path.join(_ssh_dir(), "keys", f"repo_{repository_id}")
 
 
-def pending_key_file_path(ssh_private_key: str) -> str:
-    """Key file for a repository that has no id yet (create/import in progress)."""
-    digest = hashlib.sha256(normalize_private_key(ssh_private_key).encode()).hexdigest()
-    return os.path.join(_ssh_dir(), "keys", f"pending_{digest[:32]}")
+def new_pending_key_token() -> str:
+    """Token naming the key file of one create/import operation (repository has no id yet)."""
+    return uuid.uuid4().hex
+
+
+def pending_key_file_path(pending_key_token: str) -> str:
+    if not re.fullmatch(r"[0-9a-f]{32}", pending_key_token):
+        raise ValueError("Invalid pending SSH key token")
+    return os.path.join(_ssh_dir(), "keys", f"pending_{pending_key_token}")
 
 
 def _to_executor_path(path: str) -> str:
@@ -55,18 +60,12 @@ def normalize_private_key(ssh_private_key: str) -> str:
     return ssh_private_key.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
 
 
-def write_key_file(repository_id: Optional[int], ssh_private_key: str) -> str:
-    """
-    Write the repository's private key to disk (0600), only if it changed.
+def write_key_file(repository_id: int, ssh_private_key: str) -> str:
+    """Write the repository's private key to disk (0600), only if it changed."""
+    return _write_key_file_at(key_file_path(repository_id), ssh_private_key)
 
-    A repository without an id yet gets a pending key file, which the caller
-    removes with delete_pending_key_file once creation or import finishes.
-    """
-    path = (
-        key_file_path(repository_id)
-        if repository_id is not None
-        else pending_key_file_path(ssh_private_key)
-    )
+
+def _write_key_file_at(path: str, ssh_private_key: str) -> str:
     content = normalize_private_key(ssh_private_key).encode()
 
     if os.path.exists(path):
@@ -99,10 +98,10 @@ def delete_key_file(repository_id: int) -> None:
     _remove_key_file(key_file_path(repository_id))
 
 
-def delete_pending_key_file(ssh_private_key: Optional[str]) -> None:
-    """Remove the key file written for a repository that had no id yet, if present."""
-    if ssh_private_key:
-        _remove_key_file(pending_key_file_path(ssh_private_key))
+def delete_pending_key_file(pending_key_token: Optional[str]) -> None:
+    """Remove the key file written for one create/import operation, if present."""
+    if pending_key_token:
+        _remove_key_file(pending_key_file_path(pending_key_token))
 
 
 def _ssh_config_quote(value: str) -> str:
@@ -115,6 +114,7 @@ def build_ssh_env_overrides(
     repository_path: Optional[str],
     ssh_private_key: Optional[str],
     remote_borg_path: Optional[str],
+    pending_key_token: Optional[str] = None,
 ) -> dict[str, str]:
     """
     Build BORG_RSH / BORG_REMOTE_PATH for a remote repository.
@@ -130,7 +130,18 @@ def build_ssh_env_overrides(
 
     rsh = ["ssh"]
     if ssh_private_key:
-        key_path = write_key_file(repository_id, ssh_private_key)
+        if repository_id is not None:
+            key_path = write_key_file(repository_id, ssh_private_key)
+        elif pending_key_token:
+            # Each create/import operation has its own file, so concurrent
+            # operations using the same key can't delete each other's identity.
+            key_path = _write_key_file_at(
+                pending_key_file_path(pending_key_token), ssh_private_key
+            )
+        else:
+            raise ValueError(
+                "An SSH key for a repository without an id needs a pending key token"
+            )
         rsh += ["-i", _to_executor_path(key_path), "-o", "IdentitiesOnly=yes"]
     rsh += [
         "-o",

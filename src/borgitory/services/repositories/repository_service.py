@@ -47,6 +47,7 @@ from borgitory.services.repositories.repository_environment import (
 from borgitory.services.ssh.repository_ssh_service import (
     delete_key_file,
     delete_pending_key_file,
+    new_pending_key_token,
 )
 from borgitory.utils.security import create_borg_command
 
@@ -693,6 +694,8 @@ class RepositoryService:
             return
         repository.set_ssh_private_key(ssh_private_key or None)
         repository.remote_borg_path = remote_borg_path or None
+        if repository.id is None:
+            repository.pending_ssh_key_token = new_pending_key_token()
 
     @staticmethod
     def _remove_pending_key_file(repository: Optional[Repository]) -> None:
@@ -701,10 +704,11 @@ class RepositoryService:
 
         The repository isn't added to the session until borg has finished, so no
         database write transaction is held open across SSH operations; until then
-        its key file is named by content rather than by id.
+        its key file is named by a per-operation token rather than by id.
         """
-        if repository is not None and repository.is_remote:
-            delete_pending_key_file(repository.get_ssh_private_key())
+        if repository is not None:
+            delete_pending_key_file(repository.pending_ssh_key_token)
+            repository.pending_ssh_key_token = None
 
     def _parse_borg_initialization_error(self, borg_error: str) -> str:
         """Parse Borg initialization error into user-friendly message."""

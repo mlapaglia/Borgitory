@@ -96,6 +96,8 @@ def get_cipher_suite() -> Fernet:
 
 class Repository(Base):
     __tablename__ = "repositories"
+    # Lets the non-column attribute below carry a plain type annotation
+    __allow_unmapped__ = True
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
@@ -124,6 +126,10 @@ class Repository(Base):
     schedules: Mapped[List["Schedule"]] = relationship(
         "Schedule", back_populates="repository", cascade="all, delete-orphan"
     )
+
+    # Not persisted: names the SSH key file used while a new repository is
+    # being created/imported and has no id yet.
+    pending_ssh_key_token: str | None = None
 
     def set_passphrase(self, passphrase: str) -> None:
         self.encrypted_passphrase = (
