@@ -35,6 +35,11 @@ def missing_tools() -> list[str]:
     return missing
 
 
+def sshd_config_path(path: Path) -> str:
+    """Quote a path for sshd_config, which otherwise splits arguments on whitespace."""
+    return '"' + str(path).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 def generate_key(path: Path) -> str:
     """Create an ed25519 key pair at path / path.pub and return the private key."""
     subprocess.run(
@@ -110,9 +115,11 @@ class SshServer:
                 [
                     f"Port {self.port}",
                     "ListenAddress 127.0.0.1",
-                    f"HostKey {self.root / 'host_key'}",
-                    f"AuthorizedKeysFile {self.authorized_keys}",
-                    f"PidFile {self.root / 'sshd.pid'}",
+                    f"HostKey {sshd_config_path(self.root / 'host_key')}",
+                    # AuthorizedKeysFile expands %-tokens, so a literal % is %%
+                    "AuthorizedKeysFile "
+                    + sshd_config_path(self.authorized_keys).replace("%", "%%"),
+                    f"PidFile {sshd_config_path(self.root / 'sshd.pid')}",
                     "PubkeyAuthentication yes",
                     "PasswordAuthentication no",
                     "KbdInteractiveAuthentication no",
