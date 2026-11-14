@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 from typing import Dict, List, Optional, Union, cast, Mapping, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
@@ -27,6 +26,7 @@ from borgitory.dependencies import (
 )
 from borgitory.api.auth import get_current_user
 from borgitory.models.database import User
+from borgitory.utils.template_paths import get_template_directory
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -50,33 +50,36 @@ def _get_supported_providers(registry: ProviderRegistryDep) -> List[Dict[str, st
     return sorted(supported_providers, key=lambda x: str(x["value"]))
 
 
+_PROVIDER_TEMPLATES_SUBDIR = "partials/cloud_sync/providers"
+
+
+def _discover_provider_templates() -> Dict[str, str]:
+    """Map each provider that ships a fields template to its template path."""
+    template_root = get_template_directory()
+    providers_dir = os.path.join(template_root, _PROVIDER_TEMPLATES_SUBDIR)
+    try:
+        entries = os.listdir(providers_dir)
+    except OSError:
+        logger.warning(f"Provider templates directory not found: {providers_dir}")
+        return {}
+
+    templates: Dict[str, str] = {}
+    for name in entries:
+        relative_path = f"{_PROVIDER_TEMPLATES_SUBDIR}/{name}/{name}_fields.html"
+        if os.path.isfile(os.path.join(template_root, relative_path)):
+            templates[name] = relative_path
+    return templates
+
+
 def _get_provider_template(provider: str) -> Optional[str]:
-    """Get the appropriate template path for a provider"""
+    """Get the appropriate template path for a provider.
+
+    The provider value comes from the request, so it is only used as a lookup
+    key into templates discovered on disk and never to build a path itself.
+    """
     if not provider:
         return None
-
-    # Validate provider name: only allow alphanumerics, underscores, hyphens
-    if not re.fullmatch(r"^[\w-]+$", provider):
-        return None
-
-    # Automatically discover templates by checking if they exist on filesystem
-    base_templates_dir = os.path.abspath(
-        os.path.normpath(
-            f"src/borgitory/templates/partials/cloud_sync/providers/{provider}"
-        )
-    )
-
-    template_path = f"partials/cloud_sync/providers/{provider}/{provider}_fields.html"
-    full_path = f"src/borgitory/templates/{template_path}"
-    normalized_path = os.path.abspath(os.path.normpath(full_path))
-
-    if os.path.commonpath([base_templates_dir, normalized_path]) != base_templates_dir:
-        return None
-
-    if os.path.exists(full_path):
-        return template_path
-
-    return None
+    return _discover_provider_templates().get(provider)
 
 
 def _get_submit_button_text(
