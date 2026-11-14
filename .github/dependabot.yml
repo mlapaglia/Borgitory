@@ -40,26 +40,6 @@ updates:
           - "cryptography*"
           - "bcrypt*"
 
-  # Hash-pinned build tools used by CI (build, twine)
-  - package-ecosystem: "pip"
-    directory: "/.github/requirements"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 5
-    reviewers:
-      - "mlapaglia"
-    commit-message:
-      prefix: "ci"
-      include: "scope"
-    groups:
-      ci-build-tools:
-        patterns:
-          - "*"
-
   # Docker dependencies
   - package-ecosystem: "docker"
     directory: "/"
