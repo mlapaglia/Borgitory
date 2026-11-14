@@ -46,11 +46,14 @@ ARG PYFUSE3_VERSION
 
 WORKDIR /app
 
+# libatomic1: Playwright's bundled Node driver (>= 1.65) links against it, so it must be
+# present before `playwright install --with-deps` can run and install everything else.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     rclone=${RCLONE_VERSION} \
     borgbackup=${BORGBACKUP_VERSION} \
     fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=${PYFUSE3_VERSION} \
+    libatomic1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
