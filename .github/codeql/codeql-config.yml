@@ -1,0 +1,6 @@
+name: Borgitory CodeQL config
+
+# Test code doesn't ship in the app; its assertions trip rules like
+# py/incomplete-url-substring-sanitization without any real risk.
+paths-ignore:
+  - tests
