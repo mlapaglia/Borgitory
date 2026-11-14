@@ -26,6 +26,12 @@ class JobData:
     progress_info: str
 
 
+# Sent to clients when a stream fails; details are logged server-side only.
+_STREAM_ERROR_MESSAGE = (
+    "An internal error occurred while streaming. Check the server logs."
+)
+
+
 class JobStreamService:
     """Service for handling Server-Sent Events streaming for jobs"""
 
@@ -121,9 +127,9 @@ class JobStreamService:
                 event_type = job_event.event_type.value
                 yield f"event: {event_type}\\ndata: {json.dumps(job_event.to_dict())}\\n\\n"
 
-        except Exception as e:
-            logger.error(f"SSE streaming error: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\\n\\n"
+        except Exception:
+            logger.exception("SSE streaming error")
+            yield f"data: {json.dumps({'type': 'error', 'message': _STREAM_ERROR_MESSAGE})}\\n\\n"
 
     async def _job_output_event_generator(
         self, job_id: uuid.UUID
@@ -253,8 +259,11 @@ class JobStreamService:
                                     yield f"data: {json.dumps(event.to_dict())}\n\n"
                         except asyncio.TimeoutError:
                             yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
-                        except Exception as e:
-                            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                        except Exception:
+                            logger.exception(
+                                f"Error reading events for job output stream {job_id}"
+                            )
+                            yield f"data: {json.dumps({'type': 'error', 'message': _STREAM_ERROR_MESSAGE})}\n\n"
                             break
                 finally:
                     if event_queue:
@@ -296,13 +305,12 @@ class JobStreamService:
                         else:
                             # Send other events as JSON data
                             yield f"data: {json.dumps(output_event)}\n\n"
-                except Exception as stream_error:
-                    logger.error(
-                        f"Error in job output stream for {job_id}: {stream_error}"
-                    )
-                    yield f"event: output\ndata: Error streaming output: {stream_error}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                except Exception:
+                    logger.exception(f"Error in job output stream for {job_id}")
+                    yield f"event: output\ndata: {_STREAM_ERROR_MESSAGE}\n\n"
+        except Exception:
+            logger.exception(f"Error in job output stream for {job_id}")
+            yield f"data: {json.dumps({'type': 'error', 'message': _STREAM_ERROR_MESSAGE})}\n\n"
 
     async def stream_task_output(
         self, job_id: uuid.UUID, task_order: int
@@ -442,14 +450,11 @@ class JobStreamService:
                 if event_queue:
                     self.job_manager.unsubscribe_from_events(event_queue)
 
-        except Exception as e:
-            logger.error(
-                f"Error in task output stream for job {job_id}, task {task_order}: {e}",
-                exc_info=True,
+        except Exception:
+            logger.exception(
+                f"Error in task output stream for job {job_id}, task {task_order}"
             )
-            # Send error event with more specific information
-            error_msg = f"Streaming error for job {job_id}, task {task_order}: {str(e)}"
-            yield f"event: error\ndata: {error_msg}\n\n"
+            yield f"event: error\ndata: {_STREAM_ERROR_MESSAGE}\n\n"
 
     def get_current_jobs_data(self) -> list[JobData]:
         """Get current running jobs data for rendering"""

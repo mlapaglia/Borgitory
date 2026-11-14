@@ -8,12 +8,23 @@ from borgitory.api.cancel_on_disconnect import with_cancel_on_disconnect
 from borgitory.models.database import Repository
 from borgitory.dependencies import get_db
 from borgitory.dependencies import RepositoryStatsServiceDep, get_templates
-from borgitory.services.repositories.repository_stats_service import RepositoryStats
+from borgitory.services.repositories.repository_stats_service import (
+    ArchiveInfoUnavailableError,
+    NoArchivesError,
+    RepositoryStats,
+)
 from borgitory.api.auth import get_current_user
 from borgitory.models.database import User
 
 router = APIRouter()
 templates = get_templates()
+
+
+def _stats_error_html(message: str) -> HTMLResponse:
+    return HTMLResponse(
+        content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{message}</p>",
+        status_code=400,
+    )
 
 
 @router.get("/stats/selector")
@@ -64,13 +75,20 @@ async def get_repository_statistics(
     try:
         stats = await stats_svc.get_repository_statistics(repository, db)
         return stats
-    except ValueError as e:
-        # Handle validation errors (e.g., no archives found)
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        # Handle other errors
+    except NoArchivesError:
+        raise HTTPException(status_code=400, detail=NoArchivesError.user_message)
+    except ArchiveInfoUnavailableError:
         raise HTTPException(
-            status_code=500, detail=f"Error generating statistics: {str(e)}"
+            status_code=400, detail=ArchiveInfoUnavailableError.user_message
+        )
+    except Exception:
+        logging.exception(
+            "Exception occurred while generating repository statistics (repository_id=%s)",
+            repository_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An internal error has occurred while generating repository statistics.",
         )
 
 
@@ -97,11 +115,10 @@ async def get_repository_statistics_html(
             "partials/repository_stats/stats_panel.html",
             {"repository": repository, "stats": stats},
         )
-    except ValueError as e:
-        return HTMLResponse(
-            content=f"<p class='text-red-700 dark:text-red-300 text-sm text-center'>{str(e)}</p>",
-            status_code=400,
-        )
+    except NoArchivesError:
+        return _stats_error_html(NoArchivesError.user_message)
+    except ArchiveInfoUnavailableError:
+        return _stats_error_html(ArchiveInfoUnavailableError.user_message)
     except Exception:
         logging.exception(
             "Exception occurred while generating repository statistics HTML (repository_id=%s)",

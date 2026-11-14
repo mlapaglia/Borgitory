@@ -126,7 +126,7 @@ class TestJobStreamService:
         assert len(events) == 2
         assert '"jobs": []' in events[0]
         assert '"type": "error"' in events[1]
-        assert "Test streaming error" in events[1]
+        assert "Test streaming error" not in events[1]
 
     async def test_stream_job_output_composite_job_basic(self) -> None:
         """Test streaming output for a composite job (all jobs are now composite)."""
@@ -320,7 +320,7 @@ class TestJobStreamService:
         # Check error event
         error_data = json.loads(events[1].split("data: ")[1])
         assert error_data["type"] == "error"
-        assert "Queue error" in error_data["message"]
+        assert "Queue error" not in error_data["message"]
 
     async def test_stream_job_output_nonexistent_job(self) -> None:
         """Test streaming output for a job that doesn't exist."""

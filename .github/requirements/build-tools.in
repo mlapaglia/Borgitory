@@ -1,0 +1,7 @@
+# CI build tools, locked with hashes in build-tools.txt.
+# Not managed by Dependabot: its pip-compile updater can't produce a
+# --universal lock and drops the Windows-only pins. To update, run:
+#   uv pip compile .github/requirements/build-tools.in --universal --generate-hashes \
+#     --python-version 3.14 -o .github/requirements/build-tools.txt --upgrade
+build
+twine

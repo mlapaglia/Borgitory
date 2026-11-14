@@ -51,6 +51,7 @@ jobs:
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 2
+        persist-credentials: false
 
     - name: Set up Python
       uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -70,8 +71,7 @@ jobs:
 
     - name: Install build dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install build
+        python -m pip install --require-hashes -r .github/requirements/build-tools.txt
 
     - name: Build package
       run: python -m build
@@ -83,13 +83,13 @@ jobs:
 
     - name: Publish to PyPI
       if: github.event.release.prerelease == false
-      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+      uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
       with:
         print-hash: true
 
     - name: Publish to TestPyPI
       if: github.event.release.prerelease == true
-      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+      uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
       with:
         repository-url: https://test.pypi.org/legacy/
         print-hash: true
@@ -117,6 +117,7 @@ jobs:
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 2
+        persist-credentials: false
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -156,9 +157,11 @@ jobs:
         outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
     - name: Export digest
+      env:
+        DIGEST: ${{ steps.build.outputs.digest }}
       run: |
         mkdir -p /tmp/digests
-        digest="${{ steps.build.outputs.digest }}"
+        digest="$DIGEST"
         touch "/tmp/digests/${digest#sha256:}"
 
     - name: Upload digest
@@ -187,6 +190,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Download digests
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
@@ -222,18 +226,22 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+            $(printf "${REGISTRY}/${IMAGE_NAME}@sha256:%s " *)
 
       - name: Inspect image
+        env:
+          VERSION: ${{ needs.extract-version.outputs.version }}
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract-version.outputs.version }}
+          docker buildx imagetools inspect "${REGISTRY}/${IMAGE_NAME}:${VERSION}"
 
       - name: Install cosign
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
 
       - name: Sign Docker image
+        env:
+          VERSION: ${{ needs.extract-version.outputs.version }}
         run: |
-          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract-version.outputs.version }}
+          cosign sign --yes "${REGISTRY}/${IMAGE_NAME}:${VERSION}"
 
       - name: Update Docker Hub description
         if: always()
