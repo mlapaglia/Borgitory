@@ -11,6 +11,9 @@ from sqlalchemy import select, func, and_
 from borgitory.models.database import Repository
 from borgitory.services.jobs.job_models import TaskStatusEnum
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides,
+)
 from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
@@ -184,6 +187,7 @@ class RepositoryStatsService:
                 repository_path=str(repository.path),
                 passphrase=repository.get_passphrase(),
                 additional_args=["--short"],
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_executor.execute_command(
@@ -214,6 +218,7 @@ class RepositoryStatsService:
                 repository_path="",
                 passphrase=repository.get_passphrase(),
                 additional_args=["--json", f"{repository.path}::{archive_name}"],
+                environment_overrides=build_repository_env_overrides(repository),
             )
             result = await self.command_executor.execute_command(
                 command=borg_command.command,
@@ -473,6 +478,7 @@ class RepositoryStatsService:
                         f"{repository.path}::{archive_name}",
                         "--format={size} {path}{NL}",
                     ],
+                    environment_overrides=build_repository_env_overrides(repository),
                 )
                 process = await self.command_executor.create_subprocess(
                     command=borg_command.command,

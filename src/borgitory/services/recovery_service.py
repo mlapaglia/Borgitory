@@ -12,6 +12,9 @@ from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 import asyncio
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides,
+)
 from borgitory.utils.security import create_borg_command
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from sqlalchemy import select
@@ -139,6 +142,7 @@ class RecoveryService:
                 passphrase=repository.get_passphrase(),
                 base_command="borg break-lock",
                 additional_args=[],
+                environment_overrides=build_repository_env_overrides(repository),
             )
             # Execute the break-lock command with a timeout using command executor
             process = await self.command_executor.create_subprocess(

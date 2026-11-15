@@ -83,6 +83,7 @@ class TestRepositoryManagementService:
         repo.get_passphrase.return_value = "test_passphrase"
         repo.get_keyfile_content.return_value = None
         repo.cache_dir = "/mnt/test/cache/dir"
+        repo.is_remote = False
         return repo
 
     def test_format_bytes_helper(self, repository_service: RepositoryService) -> None:
@@ -214,6 +215,7 @@ class TestRepositoryManagementBusinessLogic:
         repo.get_passphrase.return_value = "test_passphrase"
         repo.get_keyfile_content.return_value = None
         repo.cache_dir = "/mnt/test/cache/dir"
+        repo.is_remote = False
         return repo
 
     async def test_check_repository_lock_status_unlocked(

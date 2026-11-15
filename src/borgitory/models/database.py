@@ -16,6 +16,7 @@ from borgitory.services.migrations.migration_factory import (
     create_migration_service_for_startup,
 )
 from borgitory.utils.datetime_utils import now_utc
+from borgitory.utils.security import is_remote_repository_path
 from borgitory.models.enums import EncryptionType
 from typing import List, Any
 
@@ -95,6 +96,8 @@ def get_cipher_suite() -> Fernet:
 
 class Repository(Base):
     __tablename__ = "repositories"
+    # Lets the non-column attribute below carry a plain type annotation
+    __allow_unmapped__ = True
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
@@ -109,6 +112,12 @@ class Repository(Base):
     cache_dir: Mapped[str | None] = mapped_column(
         String, nullable=True
     )  # Custom BORG_CACHE_DIR path
+    encrypted_ssh_private_key: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # Encrypted SSH private key for remote (ssh://) repositories
+    remote_borg_path: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # BORG_REMOTE_PATH for remote repositories
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
 
     jobs: Mapped[List["Job"]] = relationship(
@@ -117,6 +126,10 @@ class Repository(Base):
     schedules: Mapped[List["Schedule"]] = relationship(
         "Schedule", back_populates="repository", cascade="all, delete-orphan"
     )
+
+    # Not persisted: names the SSH key file used while a new repository is
+    # being created/imported and has no id yet.
+    pending_ssh_key_token: str | None = None
 
     def set_passphrase(self, passphrase: str) -> None:
         self.encrypted_passphrase = (
@@ -148,6 +161,30 @@ class Repository(Base):
                 .decode()
             )
         return None
+
+    def set_ssh_private_key(self, ssh_private_key: str | None) -> None:
+        """Encrypt and store the SSH private key used for remote repositories."""
+        if ssh_private_key:
+            self.encrypted_ssh_private_key = (
+                get_cipher_suite().encrypt(ssh_private_key.encode()).decode()
+            )
+        else:
+            self.encrypted_ssh_private_key = None
+
+    def get_ssh_private_key(self) -> str | None:
+        """Decrypt and return the SSH private key."""
+        if self.encrypted_ssh_private_key:
+            return (
+                get_cipher_suite()
+                .decrypt(self.encrypted_ssh_private_key.encode())
+                .decode()
+            )
+        return None
+
+    @property
+    def is_remote(self) -> bool:
+        """True if this repository lives on a remote borg server (ssh://)."""
+        return is_remote_repository_path(self.path)
 
 
 class Job(Base):

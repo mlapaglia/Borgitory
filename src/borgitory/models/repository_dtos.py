@@ -19,6 +19,8 @@ class CreateRepositoryRequest:
     passphrase: Optional[str] = None
     cache_dir: Optional[str] = None
     keyfile_content: Optional[str] = None  # Keyfile content as text
+    ssh_private_key: Optional[str] = None  # For remote ssh:// repositories
+    remote_borg_path: Optional[str] = None  # BORG_REMOTE_PATH
 
 
 @dataclass
@@ -31,6 +33,8 @@ class ImportRepositoryRequest:
     passphrase: Optional[str] = None
     keyfile_content: Optional[str] = None  # Keyfile content as text
     cache_dir: Optional[str] = None
+    ssh_private_key: Optional[str] = None  # For remote ssh:// repositories
+    remote_borg_path: Optional[str] = None  # BORG_REMOTE_PATH
 
 
 @dataclass

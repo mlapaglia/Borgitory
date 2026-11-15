@@ -22,20 +22,22 @@
                            class="input-modern mt-1"
                            placeholder="My Repository">
                 </div>
-                <div>
+                <div hx-on:input="if (event.target.id === 'import-path') { document.getElementById('import-ssh-fields').hidden = !event.target.value.trim().startsWith('ssh://'); }">
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Repository Path
                     </label>
                     {% set input_id = "import-path" %}
                     {% set input_name = "path" %}
                     {% set input_value = "" %}
-                    {% set placeholder = "/repos/my-repo" %}
+                    {% set placeholder = "/repos/my-repo or ssh://user@host:23/./my-repo" %}
                     {% set required = true %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Enter the full path to your existing Borg repository
+                        Enter the full path to your existing Borg repository, or an ssh:// URL for a remote borg server
                     </p>
                 </div>
+                {% set ssh_container_id = "import-ssh-fields" %}
+                {% include "partials/repositories/ssh_fields.html" %}
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Encryption Type

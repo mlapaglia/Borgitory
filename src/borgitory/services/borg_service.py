@@ -1,8 +1,6 @@
-import asyncio
 import json
 import logging
 import re
-from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.archives.archive_models import ArchiveEntry
 from typing import List
 
@@ -19,17 +17,12 @@ from borgitory.protocols import (
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 from borgitory.protocols.path_protocols import PathServiceInterface
 from borgitory.protocols.repository_protocols import ArchiveServiceProtocol
+from borgitory.services.repositories.repository_environment import (
+    build_repository_env_overrides,
+)
 from borgitory.utils.security import create_borg_command
 
 logger = logging.getLogger(__name__)
-
-
-def _build_repository_env_overrides(repository: "Repository") -> dict[str, str]:
-    """Build environment overrides for a repository, including cache directory."""
-    env_overrides = {}
-    if repository.cache_dir:
-        env_overrides["BORG_CACHE_DIR"] = repository.cache_dir
-    return env_overrides
 
 
 class BorgService:
@@ -76,7 +69,7 @@ class BorgService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--encryption=" + repository.encryption_type.value],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_runner.run_command(
@@ -116,7 +109,7 @@ class BorgService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--json"],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_runner.run_command(
@@ -157,7 +150,7 @@ class BorgService:
                 repository_path=f"{repository.path}::{archive_name}",
                 passphrase=repository.get_passphrase(),
                 additional_args=[],
-                environment_overrides=_build_repository_env_overrides(repository),
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
             result = await self.command_runner.run_command(
@@ -193,34 +186,19 @@ class BorgService:
                 repository_path=repository.path,
                 passphrase=repository.get_passphrase(),
                 additional_args=["--json"],
+                environment_overrides=build_repository_env_overrides(repository),
             )
 
-            job_id = await self.job_manager.start_borg_command(
-                result.command, env=result.environment
+            # run_command kills borg if it exceeds the timeout, so a stalled
+            # remote connection can't block verification indefinitely.
+            command_result = await self.command_runner.run_command(
+                result.command, result.environment, timeout=30
             )
-
-            max_wait = 30
-            wait_time = 0.0
-
-            while wait_time < max_wait:
-                status = self.job_manager.get_job_status(job_id)
-
-                if not status:
-                    return False
-
-                if (
-                    status.status == JobStatusEnum.COMPLETED
-                    or status.status == JobStatusEnum.FAILED
-                ):
-                    success = status.return_code == 0
-
-                    self.job_manager.cleanup_job(job_id)
-                    return bool(success)
-
-                await asyncio.sleep(0.5)
-                wait_time += 0.5
-
-            return False
+            if not command_result.success:
+                logger.info(
+                    f"Repository access verification failed: {command_result.stderr.strip() or command_result.error}"
+                )
+            return bool(command_result.success)
 
         except Exception as e:
             logger.error(f"Failed to verify repository access: {e}")

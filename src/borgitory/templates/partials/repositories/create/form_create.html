@@ -24,24 +24,26 @@
                            class="input-modern mt-1"
                            value="{{ repository.name if repository else '' }}">
                 </div>
-                <div>
+                <div hx-on:input="if (event.target.id === 'create-path') { document.getElementById('create-ssh-fields').hidden = !event.target.value.trim().startsWith('ssh://'); }">
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Repository Path
                     </label>
                     {% set input_id = "create-path" %}
                     {% set input_name = "path" %}
                     {% set input_value = repository.path if repository else "" %}
-                    {% set placeholder = "/repos/my-repo" %}
+                    {% set placeholder = "/repos/my-repo or ssh://user@host:23/./my-repo" %}
                     {% set required = true %}
                     {% include "partials/shared/path_autocomplete.html" %}
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         {% if repository %}
                             Repository path (cannot be changed after creation)
                         {% else %}
-                            Enter the full path to your new Borg repository
+                            Enter the full path to your new Borg repository, or an ssh:// URL for a remote borg server
                         {% endif %}
                     </p>
                 </div>
+                {% set ssh_container_id = "create-ssh-fields" %}
+                {% include "partials/repositories/ssh_fields.html" %}
                 <div>
                     <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Encryption Type
@@ -88,7 +90,7 @@
                     </p>
                 </div>
                 <div id="passphrase-container">
-                    {% if repository and repository.encryption_type != 'none' %}
+                    {% if repository and repository.encryption_type != "none" %}
                         <div>
                             <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                                 Passphrase

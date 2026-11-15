@@ -8,6 +8,10 @@ import json
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 from borgitory.models.enums import EncryptionType
+from borgitory.utils.security import (
+    is_remote_repository_path,
+    validate_remote_repository_url,
+)
 
 
 def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
@@ -89,6 +93,31 @@ def validate_patterns_json(patterns_json: str) -> tuple[bool, Optional[str]]:
 # Unix absolute path pattern for WSL-first approach
 # All paths are Unix-style, including Windows paths as /mnt/c/...
 ABSOLUTE_PATH_PATTERN = r"^/.*"
+
+
+def validate_repository_path(v: str) -> str:
+    """Accept an absolute local path or a remote ssh://user@host[:port]/path URL."""
+    if is_remote_repository_path(v):
+        return validate_remote_repository_url(v)
+    if not re.match(ABSOLUTE_PATH_PATTERN, v):
+        raise ValueError(
+            "Repository path must be an absolute path or an ssh://user@host/path URL"
+        )
+    return v
+
+
+def normalize_remote_borg_path(v: Optional[str]) -> Optional[str]:
+    """Validate the remote borg executable name/path (sent as BORG_REMOTE_PATH)."""
+    if v is None:
+        return None
+    v = v.strip()
+    if v == "":
+        return v
+    if not re.match(r"^[A-Za-z0-9._/-]+$", v):
+        raise ValueError(
+            "Remote borg path may only contain letters, digits, '.', '_', '-' and '/'"
+        )
+    return v
 
 
 def normalize_source_paths(v: object) -> Optional[list[str]]:
@@ -176,13 +205,29 @@ class RepositoryBase(BaseModel):
     )
     path: str = Field(
         min_length=1,
-        pattern=ABSOLUTE_PATH_PATTERN,
-        description="Absolute path to repository",
+        description="Absolute path to repository, or ssh://user@host[:port]/path",
     )
     cache_dir: Optional[str] = Field(
         None,
         description="Custom cache directory path (optional, absolute path)",
     )
+    ssh_private_key: Optional[str] = Field(
+        None, description="SSH private key for remote (ssh://) repositories"
+    )
+    remote_borg_path: Optional[str] = Field(
+        None,
+        description="Borg executable on the remote server (BORG_REMOTE_PATH)",
+    )
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        return validate_repository_path(v)
+
+    @field_validator("remote_borg_path")
+    @classmethod
+    def validate_remote_borg_path(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_remote_borg_path(v)
 
     @field_validator("passphrase")
     @classmethod
@@ -224,11 +269,34 @@ class RepositoryUpdate(BaseModel):
     name: Optional[str] = Field(
         None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-_\s]+$"
     )
-    path: Optional[str] = Field(None, min_length=1, pattern=ABSOLUTE_PATH_PATTERN)
+    path: Optional[str] = Field(None, min_length=1)
     passphrase: Optional[str] = Field(None)
     cache_dir: Optional[str] = Field(
         None, description="Custom cache directory path (optional, absolute path)"
     )
+    ssh_private_key: Optional[str] = Field(
+        None,
+        description="New SSH private key (None or empty keeps the current key)",
+    )
+    clear_ssh_private_key: bool = Field(
+        False, description="Remove the stored SSH private key"
+    )
+    remote_borg_path: Optional[str] = Field(
+        None,
+        description="Borg executable on the remote server (empty string clears it)",
+    )
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return validate_repository_path(v)
+
+    @field_validator("remote_borg_path")
+    @classmethod
+    def validate_remote_borg_path(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_remote_borg_path(v)
 
     @field_validator("passphrase")
     @classmethod
@@ -273,6 +341,7 @@ class RepositoryResponse(BaseModel):
     encryption_type: EncryptionType
     created_at: datetime
     cache_dir: Optional[str] = None
+    remote_borg_path: Optional[str] = None
 
     model_config = {
         "from_attributes": True,

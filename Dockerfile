@@ -54,8 +54,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=${PYFUSE3_VERSION} \
     libatomic1 \
+    openssh-client \
+    openssh-server \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    # sshd (for remote repository tests) needs its privilege separation directory
+    && mkdir -p /run/sshd
 
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
@@ -84,6 +88,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     borgbackup=${BORGBACKUP_VERSION} \
     fuse3=${FUSE3_VERSION} \
     python3-pyfuse3=${PYFUSE3_VERSION} \
+    openssh-client \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir -p /app/data

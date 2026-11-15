@@ -444,3 +444,29 @@ class TestBorgServiceDeleteArchive:
         call_args = mock_command_runner.run_command.call_args
         timeout = call_args[1]["timeout"]
         assert timeout == 60
+
+
+class TestVerifyRepositoryAccess:
+    """verify_repository_access runs borg with a timeout that kills a stalled process."""
+
+    @pytest.mark.parametrize("success", [True, False])
+    async def test_uses_command_runner_with_timeout(
+        self,
+        borg_service: BorgService,
+        mock_command_runner: Mock,
+        mock_job_manager: Mock,
+        mock_repository: Mock,
+        success: bool,
+    ) -> None:
+        mock_repository.path = "/test/repo/path"
+        mock_command_runner.run_command = AsyncMock(
+            return_value=Mock(success=success, stderr="", error=None)
+        )
+
+        assert await borg_service.verify_repository_access(mock_repository) is success
+
+        mock_command_runner.run_command.assert_awaited_once()
+        command = mock_command_runner.run_command.call_args.args[0]
+        assert command[:2] == ["borg", "info"]
+        assert mock_command_runner.run_command.call_args.kwargs["timeout"] == 30
+        mock_job_manager.start_borg_command.assert_not_called()
