@@ -18,7 +18,10 @@ from borgitory.services.notifications.apprise_storage import (
 )
 from borgitory.services.notifications.config_service import NotificationConfigService
 from borgitory.services.notifications.service import NotificationService
-from borgitory.services.notifications.types import NotificationResult
+from borgitory.services.notifications.types import (
+    NotificationPolicy,
+    NotificationResult,
+)
 from tests.fixtures.notification_fixtures import (
     DISCORD_WEBHOOK_TOKEN,
     create_notification_config,
@@ -84,6 +87,25 @@ class TestNotificationConfigService:
         assert stored.service == "discord"
         assert stored.service_name == "Discord"
 
+    async def test_create_config_defaults_to_all_events(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
+        config = await service.create_config(test_db, "new", discord_submission())
+
+        assert config.notify_on == NotificationPolicy.ALL.value
+
+    async def test_create_config_stores_policy(
+        self, service: NotificationConfigService, test_db: AsyncSession
+    ) -> None:
+        config = await service.create_config(
+            test_db,
+            "new",
+            discord_submission(),
+            notify_on=NotificationPolicy.FAILURES_ONLY,
+        )
+
+        assert config.notify_on == "failures_only"
+
     async def test_create_config_duplicate_name(
         self,
         service: NotificationConfigService,
@@ -127,6 +149,37 @@ class TestNotificationConfigService:
             stored.encrypted_fields["webhook_token"]
         )
         assert token == DISCORD_WEBHOOK_TOKEN
+
+    async def test_update_config_changes_policy(
+        self,
+        service: NotificationConfigService,
+        test_db: AsyncSession,
+        sample_config: NotificationConfig,
+    ) -> None:
+        updated = await service.update_config(
+            test_db,
+            sample_config.id,
+            "test-config",
+            discord_submission(),
+            notify_on=NotificationPolicy.WARNINGS_AND_FAILURES,
+        )
+
+        assert updated.notify_on == "warnings_and_failures"
+
+    async def test_update_config_without_policy_keeps_it(
+        self,
+        service: NotificationConfigService,
+        test_db: AsyncSession,
+        sample_config: NotificationConfig,
+    ) -> None:
+        sample_config.notify_on = "failures_only"
+        await test_db.commit()
+
+        updated = await service.update_config(
+            test_db, sample_config.id, "test-config", discord_submission()
+        )
+
+        assert updated.notify_on == "failures_only"
 
     async def test_update_config_not_found(
         self, service: NotificationConfigService, test_db: AsyncSession

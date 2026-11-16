@@ -24,6 +24,7 @@
                    class="input-modern mt-1">
         </div>
         {% include "partials/notifications/service_select.html" %}
+        {% include "partials/notifications/notify_on_select.html" %}
         <!-- Service fields, pre-filled with the stored non-secret values -->
         <div id="notification-fields-container"
              {% if selected_service %}hx-get="/api/notifications/service-fields?service={{ selected_service | urlencode }}&config_id={{ config.id }}" hx-trigger="load" hx-target="this" hx-swap="innerHTML"{% endif %}>

@@ -8,6 +8,7 @@ import json
 from borgitory.custom_types import ConfigDict
 from borgitory.services.hooks.hook_config import validate_hooks_json
 from borgitory.models.enums import EncryptionType
+from borgitory.services.notifications.types import NotificationPolicy
 from borgitory.utils.security import (
     is_remote_repository_path,
     validate_remote_repository_url,
@@ -718,6 +719,10 @@ class NotificationConfigBase(BaseModel):
     provider_config: Dict[str, Union[str, int, float, bool]] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
+    notify_on: NotificationPolicy = Field(
+        default=NotificationPolicy.ALL,
+        description="Which job outcomes trigger this notification",
+    )
 
 
 class NotificationConfigCreate(NotificationConfigBase):
@@ -729,6 +734,7 @@ class NotificationConfigUpdate(BaseModel):
     provider: Optional[str] = None
     provider_config: Optional[Dict[str, Union[str, int, float, bool]]] = None
     enabled: Optional[bool] = None
+    notify_on: Optional[NotificationPolicy] = None
 
 
 class NotificationConfig(NotificationConfigBase):

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from fastapi.responses import StreamingResponse
 
 from borgitory.protocols import JobManagerProtocol
+from borgitory.services.jobs.job_models import TaskStatusEnum
 
 if TYPE_CHECKING:
     from borgitory.services.jobs.broadcaster.job_event import JobEvent
@@ -234,7 +235,13 @@ class JobStreamService:
                                         if isinstance(task_index_raw, (int, str))
                                         else 0
                                     )
-                                    status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ Completed</span>'
+                                    task_status = (
+                                        event.data.get("status") if event.data else None
+                                    )
+                                    if task_status == TaskStatusEnum.SKIPPED:
+                                        status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">⏸ Cancelled</span>'
+                                    else:
+                                        status_badge = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ Completed</span>'
                                     yield f"event: task-{task_index}-status\ndata: {status_badge}\n\n"
 
                                 elif event.event_type.value == "task_failed":

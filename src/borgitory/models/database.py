@@ -434,6 +434,10 @@ class NotificationConfig(Base):
 
     # Common fields
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Which job outcomes to send: "all", "warnings_and_failures", "failures_only"
+    notify_on: Mapped[str] = mapped_column(
+        String, nullable=False, default="all", server_default="all"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: now_utc(), onupdate=lambda: now_utc()

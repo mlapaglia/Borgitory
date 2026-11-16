@@ -54,6 +54,7 @@ from borgitory.services.notifications.apprise_catalog import (
 )
 from borgitory.services.notifications.service import NotificationService
 from borgitory.services.notifications.config_service import NotificationConfigService
+from borgitory.services.notifications.types import NotificationPolicy
 from borgitory.services.jobs.job_stream_service import JobStreamService
 from borgitory.services.jobs.job_render_service import JobRenderService
 from borgitory.services.cloud_providers.registry import ProviderRegistry
@@ -552,6 +553,7 @@ def get_templates() -> TimezoneAwareJinja2Templates:
     templates.env.globals["TaskStatusEnum"] = TaskStatusEnum
     templates.env.globals["TaskTypeEnum"] = TaskTypeEnum
     templates.env.globals["JobStatusEnum"] = JobStatusEnum
+    templates.env.globals["NotificationPolicy"] = NotificationPolicy
     templates.env.globals["JobTypeEnum"] = JobTypeEnum
     templates.env.globals["EncryptionType"] = EncryptionType
 

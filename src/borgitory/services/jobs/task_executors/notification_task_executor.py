@@ -58,6 +58,7 @@ class NotificationTaskExecutor:
                 from borgitory.models.database import Repository
                 from borgitory.services.notifications.types import (
                     NotificationMessage,
+                    NotificationPolicy,
                     NotificationType,
                 )
                 from sqlalchemy import select
@@ -125,6 +126,23 @@ class NotificationTaskExecutor:
                     )
                 except ValueError:
                     notification_type = NotificationType.INFO
+
+                policy = NotificationPolicy.from_value(config.notify_on)
+                if not policy.allows(notification_type):
+                    skip_line = (
+                        f"Notification skipped: job result '{notification_type.value}' "
+                        f"is filtered by policy '{policy.label}'"
+                    )
+                    logger.info(f"{skip_line} for {config.name}")
+                    task.output_lines.append(skip_line)
+                    self.event_broadcaster.broadcast_event(
+                        EventType.JOB_OUTPUT,
+                        job_id=job.id,
+                        data={"line": skip_line, "task_index": task_index},
+                    )
+                    task.status = TaskStatusEnum.SKIPPED
+                    task.return_code = 0
+                    return True
 
                 notification_message = NotificationMessage(
                     title=str(title),

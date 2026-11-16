@@ -430,9 +430,9 @@ class JobManager:
                         task.completed_at = now_utc()
 
                     self.event_broadcaster.broadcast_event(
-                        EventType.TASK_COMPLETED
-                        if task.status == TaskStatusEnum.COMPLETED
-                        else EventType.TASK_FAILED,
+                        EventType.TASK_FAILED
+                        if task.status == TaskStatusEnum.FAILED
+                        else EventType.TASK_COMPLETED,
                         job_id=job.id,
                         data={
                             "task_index": task_index,
