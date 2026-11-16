@@ -3,7 +3,7 @@ Tests for NotificationTaskExecutor honoring the notification config's notify_on 
 """
 
 import uuid
-from typing import List
+from typing import Dict, List, Optional
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -67,7 +67,11 @@ async def _add_config(test_db: AsyncSession, policy: NotificationPolicy) -> int:
     return config.id
 
 
-def _job(outcome: NotificationType, config_id: int) -> tuple[BorgJob, BorgJobTask]:
+def _job(
+    outcome: NotificationType,
+    config_id: int,
+    extra_params: Optional[Dict[str, object]] = None,
+) -> tuple[BorgJob, BorgJobTask]:
     tasks: List[BorgJobTask] = []
     if outcome == NotificationType.ERROR:
         tasks.append(
@@ -99,7 +103,15 @@ def _job(outcome: NotificationType, config_id: int) -> tuple[BorgJob, BorgJobTas
         task_type=TaskTypeEnum.NOTIFICATION,
         task_name="Notify",
         status=TaskStatusEnum.RUNNING,
-        parameters={"config_id": config_id},
+        # Same shape create_composite_job builds: the dispatch type is stored
+        # under "type" alongside the task definition's own parameters.
+        parameters={
+            "type": TaskTypeEnum.NOTIFICATION,
+            "name": "Notify",
+            "provider": "apprise",
+            "config_id": config_id,
+            **(extra_params or {}),
+        },
     )
     tasks.append(notification_task)
 
@@ -154,3 +166,35 @@ async def test_policy_filters_notifications(
             "filtered by policy" in str(line) and policy.label in str(line)
             for line in task.output_lines
         )
+
+
+async def test_valid_type_param_overrides_severity(
+    executor: NotificationTaskExecutor,
+    notification_service: Mock,
+    test_db: AsyncSession,
+) -> None:
+    """An explicit severity in the task parameters still takes precedence."""
+    config_id = await _add_config(test_db, NotificationPolicy.FAILURES_ONLY)
+    job, task = _job(NotificationType.SUCCESS, config_id, {"type": "error"})
+
+    await executor.execute_notification_task(job, task, len(job.tasks) - 1)
+
+    notification_service.send_notification.assert_awaited_once()
+    sent = notification_service.send_notification.await_args.args[1]
+    assert sent.notification_type == NotificationType.ERROR
+
+
+async def test_dispatch_type_does_not_override_severity(
+    executor: NotificationTaskExecutor,
+    notification_service: Mock,
+    test_db: AsyncSession,
+) -> None:
+    """The "notification" dispatch type must not be mistaken for a severity."""
+    config_id = await _add_config(test_db, NotificationPolicy.ALL)
+    job, task = _job(NotificationType.ERROR, config_id)
+    assert task.parameters["type"] == TaskTypeEnum.NOTIFICATION
+
+    await executor.execute_notification_task(job, task, len(job.tasks) - 1)
+
+    sent = notification_service.send_notification.await_args.args[1]
+    assert sent.notification_type == NotificationType.ERROR
