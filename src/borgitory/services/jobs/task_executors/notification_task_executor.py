@@ -202,6 +202,9 @@ class NotificationTaskExecutor:
         """Return value as a NotificationType, or None if it is not a valid severity"""
         if value is None:
             return None
+        # str() of a str/Enum mixin gives "NotificationType.ERROR", not "error"
+        if isinstance(value, NotificationType):
+            return value
         try:
             return NotificationType(str(value).lower())
         except ValueError:

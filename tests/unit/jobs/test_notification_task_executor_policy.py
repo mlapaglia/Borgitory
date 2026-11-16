@@ -198,3 +198,39 @@ async def test_dispatch_type_does_not_override_severity(
 
     sent = notification_service.send_notification.await_args.args[1]
     assert sent.notification_type == NotificationType.ERROR
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (NotificationType.ERROR, NotificationType.ERROR),
+        (NotificationType.WARNING, NotificationType.WARNING),
+        ("error", NotificationType.ERROR),
+        ("WARNING", NotificationType.WARNING),
+        (TaskTypeEnum.NOTIFICATION, None),
+        ("notification", None),
+        (None, None),
+    ],
+)
+def test_parse_severity_override(
+    value: object, expected: Optional[NotificationType]
+) -> None:
+    assert NotificationTaskExecutor._parse_severity_override(value) == expected
+
+
+async def test_enum_type_param_overrides_severity(
+    executor: NotificationTaskExecutor,
+    notification_service: Mock,
+    test_db: AsyncSession,
+) -> None:
+    """A NotificationType member passed as the override is honored, not ignored."""
+    config_id = await _add_config(test_db, NotificationPolicy.FAILURES_ONLY)
+    job, task = _job(
+        NotificationType.SUCCESS, config_id, {"type": NotificationType.ERROR}
+    )
+
+    await executor.execute_notification_task(job, task, len(job.tasks) - 1)
+
+    notification_service.send_notification.assert_awaited_once()
+    sent = notification_service.send_notification.await_args.args[1]
+    assert sent.notification_type == NotificationType.ERROR
