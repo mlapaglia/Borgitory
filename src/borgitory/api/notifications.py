@@ -72,7 +72,7 @@ def _parse_policy(form_data: FormData) -> Optional[NotificationPolicy]:
     try:
         return NotificationPolicy(raw)
     except ValueError:
-        raise ValueError(f"Invalid notification policy: {raw}")
+        raise ValueError(f"Invalid notification policy: {raw}") from None
 
 
 def _parse_submission(form_data: FormData) -> AppriseSubmission:
@@ -477,7 +477,7 @@ async def get_notification_config_edit_form(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error loading edit form: {str(e)}"
-        )
+        ) from e
 
 
 @router.put("/{config_id}", response_class=HTMLResponse)

@@ -9,7 +9,6 @@ import asyncio
 import logging
 import os
 import re
-import subprocess
 import tempfile
 import time
 from typing import Callable, Dict, Optional, List, AsyncGenerator, cast
@@ -20,6 +19,7 @@ from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 
 from .base import CloudStorage, CloudStorageConfig
+from .rclone_credentials import build_rclone_env, obscure_password
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
 
@@ -337,29 +337,19 @@ class SMBStorage(CloudStorage):
             optional_params={"port": 445, "domain": "WORKGROUP", "path_prefix": ""},
         )
 
-    def _obscure_password(self, password: str) -> str:
-        """Obscure password using rclone's method"""
-        try:
-            result = subprocess.run(
-                ["rclone", "obscure", password],
-                capture_output=True,
-                text=True,
-                timeout=10,
+    async def _build_smb_env(self, password: Optional[str]) -> Dict[str, str]:
+        """The (obscured) password goes to rclone via RCLONE_SMB_PASS, never argv."""
+        secrets: Dict[str, Optional[str]] = {}
+        if password:
+            secrets["RCLONE_SMB_PASS"] = await obscure_password(
+                self._command_executor, password
             )
-
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                return password
-
-        except Exception:
-            return password
+        return build_rclone_env(secrets)
 
     def _build_smb_flags(
         self,
         host: str,
         user: str,
-        password: Optional[str] = None,
         port: int = 445,
         domain: str = "WORKGROUP",
         spn: Optional[str] = None,
@@ -382,10 +372,6 @@ class SMBStorage(CloudStorage):
             "--smb-idle-timeout",
             idle_timeout,
         ]
-
-        if password:
-            obscured_password = self._obscure_password(password)
-            flags.extend(["--smb-pass", obscured_password])
 
         if spn:
             flags.extend(["--smb-spn", spn])
@@ -442,7 +428,6 @@ class SMBStorage(CloudStorage):
         smb_flags = self._build_smb_flags(
             host,
             user,
-            password,
             port,
             domain,
             spn,
@@ -454,9 +439,11 @@ class SMBStorage(CloudStorage):
         )
         command.extend(smb_flags)
 
+        process: Optional[asyncio.subprocess.Process] = None
         try:
             process = await self._command_executor.create_subprocess(
                 command=command,
+                env=await self._build_smb_env(password),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -465,9 +452,7 @@ class SMBStorage(CloudStorage):
                 ProgressData,
                 {
                     "type": "started",
-                    "command": " ".join(
-                        [c for c in command if not c.startswith("--smb-pass")]
-                    ),
+                    "command": " ".join(command),
                     "pid": process.pid,
                 },
             )
@@ -516,6 +501,8 @@ class SMBStorage(CloudStorage):
 
         except Exception as e:
             yield cast(ProgressData, {"type": "error", "message": str(e)})
+        finally:
+            await self._ensure_process_stopped(process)
 
     async def test_smb_connection(
         self,
@@ -545,7 +532,6 @@ class SMBStorage(CloudStorage):
             smb_flags = self._build_smb_flags(
                 host,
                 user,
-                password,
                 port,
                 domain,
                 spn,
@@ -558,7 +544,9 @@ class SMBStorage(CloudStorage):
             command.extend(smb_flags)
 
             result = await self._command_executor.execute_command(
-                command=command, timeout=30.0
+                command=command,
+                env=await self._build_smb_env(password),
+                timeout=30.0,
             )
 
             logger.info(f"SMB test command return code: {result.return_code}")
@@ -659,7 +647,6 @@ class SMBStorage(CloudStorage):
             smb_flags = self._build_smb_flags(
                 host,
                 user,
-                password,
                 port,
                 domain,
                 spn,
@@ -670,9 +657,10 @@ class SMBStorage(CloudStorage):
                 kerberos_ccache,
             )
             command.extend(smb_flags)
+            smb_env = await self._build_smb_env(password)
 
             upload_result = await self._command_executor.execute_command(
-                command=command, timeout=30.0
+                command=command, env=smb_env, timeout=30.0
             )
 
             if upload_result.success:
@@ -685,7 +673,7 @@ class SMBStorage(CloudStorage):
                 delete_command.extend(smb_flags)
 
                 await self._command_executor.execute_command(
-                    command=delete_command, timeout=30.0
+                    command=delete_command, env=smb_env, timeout=30.0
                 )
 
                 return {
@@ -707,9 +695,9 @@ class SMBStorage(CloudStorage):
                 "message": f"Write permission test failed: {str(e)}",
             }
         finally:
-            if temp_file and os.path.exists(temp_file):
+            if temp_file:
                 try:
-                    os.unlink(temp_file)
+                    await asyncio.to_thread(os.unlink, temp_file)
                 except OSError:
                     pass
 

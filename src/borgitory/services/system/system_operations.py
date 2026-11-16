@@ -4,6 +4,7 @@ System operations service implementations.
 Concrete implementations of system operation protocols for production use.
 """
 
+import asyncio
 import os
 import subprocess
 import logging
@@ -68,19 +69,25 @@ class DatabaseOperations(DatabaseOperationsProtocol):
     """Production implementation of database operations."""
 
     async def get_current_revision(self) -> Optional[str]:
-        """Get the current database revision."""
+        """Get the current database revision without blocking the event loop."""
         try:
-            # Create a synchronous engine for Alembic operations
-            sync_engine = create_engine(
-                DATABASE_URL, connect_args={"check_same_thread": False}
-            )
-
-            with sync_engine.connect() as connection:
-                context = MigrationContext.configure(connection)
-                return context.get_current_revision()
+            return await asyncio.to_thread(self._get_current_revision_sync)
         except Exception as e:
             logger.error(f"Failed to get current revision: {e}")
             return None
+
+    @staticmethod
+    def _get_current_revision_sync() -> Optional[str]:
+        # Alembic's MigrationContext needs a synchronous connection
+        sync_engine = create_engine(
+            DATABASE_URL, connect_args={"check_same_thread": False}
+        )
+        try:
+            with sync_engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                return context.get_current_revision()
+        finally:
+            sync_engine.dispose()
 
 
 class MigrationOperations(MigrationOperationsProtocol):

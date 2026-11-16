@@ -27,7 +27,7 @@ class RegistryFactory:
         import borgitory.services.cloud_providers.storage as storage_package
 
         # Automatically discover and import all storage modules
-        for importer, modname, ispkg in pkgutil.iter_modules(
+        for _importer, modname, ispkg in pkgutil.iter_modules(
             storage_package.__path__, storage_package.__name__ + "."
         ):
             if not ispkg and not modname.endswith(
@@ -70,7 +70,7 @@ class RegistryFactory:
             return RegistryFactory.create_production_registry()
 
         # Import and register only requested providers
-        for importer, modname, ispkg in pkgutil.iter_modules(
+        for _importer, modname, ispkg in pkgutil.iter_modules(
             storage_package.__path__, storage_package.__name__ + "."
         ):
             if not ispkg and not modname.endswith(".base"):

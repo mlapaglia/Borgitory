@@ -34,6 +34,16 @@ class JobOutputManagerProtocol(Protocol):
         """Add an output line for a specific job"""
         ...
 
+    def append_output_line(
+        self,
+        job_id: uuid.UUID,
+        text: str,
+        line_type: str = "stdout",
+        progress_info: Optional[Dict[str, object]] = None,
+    ) -> None:
+        """Synchronously add an output line (for use in output callbacks)"""
+        ...
+
     def get_job_output(self, job_id: uuid.UUID) -> Optional["JobOutput"]:
         """Get output container for a job"""
         ...

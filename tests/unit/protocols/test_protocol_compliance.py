@@ -230,7 +230,7 @@ class TestProtocolCompliance:
         # JobManager is complex, so we'll just do basic checks
         key_methods = ["list_jobs", "get_job_status", "start_borg_command"]
 
-        for method in key_methods:
+        for _method in key_methods:
             # Check method exists (may have different name)
             # JobManager uses different method names, so we'll be flexible
             pass

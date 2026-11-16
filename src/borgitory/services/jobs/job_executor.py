@@ -177,7 +177,7 @@ class JobExecutor:
         safe_command = []
         skip_next = False
 
-        for i, arg in enumerate(command):
+        for _i, arg in enumerate(command):
             if skip_next:
                 safe_command.append("[REDACTED]")
                 skip_next = False

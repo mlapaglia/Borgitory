@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.models.job_results import JobStatusEnum
 from borgitory.utils.datetime_utils import now_utc
 from unittest.mock import Mock, AsyncMock
-from typing import Any, AsyncGenerator, Dict, List
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from borgitory.services.jobs.job_models import (
     BorgJob,
@@ -205,12 +205,15 @@ def mock_subprocess_process() -> AsyncMock:
 
 
 def create_mock_job_context(
-    job_id: uuid.UUID = uuid.uuid4(),
+    job_id: Optional[uuid.UUID] = None,
     status: str = "completed",
     job_type: str = "simple",
-    tasks: List[Dict[str, Any]] = [],
+    tasks: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Factory function to create mock job context for rendering tests."""
+    if job_id is None:
+        job_id = uuid.uuid4()
+    tasks = tasks or []
 
     mock_job = Mock()
     mock_job.id = job_id

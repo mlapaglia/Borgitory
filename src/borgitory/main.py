@@ -3,7 +3,6 @@ import os
 import sys
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +12,11 @@ from starlette.templating import _TemplateResponse
 from borgitory.models.database import User, async_session_maker
 from borgitory.utils.template_paths import get_static_directory, get_template_directory
 from borgitory.utils.security import get_or_generate_secret_key
+from borgitory.utils.web_security import (
+    CrossSiteRequestMiddleware,
+    safe_redirect_target,
+    trusted_origins_from_env,
+)
 from borgitory.models.database import init_db
 from borgitory.services.notifications.apprise_catalog import get_apprise_catalog
 from borgitory.api import (
@@ -35,8 +39,10 @@ from borgitory.dependencies import (
     get_db,
     get_recovery_service,
     get_package_restoration_service_for_startup,
+    get_job_manager_singleton,
     get_scheduler_service_singleton,
 )
+from borgitory.utils.background_tasks import background_tasks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,6 +92,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Shutting down...")
 
         await scheduler_service.stop()
+
+        # Only shut down the job manager if something created it
+        if get_job_manager_singleton.cache_info().currsize:
+            await get_job_manager_singleton().shutdown()
+        await background_tasks.cancel_all()
     except Exception as e:
         logger.error(f"Lifespan error: {e}")
         import traceback
@@ -95,6 +106,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="Borgitory - BorgBackup Web Manager", lifespan=lifespan)
+app.add_middleware(
+    CrossSiteRequestMiddleware, trusted_origins=trusted_origins_from_env()
+)
 
 static_path = get_static_directory()
 template_path = get_template_directory()
@@ -224,6 +238,12 @@ def _render_page_with_tab(
     )
 
 
+@app.get("/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    """Unauthenticated liveness probe. Reveals nothing about the instance."""
+    return {"status": "ok"}
+
+
 @app.get("/")
 async def root(
     request: Request, db: AsyncSession = Depends(get_db)
@@ -242,15 +262,7 @@ async def login_page(
     request: Request, db: AsyncSession = Depends(get_db)
 ) -> RedirectResponse | _TemplateResponse:
     current_user = await auth.get_current_user_optional(request, db)
-    next_url = request.query_params.get("next", "/repositories")
-    # Strip backslashes, and validate redirect target is internal
-    cleaned_next_url = next_url.replace("\\", "")
-    parsed_url = urlparse(cleaned_next_url)
-    safe_next_url = (
-        cleaned_next_url
-        if not parsed_url.scheme and not parsed_url.netloc
-        else "/repositories"
-    )
+    safe_next_url = safe_redirect_target(request.query_params.get("next"))
 
     if current_user:
         return RedirectResponse(url=safe_next_url, status_code=302)

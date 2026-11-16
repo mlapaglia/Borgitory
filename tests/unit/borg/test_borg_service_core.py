@@ -327,7 +327,7 @@ class TestBorgDefaultDirectories:
     ) -> None:
         """Test that PathService has get_default_directories method."""
         assert hasattr(mock_path_service, "get_default_directories")
-        assert callable(getattr(mock_path_service, "get_default_directories"))
+        assert callable(mock_path_service.get_default_directories)
 
 
 class TestBorgServiceDeleteArchive:

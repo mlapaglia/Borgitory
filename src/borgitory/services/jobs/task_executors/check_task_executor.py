@@ -2,7 +2,6 @@
 Check Task Executor - Handles repository check task execution
 """
 
-import asyncio
 import logging
 from typing import Dict
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
@@ -69,11 +68,7 @@ class CheckTaskExecutor:
                 task.output_lines.append(line)
                 # Provide default progress since callback now only receives line
                 progress: Dict[str, object] = {}
-                asyncio.create_task(
-                    self.output_manager.add_output_line(
-                        job.id, line, "stdout", progress
-                    )
-                )
+                self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
             additional_args = []
 
@@ -120,10 +115,8 @@ class CheckTaskExecutor:
                     for line in full_output.split("\n"):
                         if line.strip():
                             task.output_lines.append(line)
-                            asyncio.create_task(
-                                self.output_manager.add_output_line(
-                                    job.id, line, "stdout", {}
-                                )
+                            self.output_manager.append_output_line(
+                                job.id, line, "stdout", {}
                             )
 
             if result.error:

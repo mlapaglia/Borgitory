@@ -46,12 +46,12 @@ class TestIgnoreLockFunctionality:
         mock_executor = MagicMock()
         mock_executor.start_process = AsyncMock()
         mock_executor.monitor_process_output = AsyncMock()
-        setattr(deps, "job_executor", mock_executor)
+        deps.job_executor = mock_executor
 
         # Override output manager with our custom mock
         mock_output_manager = MagicMock()
         mock_output_manager.add_output_line = AsyncMock()
-        setattr(deps, "output_manager", mock_output_manager)
+        deps.output_manager = mock_output_manager
 
         return deps
 

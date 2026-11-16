@@ -38,11 +38,11 @@ class TestBackupSourcePaths:
                 return_code=0, stdout=b"", stderr=b"", error=None
             )
         )
-        setattr(deps, "job_executor", mock_executor)
+        deps.job_executor = mock_executor
 
         mock_output_manager = MagicMock()
         mock_output_manager.add_output_line = AsyncMock()
-        setattr(deps, "output_manager", mock_output_manager)
+        deps.output_manager = mock_output_manager
 
         return JobManager(dependencies=deps)
 

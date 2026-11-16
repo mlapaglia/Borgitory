@@ -3,9 +3,12 @@ Job Manager Models - Data structures and configuration for job management
 """
 
 import asyncio
+from collections import deque
 from datetime import datetime
 from enum import Enum
 from typing import (
+    Deque,
+    Iterable,
     Union,
     Dict,
     Optional,
@@ -128,6 +131,19 @@ class JobManagerDependencies:
     )
 
 
+# Upper bound on output retained per task (in memory and persisted). The most
+# recent lines are kept, since that is where errors and summaries appear.
+MAX_TASK_OUTPUT_LINES = 10_000
+
+TaskOutputLine = Union[str, Dict[str, str]]
+
+
+def _new_output_buffer(
+    lines: Iterable[TaskOutputLine] = (),
+) -> Deque[TaskOutputLine]:
+    return deque(lines, maxlen=MAX_TASK_OUTPUT_LINES)
+
+
 @dataclass
 class BorgJobTask:
     """Individual task within a job"""
@@ -140,9 +156,15 @@ class BorgJobTask:
     return_code: Optional[int] = None
     error: Optional[str] = None
     parameters: Dict[str, object] = field(default_factory=dict)
-    output_lines: List[Union[str, Dict[str, str]]] = field(
-        default_factory=list
-    )  # Store task output
+    output_lines: Deque[TaskOutputLine] = field(default_factory=_new_output_buffer)
+
+    def __post_init__(self) -> None:
+        # Accept any iterable (e.g. a list) but always store a bounded buffer
+        if not (
+            isinstance(self.output_lines, deque)
+            and self.output_lines.maxlen == MAX_TASK_OUTPUT_LINES
+        ):
+            self.output_lines = _new_output_buffer(self.output_lines)
 
 
 @dataclass

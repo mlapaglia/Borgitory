@@ -8,6 +8,7 @@ Commands:
   check    - Check for linting issues
   fix      - Fix auto-fixable linting issues
   format   - Format code with ruff
+  format-check - Verify code is formatted (no changes made)
   mypy     - Run mypy type checking
   html     - Lint HTML templates with djLint
   html-fix - Format HTML templates with djLint
@@ -45,6 +46,8 @@ def main() -> None:
         exit_code = run_command(["ruff", "check", "--fix"] + py_files)
     elif command == "format":
         exit_code = run_command(["ruff", "format"] + py_files)
+    elif command == "format-check":
+        exit_code = run_command(["ruff", "format", "--check"] + py_files)
     elif command == "mypy":
         python_exe = sys.executable
         targets = py_files if py_files else ["src/borgitory"]

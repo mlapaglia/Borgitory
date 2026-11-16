@@ -369,7 +369,7 @@ class TestUtilityFunctions:
             ("file?.txt", r"^file[^/]\.txt$"),
         ]
 
-        for pattern, expected_regex in test_cases:
+        for pattern, _expected_regex in test_cases:
             result = shellpattern_translate_simple(pattern)
             # We'll just check that it's a valid regex pattern
             import re

@@ -478,7 +478,7 @@ class JobRenderService:
             current_jobs_data = []
 
             # Get current running jobs from job manager
-            for job_id, memory_job in self.job_manager.jobs.items():
+            for _job_id, memory_job in self.job_manager.jobs.items():
                 if memory_job.status == "running":
                     job_data = self.converter.convert_memory_job(memory_job)
                     current_jobs_data.append(
@@ -538,7 +538,7 @@ class JobRenderService:
             yield "data: \n\n"
 
             # Subscribe to job events for real-time updates
-            async for event in self.job_manager.stream_all_job_updates():
+            async for _event in self.job_manager.stream_all_job_updates():
                 try:
                     # Re-render current jobs HTML when events occur
                     updated_html = self.render_current_jobs_html()

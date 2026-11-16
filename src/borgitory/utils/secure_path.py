@@ -4,13 +4,14 @@ Secure path utilities to prevent directory traversal attacks.
 This module provides secure wrappers around common file system operations.
 """
 
+import asyncio
 import logging
 import os
 import re
 import uuid
 import configparser
 from pathlib import Path
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -286,13 +287,21 @@ async def get_directory_listing(
     """
     validated_path = Path(path)
 
-    if not validated_path.is_dir():
-        return []
+    def _scan() -> Optional[List[Tuple[Path, bool, bool]]]:
+        # Directory scans can be slow (network mounts); keep them off the loop
+        if not validated_path.is_dir():
+            return None
+        return [
+            (item, item.is_dir(), item.is_file()) for item in validated_path.iterdir()
+        ]
 
     items = []
     try:
-        for item in validated_path.iterdir():
-            if item.is_dir():
+        entries = await asyncio.to_thread(_scan)
+        if entries is None:
+            return []
+        for item, item_is_dir, item_is_file in entries:
+            if item_is_dir:
                 is_borg_repo = await _is_borg_repository(str(item), file_service)
                 is_borg_cache = await _is_borg_cache(str(item), file_service)
                 items.append(
@@ -304,7 +313,7 @@ async def get_directory_listing(
                         has_permission_error=False,  # Local filesystem access doesn't have WSL permission issues
                     )
                 )
-            elif include_files and item.is_file():
+            elif include_files and item_is_file:
                 items.append(
                     DirectoryInfo(
                         name=item.name,

@@ -2,7 +2,6 @@
 Cloud Sync Task Executor - Handles cloud sync task execution
 """
 
-import asyncio
 import logging
 from typing import Dict
 from borgitory.services.cloud_providers.cloud_sync_service import CloudSyncService
@@ -71,9 +70,7 @@ class CloudSyncTaskExecutor:
             task.return_code = 0
             task.completed_at = now_utc()
             task.output_lines.append(message)
-            asyncio.create_task(
-                self.output_manager.add_output_line(job.id, message, "stdout", {})
-            )
+            self.output_manager.append_output_line(job.id, message, "stdout", {})
             return True
 
         # Validate required parameters
@@ -95,9 +92,7 @@ class CloudSyncTaskExecutor:
             task.output_lines.append(line)
             # Provide default progress since callback now only receives line
             progress: Dict[str, object] = {}
-            asyncio.create_task(
-                self.output_manager.add_output_line(job.id, line, "stdout", progress)
-            )
+            self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
             self.event_broadcaster.broadcast_event(
                 EventType.JOB_OUTPUT,
@@ -125,10 +120,8 @@ class CloudSyncTaskExecutor:
             task.completed_at = now_utc()
             # Add output line for UI feedback
             task.output_lines.append("Cloud sync skipped - no configuration")
-            asyncio.create_task(
-                self.output_manager.add_output_line(
-                    job.id, "Cloud sync skipped - no configuration", "stdout", {}
-                )
+            self.output_manager.append_output_line(
+                job.id, "Cloud sync skipped - no configuration", "stdout", {}
             )
             return True
 

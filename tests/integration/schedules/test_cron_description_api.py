@@ -236,7 +236,7 @@ class TestCronDescriptionAPI:
             },  # Extra fields
         ]
 
-        for form_data in edge_cases:
+        for _form_data in edge_cases:
             response = await async_client.get("/api/schedules/cron/describe")
 
             # Should not crash, always return 200

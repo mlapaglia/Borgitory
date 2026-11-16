@@ -58,7 +58,7 @@ class HookConfigParser:
         try:
             hooks_data = json.loads(hooks_json)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in hooks configuration: {e}")
+            raise ValueError(f"Invalid JSON in hooks configuration: {e}") from e
 
         if not isinstance(hooks_data, list):
             raise ValueError("Hooks configuration must be a JSON array")
@@ -124,7 +124,7 @@ class HookConfigParser:
                 hooks.append(hook)
 
             except (ValueError, TypeError) as e:
-                raise ValueError(f"Invalid configuration for hook {i}: {e}")
+                raise ValueError(f"Invalid configuration for hook {i}: {e}") from e
 
         return hooks
 

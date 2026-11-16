@@ -19,6 +19,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: System :: Archiving :: Backup",
     "Topic :: System :: Systems Administration",
 ]
@@ -123,8 +124,15 @@ target-version = "py314"
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
-select = ["E4", "E7", "E9", "F"]
-ignore = []
+select = [
+    "E4", "E7", "E9", "F",
+    "B",      # flake8-bugbear: likely bugs and design problems
+    "ASYNC",  # blocking calls inside async functions
+    "DTZ",    # naive datetimes
+]
+ignore = [
+    "ASYNC109",  # `timeout` parameters on async functions are part of our APIs
+]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
@@ -132,6 +140,25 @@ unfixable = []
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests deliberately build fixed naive datetimes, use pytest.raises(Exception)
+# for generic failure paths and run small blocking helpers in async tests.
+"tests/**" = ["DTZ", "ASYNC", "B017"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers are evaluated once by design.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.params.Depends",
+]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
@@ -262,10 +289,3 @@ include = ["src", "tests"]
 extraPaths = ["src"]
 pythonVersion = "3.14"
 pythonPlatform = "All"
-
-[dependency-groups]
-dev = [
-    "httpx>=0.28.1",
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.2.0",
-]

@@ -357,7 +357,7 @@ class DependencyTestHelper:
             assert service is not None, "Service factory returned None"
             return service
         except Exception as e:
-            raise AssertionError(f"Service creation failed: {e}")
+            raise AssertionError(f"Service creation failed: {e}") from e
 
 
 def create_test_overrides_for_hybrid_services() -> Dict[

@@ -8,6 +8,7 @@ replacing generic Dict[str, object] return types.
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from borgitory.utils.datetime_utils import now_utc
 
 
 @dataclass
@@ -329,7 +330,7 @@ class RepositoryInitializationResult:
             message=message,
             repository_path=repository_path,
             encryption_mode=encryption_mode,
-            created_at=datetime.now(),
+            created_at=now_utc(),
         )
 
     @classmethod

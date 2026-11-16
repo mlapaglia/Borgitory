@@ -76,12 +76,14 @@ async def get_repository_statistics(
         stats = await stats_svc.get_repository_statistics(repository, db)
         return stats
     except NoArchivesError:
-        raise HTTPException(status_code=400, detail=NoArchivesError.user_message)
+        raise HTTPException(
+            status_code=400, detail=NoArchivesError.user_message
+        ) from None
     except ArchiveInfoUnavailableError:
         raise HTTPException(
             status_code=400, detail=ArchiveInfoUnavailableError.user_message
-        )
-    except Exception:
+        ) from None
+    except Exception as e:
         logging.exception(
             "Exception occurred while generating repository statistics (repository_id=%s)",
             repository_id,
@@ -89,7 +91,7 @@ async def get_repository_statistics(
         raise HTTPException(
             status_code=500,
             detail="An internal error has occurred while generating repository statistics.",
-        )
+        ) from e
 
 
 @router.get("/{repository_id}/stats/html")

@@ -879,7 +879,7 @@ async def extract_file(
     try:
         return await archive_manager.extract_file_stream(repository, archive_name, file)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.delete("/{repo_id}/archives/{archive_name}", response_class=HTMLResponse)

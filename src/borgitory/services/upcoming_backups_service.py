@@ -1,6 +1,6 @@
 """Service for processing and formatting upcoming backup jobs."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Dict, List, Union
 
 from .cron_description_service import CronDescriptionService
@@ -97,9 +97,10 @@ class UpcomingBackupsService:
 
     def _calculate_time_until(self, next_run: datetime) -> str:
         """Calculate time until next run."""
-        now = datetime.now()
-        if next_run.tzinfo:
-            now = now_utc()
+        if next_run.tzinfo is None:
+            # Naive values are stored/parsed as UTC throughout the app
+            next_run = next_run.replace(tzinfo=UTC)
+        now = now_utc()
 
         time_diff_seconds = (next_run - now).total_seconds()
         time_diff_ms = int(time_diff_seconds * 1000)

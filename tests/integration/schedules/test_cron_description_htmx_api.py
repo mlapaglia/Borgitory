@@ -58,7 +58,7 @@ class TestCronDescriptionHTMXAPI:
             ("0 0 1 * *", "day 1 of the month"),
         ]
 
-        for cron_expr, expected_text in test_cases:
+        for cron_expr, _expected_text in test_cases:
             response = await async_client.get(
                 f"/api/schedules/cron/describe?custom_cron_input={cron_expr}"
             )

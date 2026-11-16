@@ -53,6 +53,10 @@ class JobStatusProtocol(Protocol):
 class JobManagerProtocol(Protocol):
     """Protocol for job management services."""
 
+    async def shutdown(self) -> None:
+        """Cancel running jobs and stop background processing."""
+        ...
+
     # Properties
     @property
     def jobs(self) -> Dict[uuid.UUID, "BorgJob"]:

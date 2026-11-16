@@ -45,7 +45,7 @@ class TestSimpleCommandRunnerProtocol:
 
         # Test that protocol methods exist
         assert hasattr(runner, "run_command")
-        assert callable(getattr(runner, "run_command"))
+        assert callable(runner.run_command)
 
         # Test method signature compatibility (basic check)
         import inspect

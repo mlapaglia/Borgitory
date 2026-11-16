@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Response, Form
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 import secrets
 from datetime import timedelta
 from borgitory.utils.datetime_utils import now_utc
@@ -9,9 +10,22 @@ from typing import Dict, Optional
 from borgitory.models.database import User, UserSession, BCRYPT_MAX_PASSWORD_BYTES
 from borgitory.dependencies import get_db
 from borgitory.dependencies import TemplatesDep
+from borgitory.utils.web_security import (
+    LoginThrottle,
+    hash_session_token,
+    safe_redirect_target,
+    use_secure_cookies,
+)
 from starlette.templating import _TemplateResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+login_throttle = LoginThrottle()
+
+
+def _client_key(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 
 @router.get("/check-users")
@@ -107,11 +121,12 @@ async def register_user(
         success_response.headers["HX-Trigger"] = "reload-auth-form"
         return success_response
 
-    except Exception as e:
+    except Exception:
+        logger.exception("Registration failed")
         return templates.TemplateResponse(
             request,
             "partials/shared/notification.html",
-            {"type": "error", "message": f"Registration failed: {str(e)}"},
+            {"type": "error", "message": "Registration failed"},
             status_code=500,
         )
 
@@ -126,10 +141,27 @@ async def login_user(
     next: str = Form("/repositories"),
     db: AsyncSession = Depends(get_db),
 ) -> _TemplateResponse:
+    client_key = _client_key(request)
+    retry_after = login_throttle.retry_after(client_key)
+    if retry_after is not None:
+        logger.warning("Login throttled for client %s", client_key)
+        response = templates.TemplateResponse(
+            request,
+            "partials/shared/notification.html",
+            {
+                "type": "error",
+                "message": "Too many failed login attempts. Try again later.",
+            },
+            status_code=429,
+        )
+        response.headers["Retry-After"] = str(retry_after)
+        return response
+
     try:
         result = await db.execute(select(User).where(User.username == username))
         user = result.scalar_one_or_none()
         if not user or not user.verify_password(password):
+            login_throttle.record_failure(client_key)
             return templates.TemplateResponse(
                 request,
                 "partials/shared/notification.html",
@@ -137,6 +169,7 @@ async def login_user(
                 status_code=401,
             )
 
+        login_throttle.reset(client_key)
         auth_token = secrets.token_urlsafe(32)
 
         if remember_me:
@@ -162,7 +195,7 @@ async def login_user(
 
         db_session = UserSession()
         db_session.user_id = user.id
-        db_session.session_token = auth_token
+        db_session.session_token = hash_session_token(auth_token)
         db_session.expires_at = expires_at
         db_session.remember_me = remember_me
         db_session.user_agent = user_agent
@@ -182,22 +215,23 @@ async def login_user(
                 "message": "Login successful! Redirecting...",
             },
         )
-        success_response.headers["HX-Redirect"] = next
+        success_response.headers["HX-Redirect"] = safe_redirect_target(next)
         success_response.set_cookie(
             key="auth_token",
             value=auth_token,
             httponly=True,
-            secure=False,
+            secure=use_secure_cookies(request),
             samesite="lax",
             max_age=max_age,
         )
         return success_response
 
-    except Exception as e:
+    except Exception:
+        logger.exception("Login failed")
         return templates.TemplateResponse(
             request,
             "partials/shared/notification.html",
-            {"type": "error", "message": f"Login failed: {str(e)}"},
+            {"type": "error", "message": "Login failed"},
             status_code=500,
         )
 
@@ -209,7 +243,9 @@ async def logout(
     auth_token = request.cookies.get("auth_token")
     if auth_token:
         await db.execute(
-            delete(UserSession).where(UserSession.session_token == auth_token)
+            delete(UserSession).where(
+                UserSession.session_token == hash_session_token(auth_token)
+            )
         )
         await db.commit()
 
@@ -226,7 +262,7 @@ async def get_current_user(
 
     result = await db.execute(
         select(UserSession).where(
-            UserSession.session_token == auth_token,
+            UserSession.session_token == hash_session_token(auth_token),
             UserSession.expires_at > now_utc(),
         )
     )

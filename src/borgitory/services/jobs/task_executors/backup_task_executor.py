@@ -69,11 +69,7 @@ class BackupTaskExecutor:
                 task.output_lines.append(line)
                 # Provide default progress since callback now only receives line
                 progress: Dict[str, object] = {}
-                asyncio.create_task(
-                    self.output_manager.add_output_line(
-                        job.id, line, "stdout", progress
-                    )
-                )
+                self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
@@ -177,10 +173,8 @@ class BackupTaskExecutor:
                     for line in full_output.split("\n"):
                         if line.strip():
                             task.output_lines.append(line)
-                            asyncio.create_task(
-                                self.output_manager.add_output_line(
-                                    job.id, line, "stdout", {}
-                                )
+                            self.output_manager.append_output_line(
+                                job.id, line, "stdout", {}
                             )
 
             if result.error:
@@ -244,12 +238,12 @@ class BackupTaskExecutor:
                     ),
                     timeout=30,
                 )
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as e:
                 if output_callback:
                     output_callback("Break-lock timed out, terminating process")
                 process.kill()
                 await process.wait()
-                raise Exception("Break-lock operation timed out")
+                raise Exception("Break-lock operation timed out") from e
 
             if result.return_code == 0:
                 if output_callback:

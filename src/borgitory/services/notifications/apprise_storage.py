@@ -70,7 +70,9 @@ class StoredAppriseConfig:
         try:
             data = json.loads(raw) if raw else {}
         except json.JSONDecodeError as e:
-            raise ValueError(f"Notification configuration is not valid JSON: {e}")
+            raise ValueError(
+                f"Notification configuration is not valid JSON: {e}"
+            ) from e
 
         if not isinstance(data, dict) or data.get("mode") not in ("service", "manual"):
             raise ValueError("Notification configuration is not in Apprise format")

@@ -226,7 +226,9 @@ async def get_repository_check_config_edit_form(
             request, "partials/repository_check/edit_form.html", context
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Check policy not found: {str(e)}")
+        raise HTTPException(
+            status_code=404, detail=f"Check policy not found: {str(e)}"
+        ) from e
 
 
 @router.put("/{config_id}", response_class=HTMLResponse)

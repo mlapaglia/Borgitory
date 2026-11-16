@@ -37,7 +37,7 @@ class PatternValidator:
         try:
             self._prepare(pattern)
         except Exception as e:
-            raise ValidationError(f"Invalid pattern: {e}")
+            raise ValidationError(f"Invalid pattern: {e}") from e
 
     def _prepare(self, pattern: str) -> None:
         """Prepare the pattern for validation. Should set self.pattern"""
@@ -123,7 +123,7 @@ class FnmatchPattern(PatternValidator):
         try:
             self.regex = re.compile(fnmatch.translate(self.pattern))
         except re.error as e:
-            raise ValidationError(f"Invalid fnmatch pattern: {e}")
+            raise ValidationError(f"Invalid fnmatch pattern: {e}") from e
 
     def get_warnings(self) -> List[str]:
         warnings = []
@@ -162,7 +162,7 @@ class ShellPattern(PatternValidator):
             # Fallback validation without the shellpattern module
             self._validate_without_shellpattern(pattern)
         except re.error as e:
-            raise ValidationError(f"Invalid shell pattern: {e}")
+            raise ValidationError(f"Invalid shell pattern: {e}") from e
 
     def _validate_without_shellpattern(self, pattern: str) -> None:
         """Basic validation when shellpattern module isn't available"""
@@ -176,7 +176,7 @@ class ShellPattern(PatternValidator):
         try:
             self.regex = re.compile("^" + regex_pattern)
         except re.error as e:
-            raise ValidationError(f"Invalid shell pattern: {e}")
+            raise ValidationError(f"Invalid shell pattern: {e}") from e
 
     def get_warnings(self) -> List[str]:
         warnings = []
@@ -199,7 +199,7 @@ class RegexPattern(PatternValidator):
         try:
             self.regex = re.compile(pattern)
         except re.error as e:
-            raise ValidationError(f"Invalid regex: {e}")
+            raise ValidationError(f"Invalid regex: {e}") from e
 
     def get_warnings(self) -> List[str]:
         warnings = []

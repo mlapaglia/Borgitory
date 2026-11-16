@@ -32,7 +32,7 @@ class TestCronDescriptionService:
             ("0 0 L * *", "At 12:00 AM, on the last day of the month"),
         ]
 
-        for cron_expr, expected_desc in test_cases:
+        for cron_expr, _expected_desc in test_cases:
             result = CronDescriptionService.get_human_description(cron_expr)
 
             assert result["error"] is None, (

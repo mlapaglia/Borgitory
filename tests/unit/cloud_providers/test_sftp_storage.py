@@ -196,7 +196,8 @@ class TestSFTPStorage:
     ) -> None:
         mock_result = AsyncMock()
         mock_result.success = True
-        mock_result.stdout = ""
+        # Also serves as the `rclone obscure -` output for the password
+        mock_result.stdout = "obscured-password"
         mock_result.stderr = ""
         mock_command_executor.execute_command.return_value = mock_result
 

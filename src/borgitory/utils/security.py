@@ -284,7 +284,7 @@ def get_or_generate_secret_key(data_dir: str) -> str:
         try:
             return secret_file.read_text().strip()
         except Exception as e:
-            raise Exception(f"Failed to read secret key from {secret_file}: {e}")
+            raise Exception(f"Failed to read secret key from {secret_file}: {e}") from e
 
     secret_key = secrets.token_urlsafe(32)
 
@@ -296,7 +296,7 @@ def get_or_generate_secret_key(data_dir: str) -> str:
             f.write(secret_key)
         return secret_key
     except Exception as e:
-        raise Exception(f"Failed to save secret key to {secret_file}: {e}")
+        raise Exception(f"Failed to save secret key to {secret_file}: {e}") from e
 
 
 def _restrict_to_owner(path: Path) -> None:

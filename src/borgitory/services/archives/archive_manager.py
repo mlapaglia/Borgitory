@@ -9,6 +9,7 @@ import os
 from pathlib import PurePath
 from typing import List, AsyncGenerator, Dict, Optional, TYPE_CHECKING
 from datetime import datetime, timedelta
+from borgitory.utils.datetime_utils import now_utc
 
 from starlette.responses import StreamingResponse
 
@@ -64,7 +65,7 @@ class ArchiveManager:
 
     def _is_cache_valid(self, cached_at: datetime) -> bool:
         """Check if cached data is still valid based on TTL"""
-        return datetime.now() - cached_at < self.cache_ttl
+        return now_utc() - cached_at < self.cache_ttl
 
     def _get_cached_items(
         self, repository: Repository, archive_name: str
@@ -89,7 +90,7 @@ class ArchiveManager:
     ) -> None:
         """Cache archive items with current timestamp"""
         cache_key = self._get_cache_key(repository, archive_name)
-        self._archive_cache[cache_key] = (items, datetime.now())
+        self._archive_cache[cache_key] = (items, now_utc())
         logger.info(f"Cached {len(items)} items for {cache_key}")
 
     def clear_cache(
@@ -191,7 +192,7 @@ class ArchiveManager:
 
         except Exception as e:
             logger.error(f"Error listing directory {path}: {e}")
-            raise Exception(f"Failed to list directory: {str(e)}")
+            raise Exception(f"Failed to list directory: {str(e)}") from e
 
     async def extract_file_stream(
         self, repository: Repository, archive_name: str, file_path: str
@@ -296,7 +297,7 @@ class ArchiveManager:
 
         except Exception as e:
             logger.error(f"Failed to extract file {file_path}: {str(e)}")
-            raise Exception(f"Failed to extract file: {str(e)}")
+            raise Exception(f"Failed to extract file: {str(e)}") from e
 
     async def _get_archive_items(
         self, repository: Repository, archive_name: str

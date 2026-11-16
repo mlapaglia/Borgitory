@@ -2,6 +2,7 @@
 
 import pytest
 import subprocess
+import sys
 import time
 import requests
 import os
@@ -58,7 +59,18 @@ class AppRunner:
         self._stderr_file = open(self._stderr_path, "w")
 
         self.process = subprocess.Popen(
-            ["borgitory", "serve", "--host", "0.0.0.0", "--port", str(self.port)],
+            # Use the current interpreter so we test this checkout, not whatever
+            # `borgitory` happens to be first on PATH.
+            [
+                sys.executable,
+                "-m",
+                "borgitory.cli",
+                "serve",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                str(self.port),
+            ],
             env=env,
             stdout=self._stdout_file,
             stderr=self._stderr_file,
@@ -92,8 +104,8 @@ class AppRunner:
     def is_ready(self) -> bool:
         """Check if the application is ready to receive requests."""
         try:
-            response = requests.get(f"{self.base_url}/api/debug/info", timeout=2)
-            return response.status_code in [200, 401, 403]
+            response = requests.get(f"{self.base_url}/health", timeout=2)
+            return response.status_code == 200
         except requests.ConnectionError, requests.Timeout:
             return False
 

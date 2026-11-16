@@ -1,0 +1,18 @@
+# Development overrides: remote debugging with debugpy.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# The debugger port is published on the host loopback interface only.
+# debugpy has no authentication; never expose it beyond localhost.
+services:
+  borgitory:
+    build:
+      context: .
+      target: dev  # includes debugpy and other dev tooling
+    environment:
+      - BORGITORY_DEBUG=true
+      # Listen on all interfaces *inside* the container so Docker can forward
+      # the port; the host side below is restricted to 127.0.0.1.
+      - BORGITORY_DEBUG_HOST=0.0.0.0
+    ports:
+      - "127.0.0.1:5678:5678"

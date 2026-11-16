@@ -8,7 +8,7 @@ proper DI patterns and real database usage where appropriate.
 import pytest
 import asyncio
 import time
-from typing import Optional, Callable, Coroutine, Any
+from typing import Optional, Callable
 from typing import Dict
 from unittest.mock import Mock
 
@@ -540,35 +540,20 @@ class TestCloudSyncer:
         storage = syncer_success._storage
         assert storage._upload_calls[0][1] == ""
 
-    async def test_progress_callback_asyncio_task_creation(
-        self, syncer_success: CloudSyncer
+    async def test_progress_callback_events_reach_handler(
+        self,
+        syncer_success: CloudSyncer,
+        mock_event_handler: MockSyncEventHandler,
     ) -> None:
-        """Test that progress callback properly creates asyncio tasks"""
-        # This test verifies the asyncio.create_task line in the progress callback
-        repository_path = "/test/repo"
+        """Progress events emitted from the sync callback are delivered."""
+        result = await syncer_success.sync_repository("/test/repo")
+        assert result.success is True
 
-        # Mock asyncio.create_task to verify it's called
-        original_create_task = asyncio.create_task
-        create_task_calls: list[Any] = []
+        # Callback-delivered events are dispatched as background tasks
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
 
-        def mock_create_task(coro: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
-            create_task_calls.append(coro)
-            return original_create_task(coro)
-
-        asyncio.create_task = mock_create_task
-
-        try:
-            result = await syncer_success.sync_repository(repository_path)
-            assert result.success is True
-
-            # Give tasks time to complete
-            await asyncio.sleep(0.1)
-
-            # Verify create_task was called (progress events trigger this)
-            assert len(create_task_calls) > 0
-
-        finally:
-            asyncio.create_task = original_create_task
+        assert any(e.type == SyncEventType.PROGRESS for e in mock_event_handler.events)
 
     async def test_multiple_sync_operations_independence(
         self,

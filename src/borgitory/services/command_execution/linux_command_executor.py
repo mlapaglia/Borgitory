@@ -14,6 +14,7 @@ from borgitory.protocols.command_executor_protocol import (
     CommandExecutorProtocol,
     CommandResult,
 )
+from borgitory.services.command_execution.redaction import redact_command
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,7 @@ class LinuxCommandExecutor(CommandExecutorProtocol):
                 f"Command not found: '{missing}'. "
                 "Ensure it is installed and available on PATH."
             )
-            logger.error(f"{error_msg} (Command: {' '.join(command)})")
+            logger.error(f"{error_msg} (Command: {redact_command(command)})")
             return CommandResult(
                 command=command,
                 return_code=-1,
@@ -130,7 +131,7 @@ class LinuxCommandExecutor(CommandExecutorProtocol):
         except Exception as e:
             execution_time = time.time() - start_time
             error_msg = f"Linux command execution failed: {str(e)}"
-            logger.error(f"{error_msg} (Command: {' '.join(command)})")
+            logger.error(f"{error_msg} (Command: {redact_command(command)})")
             logger.exception("Full exception details:")
 
             return CommandResult(

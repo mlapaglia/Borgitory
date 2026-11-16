@@ -5,11 +5,12 @@ This module provides the business logic for coordinating cloud sync operations
 with clean separation of concerns and easy testability.
 """
 
-import asyncio
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 import logging
+
+from borgitory.utils.background_tasks import background_tasks
 
 from .types import SyncEvent, SyncEventType, SyncResult
 from .storage import CloudStorage
@@ -141,7 +142,7 @@ class CloudSyncer:
                     bytes_transferred += 1024  # Placeholder
                     files_transferred += 1  # Placeholder
 
-                asyncio.create_task(self._event_handler.handle_event(event))
+                background_tasks.spawn(self._event_handler.handle_event(event))
 
             await self._storage.upload_repository(
                 repository_path, remote_path, progress_callback

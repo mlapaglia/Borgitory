@@ -377,11 +377,7 @@ class JobStreamService:
                 # Only send the latest 100 lines to avoid overwhelming the UI
                 if hasattr(task, "output_lines") and task.output_lines:
                     # Get only the latest 100 lines
-                    latest_lines = (
-                        task.output_lines[-100:]
-                        if len(task.output_lines) > 100
-                        else task.output_lines
-                    )
+                    latest_lines = list(task.output_lines)[-100:]
 
                     # Send each existing line as individual output events
                     for line in latest_lines:

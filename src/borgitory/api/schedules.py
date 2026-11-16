@@ -250,7 +250,9 @@ async def get_schedule_edit_form(
             request, "partials/schedules/edit_form.html", context
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Schedule not found: {str(e)}")
+        raise HTTPException(
+            status_code=404, detail=f"Schedule not found: {str(e)}"
+        ) from e
 
 
 @router.put("/{schedule_id}", response_class=HTMLResponse)

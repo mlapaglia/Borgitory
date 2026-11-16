@@ -113,7 +113,7 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
         except Exception as e:
             raise HTTPException(
                 status_code=400, detail=f"Invalid provider configuration: {str(e)}"
-            )
+            ) from e
 
         sensitive_fields = storage.get_sensitive_fields()
         encrypted_config = self._encryption_service.encrypt_sensitive_fields(
@@ -210,7 +210,7 @@ class CloudSyncConfigService(CloudSyncConfigServiceProtocol):
             except Exception as e:
                 raise HTTPException(
                     status_code=400, detail=f"Invalid provider configuration: {str(e)}"
-                )
+                ) from e
 
             sensitive_fields = storage.get_sensitive_fields()
             encrypted_config = self._encryption_service.encrypt_sensitive_fields(

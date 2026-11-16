@@ -2,6 +2,7 @@ import platform
 import subprocess
 import sys
 import os
+import asyncio
 import logging
 from typing import Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,14 @@ from borgitory.protocols.environment_protocol import EnvironmentProtocol
 from borgitory.protocols.command_executor_protocol import CommandExecutorProtocol
 
 logger = logging.getLogger(__name__)
+
+
+def _file_size(path: str) -> Optional[int]:
+    """Size of ``path`` in bytes, or None if it does not exist."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return None
 
 
 class SystemInfo:
@@ -230,8 +239,9 @@ class DebugService:
                 if database_url.startswith("sqlite:///"):
                     # Extract file path from SQLite URL (sqlite:///path/to/file.db)
                     db_path = database_url[10:]  # Remove "sqlite:///" prefix
-                    if os.path.exists(db_path):
-                        database_size_bytes = os.path.getsize(db_path)
+                    file_size = await asyncio.to_thread(_file_size, db_path)
+                    if file_size is not None:
+                        database_size_bytes = file_size
                         # Convert to human readable format
                         if database_size_bytes < 1024:
                             database_size = f"{database_size_bytes} B"
@@ -250,8 +260,9 @@ class DebugService:
                 elif database_url.startswith("sqlite://"):
                     # Handle relative path format (sqlite://path/to/file.db)
                     db_path = database_url[9:]  # Remove "sqlite://" prefix
-                    if os.path.exists(db_path):
-                        database_size_bytes = os.path.getsize(db_path)
+                    file_size = await asyncio.to_thread(_file_size, db_path)
+                    if file_size is not None:
+                        database_size_bytes = file_size
                         # Convert to human readable format
                         if database_size_bytes < 1024:
                             database_size = f"{database_size_bytes} B"

@@ -260,7 +260,7 @@ class RepositoryStatsService:
                 raise NoArchivesError(NoArchivesError.user_message)
 
             archive_stats = []
-            for i, archive in enumerate(archives):
+            for _i, archive in enumerate(archives):
                 archive_info = await self.execute_borg_info(repository, archive)
                 if archive_info:
                     archive_stats.append(archive_info)

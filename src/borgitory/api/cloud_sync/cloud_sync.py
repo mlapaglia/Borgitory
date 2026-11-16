@@ -368,7 +368,7 @@ async def get_cloud_sync_edit_form(
     except Exception as e:
         raise HTTPException(
             status_code=404, detail=f"Cloud sync configuration not found: {str(e)}"
-        )
+        ) from e
 
 
 @router.put("/{config_id}", response_class=HTMLResponse)

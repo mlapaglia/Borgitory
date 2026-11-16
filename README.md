@@ -105,6 +105,32 @@ borgitory serve --host 0.0.0.0 --port 8000
   - Rclone installed (optional, for cloud sync features)
 - BorgBackup does not have a native Windows executable, so WSL2 is required for all backup operations
 
+### Running behind a reverse proxy (HTTPS)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `BORGITORY_SECURE_COOKIES` | auto | `true` marks the session cookie `Secure`. Set it when TLS terminates at a proxy; by default the cookie is only `Secure` when Borgitory itself sees an `https` request. |
+| `BORGITORY_TRUSTED_ORIGINS` | *(empty)* | Comma-separated origins (e.g. `https://backup.example.com`) allowed to make state-changing requests if your proxy rewrites the `Host` header and your browser does not send `Sec-Fetch-Site`. Not normally needed. |
+
+Borgitory rejects cross-site `POST`/`PUT`/`PATCH`/`DELETE` requests (CSRF protection), and throttles repeated failed logins per client IP.
+
+The container exposes an unauthenticated `GET /health` endpoint for health checks; the image's `HEALTHCHECK` uses it.
+
+### Development with Docker
+
+`docker-compose.yml` runs the production image. To attach a debugger, layer the development override, which builds the `dev` image target and publishes debugpy on `127.0.0.1:5678` only:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+Python dependencies are pinned with hashes in `requirements.txt` (runtime) and `requirements-dev.txt` (development). After changing dependencies in `pyproject.toml`, regenerate them:
+
+```bash
+uv pip compile pyproject.toml --universal --generate-hashes --python-version 3.14 -o requirements.txt
+uv pip compile pyproject.toml --extra dev --universal --generate-hashes --python-version 3.14 -o requirements-dev.txt
+```
+
 ### Remote Repositories (SSH)
 
 Borgitory can back up directly to a repository on a remote borg server, such as BorgBase, a Hetzner Storage Box, or another machine running borg. This keeps an off-site copy that is a separate borg repository rather than an rclone mirror of a local one, so corruption of the local repository does not spread to it. This is not full ransomware protection on its own: a backup that runs after files are encrypted stores the encrypted files, and prune can remove older clean archives. Use append-only mode (below) and a retention policy that keeps older archives.

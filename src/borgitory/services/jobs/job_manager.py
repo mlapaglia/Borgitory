@@ -8,6 +8,7 @@ clean architecture following the same pattern as other services in the applicati
 import asyncio
 import logging
 import uuid
+from datetime import timedelta
 from typing import (
     Dict,
     Optional,
@@ -17,6 +18,7 @@ from typing import (
 )
 
 from borgitory.models.job_results import JobStatusEnum, JobStatus, JobTypeEnum
+from borgitory.utils.background_tasks import BackgroundTaskSet
 from borgitory.utils.datetime_utils import now_utc
 from borgitory.protocols.job_protocols import TaskDefinition
 from borgitory.services.jobs.job_models import (
@@ -46,6 +48,17 @@ if TYPE_CHECKING:
     from borgitory.models.database import Repository, Schedule
 logger = logging.getLogger(__name__)
 
+# Finished jobs stay in memory this long (for live views), then are evicted.
+FINISHED_JOB_RETENTION = timedelta(hours=1)
+TERMINAL_JOB_STATUSES = frozenset(
+    {
+        JobStatusEnum.COMPLETED,
+        JobStatusEnum.FAILED,
+        JobStatusEnum.CANCELLED,
+        JobStatusEnum.STOPPED,
+    }
+)
+
 
 class JobManager:
     """
@@ -73,6 +86,7 @@ class JobManager:
 
         self.jobs: Dict[uuid.UUID, BorgJob] = {}
         self._processes: Dict[uuid.UUID, asyncio.subprocess.Process] = {}
+        self._job_tasks = BackgroundTaskSet("JobManager")
 
         self._initialized = False
         self._shutdown_requested = False
@@ -181,6 +195,7 @@ class JobManager:
             started_at=now_utc(),
             tasks=[main_task],  # Always has at least one task
         )
+        self._evict_finished_jobs()
         self.jobs[job_id] = job
 
         self.output_manager.create_job_output(job_id)
@@ -220,11 +235,7 @@ class JobManager:
                 progress: Dict[str, object] = {}
                 # Add output to both the task and the output manager
                 task.output_lines.append(line)
-                asyncio.create_task(
-                    self.output_manager.add_output_line(
-                        job.id, line, "stdout", progress
-                    )
-                )
+                self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
@@ -292,7 +303,9 @@ class JobManager:
         """Callback when queue manager starts a job"""
         job = self.jobs.get(job_id)
         if job and job.command:
-            asyncio.create_task(self._execute_simple_job(job, job.command))
+            self._job_tasks.spawn(
+                self._execute_simple_job(job, job.command), name=f"job-{job.id}"
+            )
 
     def _on_job_complete(self, job_id: uuid.UUID, success: bool) -> None:
         """Callback when queue manager completes a job"""
@@ -345,6 +358,7 @@ class JobManager:
             schedule=schedule,
             cloud_sync_config_id=cloud_sync_config_id,
         )
+        self._evict_finished_jobs()
         self.jobs[job_id] = job
 
         if self.database_manager:
@@ -369,7 +383,7 @@ class JobManager:
 
         self.output_manager.create_job_output(job_id)
 
-        asyncio.create_task(self._execute_composite_job(job))
+        self._job_tasks.spawn(self._execute_composite_job(job), name=f"job-{job.id}")
 
         self.event_broadcaster.broadcast_event(
             EventType.JOB_STARTED,
@@ -702,11 +716,7 @@ class JobManager:
             def output_callback(line: str) -> None:
                 # Provide default progress since callback now only receives line
                 progress: Dict[str, object] = {}
-                asyncio.create_task(
-                    self.output_manager.add_output_line(
-                        job.id, line, "stdout", progress
-                    )
-                )
+                self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
                 self.event_broadcaster.broadcast_event(
                     EventType.JOB_OUTPUT,
@@ -902,6 +912,27 @@ class JobManager:
             "current_task_killed": current_task_killed,
         }
 
+    def _evict_finished_jobs(self) -> int:
+        """Drop finished jobs from memory once past the retention window.
+
+        Finished jobs are persisted to the database, which is what history views
+        read; keeping them in memory forever leaks their task output. Called on
+        every new job, so memory stays bounded by job rate x retention.
+        """
+        cutoff = now_utc() - FINISHED_JOB_RETENTION
+        expired = [
+            job_id
+            for job_id, job in self.jobs.items()
+            if job.status in TERMINAL_JOB_STATUSES
+            and job.completed_at is not None
+            and job.completed_at < cutoff
+        ]
+        for job_id in expired:
+            self.cleanup_job(job_id)
+        if expired:
+            logger.debug(f"Evicted {len(expired)} finished job(s) from memory")
+        return len(expired)
+
     def cleanup_job(self, job_id: uuid.UUID) -> bool:
         """Clean up job resources"""
         if job_id in self.jobs:
@@ -1011,6 +1042,9 @@ class JobManager:
         for job_id, job in list(self.jobs.items()):
             if job.status in ["running", "queued"]:
                 await self.cancel_job(job_id)
+
+        # Stop job coroutines that are still running (composite jobs, etc.)
+        await self._job_tasks.cancel_all()
 
         # Shutdown modules
         if self.queue_manager:

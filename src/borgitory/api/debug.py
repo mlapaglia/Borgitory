@@ -6,9 +6,14 @@ from fastapi.responses import HTMLResponse
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from borgitory.api.auth import get_current_user
 from borgitory.dependencies import DebugServiceDep, get_db, get_templates
 
-router = APIRouter(prefix="/api/debug", tags=["debug"])
+router = APIRouter(
+    prefix="/api/debug",
+    tags=["debug"],
+    dependencies=[Depends(get_current_user)],
+)
 templates = get_templates()
 logger = logging.getLogger(__name__)
 
@@ -22,7 +27,10 @@ async def get_debug_info(
         debug_info = await debug_svc.get_debug_info(db)
         return debug_info
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to collect debug info")
+        raise HTTPException(
+            status_code=500, detail="Failed to collect debug info"
+        ) from e
 
 
 @router.get("/html", response_class=HTMLResponse)
@@ -38,4 +46,7 @@ async def get_debug_html(
             {"debug_info": debug_info},
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to collect debug info")
+        raise HTTPException(
+            status_code=500, detail="Failed to collect debug info"
+        ) from e

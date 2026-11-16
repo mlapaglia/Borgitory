@@ -77,7 +77,7 @@ class TestJobManagerHookExecution:
 
         # Override the hook execution service with our mock
         # Use setattr to bypass type checking for test setup
-        setattr(self.dependencies, "hook_execution_service", self.mock_hook_service)
+        self.dependencies.hook_execution_service = self.mock_hook_service
 
         self.job_manager = JobManager(dependencies=self.dependencies)
 

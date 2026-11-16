@@ -2,7 +2,6 @@
 Compact Task Executor - Handles compact task execution
 """
 
-import asyncio
 import logging
 from typing import Dict
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
@@ -64,11 +63,7 @@ class CompactTaskExecutor:
             def task_output_callback(line: str) -> None:
                 task.output_lines.append(line)
                 progress: Dict[str, object] = {}
-                asyncio.create_task(
-                    self.output_manager.add_output_line(
-                        job.id, line, "stdout", progress
-                    )
-                )
+                self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
             result = await self.job_executor.execute_compact_task(
                 repository_path=str(repository_path or ""),

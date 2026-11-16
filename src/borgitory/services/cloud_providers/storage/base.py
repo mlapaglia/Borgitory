@@ -86,6 +86,27 @@ class CloudStorage(ABC):
                     t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    @staticmethod
+    async def _ensure_process_stopped(
+        process: Optional[asyncio.subprocess.Process], grace_seconds: float = 5.0
+    ) -> None:
+        """Terminate ``process`` if it is still running (e.g. the consumer
+        cancelled or abandoned the sync stream), escalating to SIGKILL."""
+        if process is None or process.returncode is not None:
+            return
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            return
+        try:
+            await asyncio.wait_for(process.wait(), timeout=grace_seconds)
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                return
+            await process.wait()
+
     def parse_rclone_progress(
         self, line: str
     ) -> Optional[Dict[str, Union[str, int, float]]]:

@@ -5,14 +5,17 @@ Job Queue Manager - Handles job queuing and concurrency control
 import asyncio
 import logging
 from typing import Dict, List, Optional, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from enum import Enum
 import uuid
 
+from borgitory.utils.background_tasks import BackgroundTaskSet
 from borgitory.utils.datetime_utils import now_utc
 
 logger = logging.getLogger(__name__)
+
+_EARLIEST = datetime.min.replace(tzinfo=UTC)
 
 
 class JobPriority(Enum):
@@ -54,8 +57,10 @@ class PriorityQueueItem:
         if self.priority != other.priority:
             return self.priority < other.priority
         # If priorities are equal, use timestamp (earlier timestamp = higher priority)
-        self_time = self.timestamp or datetime.min
-        other_time = other.timestamp or datetime.min
+        # Aware minimum: timestamps are UTC-aware, and comparing them with a
+        # naive datetime.min would raise TypeError
+        self_time = self.timestamp or _EARLIEST
+        other_time = other.timestamp or _EARLIEST
         return self_time < other_time
 
     def __gt__(self, other: "PriorityQueueItem") -> bool:
@@ -111,6 +116,7 @@ class JobQueueManager:
 
         # Running job tracking
         self._running_jobs: Dict[uuid.UUID, QueuedJob] = {}
+        self._tasks = BackgroundTaskSet("JobQueueManager")
         self._running_backups: Dict[uuid.UUID, QueuedJob] = {}
 
         # Queue processor control
@@ -184,8 +190,8 @@ class JobQueueManager:
     async def _start_queue_processors(self) -> None:
         """Start the queue processor tasks"""
         if not self._queue_processors_started:
-            asyncio.create_task(self._process_backup_queue())
-            asyncio.create_task(self._process_operation_queue())
+            self._tasks.spawn(self._process_backup_queue(), name="backup-queue")
+            self._tasks.spawn(self._process_operation_queue(), name="operation-queue")
             self._queue_processors_started = True
             logger.info("Queue processors started")
 
@@ -223,7 +229,7 @@ class JobQueueManager:
                         self._job_start_callback(queued_job.job_id, queued_job)
 
                     # Create task to handle job execution and cleanup
-                    asyncio.create_task(
+                    self._tasks.spawn(
                         self._execute_and_cleanup_job(queued_job, is_backup=True)
                     )
 
@@ -271,7 +277,7 @@ class JobQueueManager:
                         self._job_start_callback(queued_job.job_id, queued_job)
 
                     # Create task to handle job execution and cleanup
-                    asyncio.create_task(
+                    self._tasks.spawn(
                         self._execute_and_cleanup_job(queued_job, is_backup=False)
                     )
 
@@ -375,6 +381,8 @@ class JobQueueManager:
         """Shutdown queue processors and clean up"""
         logger.info("Shutting down job queue manager")
         self._shutdown_requested = True
+        await self._tasks.cancel_all()
+        self._queue_processors_started = False
 
         # Clear queues
         while not self._backup_queue.empty():

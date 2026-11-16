@@ -2,7 +2,6 @@
 Prune Task Executor - Handles prune task execution
 """
 
-import asyncio
 import logging
 from typing import Dict
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
@@ -65,11 +64,7 @@ class PruneTaskExecutor:
                 task.output_lines.append(line)
                 # Provide default progress since callback now only receives line
                 progress: Dict[str, object] = {}
-                asyncio.create_task(
-                    self.output_manager.add_output_line(
-                        job.id, line, "stdout", progress
-                    )
-                )
+                self.output_manager.append_output_line(job.id, line, "stdout", progress)
 
             result = await self.job_executor.execute_prune_task(
                 repository_path=str(repository_path or ""),

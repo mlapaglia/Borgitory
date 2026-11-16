@@ -108,27 +108,38 @@ class JobOutputManager(JobOutputManagerProtocol):
         line_type: str = "stdout",
         progress_info: Optional[Dict[str, object]] = None,
     ) -> None:
-        """Add a line of output to a job"""
+        """Add a line of output to a job (async-compatible wrapper)."""
+        self.append_output_line(job_id, text, line_type, progress_info)
+
+    def append_output_line(
+        self,
+        job_id: uuid.UUID,
+        text: str,
+        line_type: str = "stdout",
+        progress_info: Optional[Dict[str, object]] = None,
+    ) -> None:
+        """Add a line of output to a job.
+
+        Synchronous on purpose: it never awaits, so it is atomic with respect to
+        the event loop and safe to call from subprocess output callbacks without
+        spawning a task per line.
+        """
         if job_id not in self._job_outputs:
             self.create_job_output(job_id)
 
         job_output = self._job_outputs[job_id]
-
-        async with self._output_locks[job_id]:
-            output_line = OutputLine(
+        job_output.lines.append(
+            OutputLine(
                 text=text,
                 timestamp=now_utc().isoformat(),
                 type=line_type,
                 metadata=progress_info or {},
             )
+        )
+        job_output.total_lines += 1
 
-            job_output.lines.append(output_line)
-
-            job_output.total_lines += 1
-
-            # Update current progress if provided
-            if progress_info:
-                job_output.current_progress.update(progress_info)
+        if progress_info:
+            job_output.current_progress.update(progress_info)
 
     def get_job_output(self, job_id: uuid.UUID) -> Optional[JobOutput]:
         """Get output container for a job"""

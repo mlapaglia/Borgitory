@@ -14,6 +14,7 @@ from borgitory.protocols.command_executor_protocol import (
     CommandExecutorProtocol,
     CommandResult,
 )
+from borgitory.services.command_execution.redaction import redact_command
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class WSLCommandExecutor(CommandExecutorProtocol):
         except Exception as e:
             execution_time = time.time() - start_time
             error_msg = f"WSL command execution failed: {str(e)}"
-            logger.error(f"{error_msg} (Command: {' '.join(wsl_command)})")
+            logger.error(f"{error_msg} (Command: {redact_command(wsl_command)})")
             logger.exception("Full exception details:")
 
             return CommandResult(
@@ -187,6 +188,7 @@ class WSLCommandExecutor(CommandExecutorProtocol):
             relevant_prefixes = [
                 "BORG_",  # All Borg-related variables
                 "BORGITORY_",  # Our app-specific variables
+                "RCLONE_",  # rclone backend credentials/options
             ]
 
             for key, value in env.items():

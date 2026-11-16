@@ -198,22 +198,16 @@ class SchedulerService:
 
     def _handle_job_event(self, event: object) -> None:
         """Handle job execution events"""
-        if (
-            hasattr(event, "exception")
-            and hasattr(event, "job_id")
-            and getattr(event, "exception")
-        ):
-            logger.error(
-                f"Job {getattr(event, 'job_id')} failed: {getattr(event, 'exception')}"
-            )
+        if hasattr(event, "exception") and hasattr(event, "job_id") and event.exception:
+            logger.error(f"Job {event.job_id} failed: {event.exception}")
         elif (
             hasattr(event, "code")
             and hasattr(event, "job_id")
-            and getattr(event, "code") == EVENT_JOB_ERROR
+            and event.code == EVENT_JOB_ERROR
         ):
-            logger.error(f"Job {getattr(event, 'job_id')} failed")
+            logger.error(f"Job {event.job_id} failed")
         elif hasattr(event, "job_id"):
-            logger.info(f"Job {getattr(event, 'job_id')} executed successfully")
+            logger.info(f"Job {event.job_id} executed successfully")
 
     async def _reload_schedules(self) -> None:
         """Reload all schedules from database"""
@@ -269,7 +263,7 @@ class SchedulerService:
             except ValueError as e:
                 raise ValueError(
                     f"Invalid cron expression '{cron_expression}': {str(e)}"
-                )
+                ) from e
 
             try:
                 self.scheduler.remove_job(job_id)
@@ -296,7 +290,7 @@ class SchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to add schedule {schedule_id}: {str(e)}")
-            raise Exception(f"Failed to add schedule: {str(e)}")
+            raise Exception(f"Failed to add schedule: {str(e)}") from e
 
     async def _update_next_run_time(self, schedule_id: int, job_id: str) -> None:
         """Update the next run time in the database"""
@@ -382,7 +376,7 @@ class SchedulerService:
             logger.error(
                 f"Failed to add one-time job for schedule {schedule_id}: {str(e)}"
             )
-            raise Exception(f"Failed to schedule manual run: {str(e)}")
+            raise Exception(f"Failed to schedule manual run: {str(e)}") from e
 
     async def get_scheduled_jobs(self) -> List[Dict[str, Union[str, datetime, None]]]:
         """Get all scheduled jobs with their next run times"""

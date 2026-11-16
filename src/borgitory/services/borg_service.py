@@ -130,7 +130,7 @@ class BorgService:
                 )
 
         except Exception as e:
-            raise Exception(f"Failed to list archives: {str(e)}")
+            raise Exception(f"Failed to list archives: {str(e)}") from e
 
     async def list_archive_directory_contents(
         self, repository: "Repository", archive_name: str, path: str = ""
@@ -173,7 +173,7 @@ class BorgService:
 
         except Exception as e:
             logger.error(f"Failed to delete archive {archive_name}: {str(e)}")
-            raise Exception(f"Failed to delete archive: {str(e)}")
+            raise Exception(f"Failed to delete archive: {str(e)}") from e
 
     async def verify_repository_access(
         self,

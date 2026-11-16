@@ -93,3 +93,11 @@ def mock_rclone_service() -> Mock:
     mock.sync_repository_to_s3 = Mock(return_value=mock_sync_generator())
 
     return mock
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_throttle() -> None:
+    """Failed-login counters are process-global; isolate them per test."""
+    from borgitory.api.auth import login_throttle
+
+    login_throttle.clear()

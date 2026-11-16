@@ -18,6 +18,7 @@ from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 from borgitory.utils.datetime_utils import now_utc
 
 from .base import CloudStorage, CloudStorageConfig
+from .rclone_credentials import build_rclone_env
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
 
@@ -333,10 +334,18 @@ class S3Storage(CloudStorage):
             },
         )
 
+    @staticmethod
+    def _build_s3_env(access_key_id: str, secret_access_key: str) -> Dict[str, str]:
+        """Credentials go to rclone via environment, never via argv."""
+        return build_rclone_env(
+            {
+                "RCLONE_S3_ACCESS_KEY_ID": access_key_id,
+                "RCLONE_S3_SECRET_ACCESS_KEY": secret_access_key,
+            }
+        )
+
     def _build_s3_flags(
         self,
-        access_key_id: str,
-        secret_access_key: str,
         region: str = "us-east-1",
         endpoint_url: Optional[str] = None,
         storage_class: str = "STANDARD",
@@ -344,10 +353,6 @@ class S3Storage(CloudStorage):
         rclone_provider = self._get_rclone_provider_name()
 
         flags = [
-            "--s3-access-key-id",
-            access_key_id,
-            "--s3-secret-access-key",
-            secret_access_key,
             "--s3-provider",
             rclone_provider,
             "--s3-region",
@@ -452,39 +457,28 @@ class S3Storage(CloudStorage):
         ]
 
         s3_flags = self._build_s3_flags(
-            self._config.access_key,
-            self._config.secret_key,
             self._config.region,
             self._config.endpoint_url,
             self._config.storage_class,
         )
         command.extend(s3_flags)
 
+        process: Optional[asyncio.subprocess.Process] = None
         try:
             process = await self._command_executor.create_subprocess(
                 command=command,
+                env=self._build_s3_env(
+                    self._config.access_key, self._config.secret_key
+                ),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-
-            sensitive_prefixes = ("--s3-access-key-id", "--s3-secret-access-key")
-            safe_parts = []
-            skip_next = False
-            for part in command:
-                if skip_next:
-                    safe_parts.append("***")
-                    skip_next = False
-                elif part in sensitive_prefixes:
-                    safe_parts.append(part)
-                    skip_next = True
-                else:
-                    safe_parts.append(part)
 
             yield cast(
                 ProgressData,
                 {
                     "type": "started",
-                    "command": " ".join(safe_parts),
+                    "command": " ".join(command),
                     "pid": process.pid,
                 },
             )
@@ -533,6 +527,8 @@ class S3Storage(CloudStorage):
 
         except Exception as e:
             yield cast(ProgressData, {"type": "error", "message": str(e)})
+        finally:
+            await self._ensure_process_stopped(process)
 
     async def test_s3_connection(
         self,
@@ -555,13 +551,12 @@ class S3Storage(CloudStorage):
                 "--verbose",
             ]
 
-            s3_flags = self._build_s3_flags(
-                access_key_id, secret_access_key, region, endpoint_url, storage_class
-            )
+            s3_flags = self._build_s3_flags(region, endpoint_url, storage_class)
             command.extend(s3_flags)
 
             result = await self._command_executor.execute_command(
                 command=command,
+                env=self._build_s3_env(access_key_id, secret_access_key),
                 timeout=30.0,
             )
 
@@ -622,16 +617,17 @@ class S3Storage(CloudStorage):
                 upload_command = ["rclone", "copy", temp_file_path, s3_path]
 
                 s3_flags = self._build_s3_flags(
-                    self._config.access_key,
-                    self._config.secret_key,
                     self._config.region,
                     self._config.endpoint_url,
                     self._config.storage_class,
                 )
                 upload_command.extend(s3_flags)
+                s3_env = self._build_s3_env(
+                    self._config.access_key, self._config.secret_key
+                )
 
                 upload_result = await self._command_executor.execute_command(
-                    command=upload_command, timeout=30.0
+                    command=upload_command, env=s3_env, timeout=30.0
                 )
 
                 if upload_result.success:
@@ -639,7 +635,7 @@ class S3Storage(CloudStorage):
                     delete_command.extend(s3_flags)
 
                     await self._command_executor.execute_command(
-                        command=delete_command, timeout=30.0
+                        command=delete_command, env=s3_env, timeout=30.0
                     )
 
                     return {

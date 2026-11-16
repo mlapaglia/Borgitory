@@ -42,7 +42,7 @@ class TaskDefinitionBuilder:
         compression: str = "zstd",
         dry_run: bool = False,
         ignore_lock: bool = False,
-        patterns: List[str] = [],
+        patterns: Optional[List[str]] = None,
     ) -> TaskDefinition:
         """
         Build a backup task definition.

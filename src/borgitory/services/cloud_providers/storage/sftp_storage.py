@@ -9,8 +9,7 @@ import asyncio
 import logging
 import os
 import re
-import subprocess
-from typing import Callable, Dict, Optional, List, AsyncGenerator, cast
+from typing import Callable, Dict, Optional, List, AsyncGenerator, Tuple, cast
 from pydantic import Field, field_validator, model_validator
 from contextlib import asynccontextmanager, AsyncExitStack
 from typing import AsyncIterator
@@ -21,6 +20,7 @@ from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 
 from .base import CloudStorage, CloudStorageConfig
+from .rclone_credentials import build_rclone_env, obscure_password
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
 
@@ -293,24 +293,6 @@ class SFTPStorage(CloudStorage):
             },
         )
 
-    def _obscure_password(self, password: str) -> str:
-        """Obscure password using rclone's method"""
-        try:
-            result = subprocess.run(
-                ["rclone", "obscure", password],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                return password
-
-        except Exception:
-            return password
-
     @asynccontextmanager
     async def _build_sftp_flags(
         self,
@@ -319,14 +301,19 @@ class SFTPStorage(CloudStorage):
         port: int = 22,
         password: Optional[str] = None,
         private_key: Optional[str] = None,
-    ) -> AsyncIterator[List[str]]:
-        """Build SFTP configuration flags for rclone command"""
+    ) -> AsyncIterator[Tuple[List[str], Dict[str, str]]]:
+        """Build rclone SFTP flags plus the environment carrying credentials.
+
+        The (obscured) password is passed via RCLONE_SFTP_PASS rather than argv.
+        """
         flags = ["--sftp-host", host, "--sftp-user", username, "--sftp-port", str(port)]
+        secrets: Dict[str, Optional[str]] = {}
 
         async with AsyncExitStack() as stack:
             if password:
-                obscured_password = self._obscure_password(password)
-                flags.extend(["--sftp-pass", obscured_password])
+                secrets["RCLONE_SFTP_PASS"] = await obscure_password(
+                    self._command_executor, password
+                )
             elif private_key:
                 key_file_path = await stack.enter_async_context(
                     self._file_service.create_temp_file(
@@ -335,7 +322,7 @@ class SFTPStorage(CloudStorage):
                 )
                 flags.extend(["--sftp-key-file", key_file_path])
 
-            yield flags
+            yield flags, build_rclone_env(secrets)
 
     async def sync_repository_to_sftp(
         self,
@@ -369,14 +356,16 @@ class SFTPStorage(CloudStorage):
         if disable_hashcheck:
             command.append("--sftp-disable-hashcheck")
 
+        process: Optional[asyncio.subprocess.Process] = None
         try:
             async with self._build_sftp_flags(
                 host, username, port, password, private_key
-            ) as sftp_flags:
+            ) as (sftp_flags, sftp_env):
                 command.extend(sftp_flags)
 
                 process = await self._command_executor.create_subprocess(
                     command=command,
+                    env=sftp_env,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -385,9 +374,7 @@ class SFTPStorage(CloudStorage):
                     ProgressData,
                     {
                         "type": "started",
-                        "command": " ".join(
-                            [c for c in command if not c.startswith("--sftp-pass")]
-                        ),
+                        "command": " ".join(command),
                         "pid": process.pid,
                     },
                 )
@@ -438,6 +425,8 @@ class SFTPStorage(CloudStorage):
 
         except Exception as e:
             yield cast(ProgressData, {"type": "error", "message": str(e)})
+        finally:
+            await self._ensure_process_stopped(process)
 
     async def test_sftp_connection(
         self,
@@ -457,11 +446,11 @@ class SFTPStorage(CloudStorage):
 
             async with self._build_sftp_flags(
                 host, username, port, password, private_key
-            ) as sftp_flags:
+            ) as (sftp_flags, sftp_env):
                 command.extend(sftp_flags)
 
                 result = await self._command_executor.execute_command(
-                    command=command, timeout=30.0
+                    command=command, env=sftp_env, timeout=30.0
                 )
 
                 if result.success:
@@ -555,7 +544,7 @@ class SFTPStorage(CloudStorage):
 
                 async with self._build_sftp_flags(
                     host, username, port, password, private_key
-                ) as sftp_flags:
+                ) as (sftp_flags, sftp_env):
                     upload_command.extend(sftp_flags)
 
                     if "--sftp-key-file" in sftp_flags:
@@ -564,7 +553,7 @@ class SFTPStorage(CloudStorage):
                             key_file_path = sftp_flags[key_file_idx + 1]
 
                     upload_result = await self._command_executor.execute_command(
-                        command=upload_command, timeout=30.0
+                        command=upload_command, env=sftp_env, timeout=30.0
                     )
 
                     if upload_result.success:
@@ -572,7 +561,7 @@ class SFTPStorage(CloudStorage):
                         delete_command.extend(sftp_flags)
 
                         await self._command_executor.execute_command(
-                            command=delete_command, timeout=30.0
+                            command=delete_command, env=sftp_env, timeout=30.0
                         )
 
                         return {

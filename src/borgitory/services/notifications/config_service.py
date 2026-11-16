@@ -109,7 +109,7 @@ class NotificationConfigService:
         try:
             return self._notification_service.build_config(submission, existing)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
 
     async def create_config(
         self,

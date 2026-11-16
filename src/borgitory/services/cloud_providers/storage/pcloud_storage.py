@@ -15,6 +15,7 @@ from borgitory.protocols.file_protocols import FileServiceProtocol
 from borgitory.services.rclone_types import ConnectionTestResult, ProgressData
 
 from .base import CloudStorage, CloudStorageConfig
+from .rclone_credentials import build_rclone_env
 from ..types import SyncEvent, SyncEventType, ConnectionInfo
 from ..registry import register_provider, RcloneMethodMapping
 
@@ -71,15 +72,17 @@ class PcloudStorage(CloudStorage):
         self._command_executor = command_executor
         self._file_service = file_service
 
+    @staticmethod
+    def _build_pcloud_env(token: str) -> Dict[str, str]:
+        """The OAuth token goes to rclone via environment, never via argv."""
+        return build_rclone_env({"RCLONE_PCLOUD_TOKEN": token})
+
     def _build_pcloud_flags(
         self,
-        token: str,
         hostname: str = "api.pcloud.com",
         root_folder_id: Optional[str] = None,
     ) -> List[str]:
         flags = [
-            "--pcloud-token",
-            token,
             "--pcloud-hostname",
             hostname,
         ]
@@ -254,19 +257,20 @@ class PcloudStorage(CloudStorage):
             "1s",
             "--verbose",
         ]
-        command.extend(self._build_pcloud_flags(token, hostname, root_folder_id))
+        command.extend(self._build_pcloud_flags(hostname, root_folder_id))
 
+        process: Optional[asyncio.subprocess.Process] = None
         try:
             process = await self._command_executor.create_subprocess(
                 command=command,
+                env=self._build_pcloud_env(token),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            safe_cmd = " ".join(c if c != token else "***" for c in command)
             yield cast(
                 ProgressData,
-                {"type": "started", "command": safe_cmd, "pid": process.pid},
+                {"type": "started", "command": " ".join(command), "pid": process.pid},
             )
 
             async def read_stream(
@@ -310,6 +314,8 @@ class PcloudStorage(CloudStorage):
 
         except Exception as e:
             yield cast(ProgressData, {"type": "error", "message": str(e)})
+        finally:
+            await self._ensure_process_stopped(process)
 
     async def test_pcloud_connection(
         self,
@@ -318,11 +324,12 @@ class PcloudStorage(CloudStorage):
         root_folder_id: Optional[str] = None,
     ) -> ConnectionTestResult:
         command = ["rclone", "lsd", ":pcloud:", "--max-depth", "1", "--verbose"]
-        command.extend(self._build_pcloud_flags(token, hostname, root_folder_id))
+        command.extend(self._build_pcloud_flags(hostname, root_folder_id))
 
         try:
             result = await self._command_executor.execute_command(
                 command=command,
+                env=self._build_pcloud_env(token),
                 timeout=30.0,
             )
 

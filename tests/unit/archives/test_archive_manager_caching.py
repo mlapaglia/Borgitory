@@ -4,7 +4,8 @@ Tests for ArchiveManager caching functionality
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timedelta
+from datetime import timedelta
+from borgitory.utils.datetime_utils import now_utc
 from borgitory.config.command_runner_config import CommandRunnerConfig
 from borgitory.services.archives.archive_manager import ArchiveManager
 from borgitory.services.archives.archive_models import ArchiveEntry
@@ -69,7 +70,7 @@ class TestArchiveManagerCaching:
 
     def test_cache_validity_check(self, manager: ArchiveManager) -> None:
         """Test cache validity checking"""
-        now = datetime.now()
+        now = now_utc()
 
         # Fresh cache should be valid
         assert manager._is_cache_valid(now)
