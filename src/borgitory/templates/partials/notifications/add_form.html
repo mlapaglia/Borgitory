@@ -18,6 +18,9 @@
         {% with selected_service="", config=None %}
             {% include "partials/notifications/service_select.html" %}
         {% endwith %}
+        {% with config=None %}
+            {% include "partials/notifications/notify_on_select.html" %}
+        {% endwith %}
         <!-- Service fields are loaded when a service is selected -->
         <div id="notification-fields-container"></div>
         <div class="flex space-x-2">

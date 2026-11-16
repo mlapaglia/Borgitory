@@ -514,3 +514,60 @@ class TestJobStreamService:
         # Test that DI creates new instances (no longer singleton)
         sig = inspect.signature(get_job_stream_service)
         assert "job_manager" in sig.parameters
+
+
+class TestTaskStatusBadges:
+    """Live task status badges sent over SSE for composite jobs."""
+
+    async def _badges_for(self, events: list[JobEvent], job_id: uuid.UUID) -> list[str]:
+        job_manager = Mock()
+        job = Mock()
+        job.status = JobStatusEnum.RUNNING
+        job.tasks = [Mock(), Mock()]
+        job_manager.jobs = {job_id: job}
+        queue: asyncio.Queue[JobEvent] = asyncio.Queue()
+        for event in events:
+            queue.put_nowait(event)
+        job_manager.subscribe_to_events = Mock(return_value=queue)
+
+        generator = JobStreamService(
+            job_manager=job_manager
+        )._job_output_event_generator(job_id)
+        received = [await anext(generator) for _ in range(len(events) + 1)]
+        await generator.aclose()
+        return [e for e in received if e.startswith("event: task-")]
+
+    async def test_completed_task_shows_completed(self) -> None:
+        job_id = uuid.uuid4()
+        badges = await self._badges_for(
+            [
+                JobEvent(
+                    event_type=EventType.TASK_COMPLETED,
+                    job_id=job_id,
+                    data={"task_index": 0, "status": "completed"},
+                )
+            ],
+            job_id,
+        )
+
+        assert len(badges) == 1
+        assert badges[0].startswith("event: task-0-status")
+        assert "✓ Completed" in badges[0]
+
+    async def test_skipped_task_shows_cancelled_not_failed(self) -> None:
+        job_id = uuid.uuid4()
+        badges = await self._badges_for(
+            [
+                JobEvent(
+                    event_type=EventType.TASK_COMPLETED,
+                    job_id=job_id,
+                    data={"task_index": 1, "status": "skipped"},
+                )
+            ],
+            job_id,
+        )
+
+        assert len(badges) == 1
+        assert badges[0].startswith("event: task-1-status")
+        assert "⏸ Cancelled" in badges[0]
+        assert "Failed" not in badges[0]

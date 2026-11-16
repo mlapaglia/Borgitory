@@ -31,6 +31,7 @@ from borgitory.services.notifications.service import (
     NotificationEditView,
     NotificationService,
 )
+from borgitory.services.notifications.types import NotificationPolicy
 from borgitory.api.auth import get_current_user
 
 router = APIRouter()
@@ -47,10 +48,31 @@ class NotificationConfigSummary:
     service_name: str
     needs_attention: Optional[str] = None
 
+    @property
+    def policy(self) -> NotificationPolicy:
+        return NotificationPolicy.from_value(self.config.notify_on)
+
 
 def _form_str(form_data: FormData, key: str) -> str:
     value = form_data.get(key, "")
     return value.strip() if isinstance(value, str) else ""
+
+
+def _parse_policy(form_data: FormData) -> Optional[NotificationPolicy]:
+    """Read the notify_on policy from a submitted form.
+
+    Returns None when the field is absent.
+
+    Raises:
+        ValueError: If the value is not a known policy
+    """
+    raw = _form_str(form_data, "notify_on")
+    if not raw:
+        return None
+    try:
+        return NotificationPolicy(raw)
+    except ValueError:
+        raise ValueError(f"Invalid notification policy: {raw}")
 
 
 def _parse_submission(form_data: FormData) -> AppriseSubmission:
@@ -170,8 +192,21 @@ async def create_notification_config(
             )
 
         try:
+            notify_on = _parse_policy(form_data)
+        except ValueError as e:
+            return templates.TemplateResponse(
+                request,
+                "partials/notifications/create_error.html",
+                {"error_message": str(e)},
+                status_code=400,
+            )
+
+        try:
             db_config = await config_service.create_config(
-                db=db, name=name, submission=submission
+                db=db,
+                name=name,
+                submission=submission,
+                notify_on=notify_on or NotificationPolicy.ALL,
             )
         except HTTPException as e:
             return templates.TemplateResponse(
@@ -469,8 +504,22 @@ async def update_notification_config(
             )
 
         try:
+            notify_on = _parse_policy(form_data)
+        except ValueError as e:
+            return templates.TemplateResponse(
+                request,
+                "partials/notifications/update_error.html",
+                {"error_message": str(e)},
+                status_code=400,
+            )
+
+        try:
             updated_config = await config_service.update_config(
-                db=db, config_id=config_id, name=name, submission=submission
+                db=db,
+                config_id=config_id,
+                name=name,
+                submission=submission,
+                notify_on=notify_on,
             )
         except HTTPException as e:
             return templates.TemplateResponse(

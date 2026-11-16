@@ -3,7 +3,7 @@ Notification Task Executor - Handles notification task execution
 """
 
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from borgitory.protocols.command_protocols import ProcessExecutorProtocol
 from borgitory.protocols.job_event_broadcaster_protocol import (
@@ -13,6 +13,7 @@ from borgitory.protocols.job_output_manager_protocol import JobOutputManagerProt
 from borgitory.services.jobs.broadcaster.event_type import EventType
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
 from borgitory.services.notifications.service import NotificationService
+from borgitory.services.notifications.types import NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class NotificationTaskExecutor:
                 from borgitory.models.database import Repository
                 from borgitory.services.notifications.types import (
                     NotificationMessage,
-                    NotificationType,
+                    NotificationPolicy,
                 )
                 from sqlalchemy import select
 
@@ -107,24 +108,39 @@ class NotificationTaskExecutor:
                 title, message, notification_type_str = (
                     self._generate_notification_content(job, repository_name)
                 )
+                notification_type = NotificationType(notification_type_str)
 
                 title_param = params.get("title")
                 message_param = params.get("message")
-                type_param = params.get("type")
 
                 if title_param is not None:
                     title = str(title_param)
                 if message_param is not None:
                     message = str(message_param)
-                if type_param is not None:
-                    notification_type_str = str(type_param)
 
-                try:
-                    notification_type = NotificationType(
-                        str(notification_type_str).lower()
+                # params["type"] also holds the task dispatch type ("notification")
+                # set by create_composite_job, so only a valid severity overrides
+                # the one computed from the job outcome.
+                type_override = self._parse_severity_override(params.get("type"))
+                if type_override is not None:
+                    notification_type = type_override
+
+                policy = NotificationPolicy.from_value(config.notify_on)
+                if not policy.allows(notification_type):
+                    skip_line = (
+                        f"Notification skipped: job result '{notification_type.value}' "
+                        f"is filtered by policy '{policy.label}'"
                     )
-                except ValueError:
-                    notification_type = NotificationType.INFO
+                    logger.info(f"{skip_line} for {config.name}")
+                    task.output_lines.append(skip_line)
+                    self.event_broadcaster.broadcast_event(
+                        EventType.JOB_OUTPUT,
+                        job_id=job.id,
+                        data={"line": skip_line, "task_index": task_index},
+                    )
+                    task.status = TaskStatusEnum.SKIPPED
+                    task.return_code = 0
+                    return True
 
                 notification_message = NotificationMessage(
                     title=str(title),
@@ -180,6 +196,19 @@ class NotificationTaskExecutor:
             task.status = TaskStatusEnum.FAILED
             task.error = str(e)
             return False
+
+    @staticmethod
+    def _parse_severity_override(value: object) -> Optional[NotificationType]:
+        """Return value as a NotificationType, or None if it is not a valid severity"""
+        if value is None:
+            return None
+        # str() of a str/Enum mixin gives "NotificationType.ERROR", not "error"
+        if isinstance(value, NotificationType):
+            return value
+        try:
+            return NotificationType(str(value).lower())
+        except ValueError:
+            return None
 
     def _generate_notification_content(
         self, job: BorgJob, repository_name: str = "Unknown"

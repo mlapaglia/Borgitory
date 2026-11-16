@@ -488,3 +488,115 @@ class TestEditConfig:
         )
         assert updated.migration_error is None
         assert build_stored_config().service == updated.service
+
+
+class TestNotifyOnPolicy:
+    async def test_create_defaults_to_all_events(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        response = await async_client.post(
+            "/api/notifications/", data=discord_form("policy-default")
+        )
+
+        assert response.status_code == 200
+        result = await test_db.execute(
+            select(NotificationConfig).where(
+                NotificationConfig.name == "policy-default"
+            )
+        )
+        assert result.scalar_one().notify_on == "all"
+
+    async def test_create_with_policy(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        response = await async_client.post(
+            "/api/notifications/",
+            data=discord_form("policy-fail", notify_on="failures_only"),
+        )
+
+        assert response.status_code == 200
+        result = await test_db.execute(
+            select(NotificationConfig).where(NotificationConfig.name == "policy-fail")
+        )
+        assert result.scalar_one().notify_on == "failures_only"
+
+    async def test_create_rejects_invalid_policy(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        response = await async_client.post(
+            "/api/notifications/",
+            data=discord_form("policy-bad", notify_on="sometimes"),
+        )
+
+        assert response.status_code == 400
+        assert "Invalid notification policy" in unquote(response.text)
+        result = await test_db.execute(
+            select(NotificationConfig).where(NotificationConfig.name == "policy-bad")
+        )
+        assert result.scalar_one_or_none() is None
+
+    async def test_update_changes_policy(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        config = await _add(test_db, create_notification_config("policy-update"))
+        form = discord_form("policy-update", notify_on="warnings_and_failures")
+
+        response = await async_client.put(f"/api/notifications/{config.id}", data=form)
+
+        assert response.status_code == 200
+        updated = await _reload(test_db, config.id)
+        assert updated.notify_on == "warnings_and_failures"
+
+    async def test_update_rejects_invalid_policy(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        config = await _add(test_db, create_notification_config("policy-update-bad"))
+        form = discord_form("policy-update-bad", notify_on="sometimes")
+
+        response = await async_client.put(f"/api/notifications/{config.id}", data=form)
+
+        assert response.status_code == 400
+        updated = await _reload(test_db, config.id)
+        assert updated.notify_on == "all"
+
+    async def test_add_form_has_policy_select(self, async_client: AsyncClient) -> None:
+        response = await async_client.get("/api/notifications/form")
+
+        assert response.status_code == 200
+        assert 'name="notify_on"' in response.text
+        assert re.search(r'<option value="all"\s+selected', response.text)
+
+    async def test_edit_form_preselects_policy(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        config = create_notification_config("policy-edit")
+        config.notify_on = "failures_only"
+        config = await _add(test_db, config)
+
+        response = await async_client.get(f"/api/notifications/{config.id}/edit")
+
+        assert response.status_code == 200
+        assert re.search(r'<option value="failures_only"\s+selected', response.text)
+        assert not re.search(r'<option value="all"\s+selected', response.text)
+
+    async def test_list_shows_policy_badge(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        filtered = create_notification_config("policy-badge")
+        filtered.notify_on = "warnings_and_failures"
+        await _add(test_db, filtered)
+
+        response = await async_client.get("/api/notifications/html")
+
+        assert response.status_code == 200
+        assert "Warnings &amp; failures" in response.text
+
+    async def test_list_hides_badge_for_all_events(
+        self, async_client: AsyncClient, test_db: AsyncSession
+    ) -> None:
+        await _add(test_db, create_notification_config("policy-all"))
+
+        response = await async_client.get("/api/notifications/html")
+
+        assert response.status_code == 200
+        assert "All events" not in response.text

@@ -21,7 +21,10 @@ from borgitory.services.notifications.service import (
     NotificationEditView,
     NotificationService,
 )
-from borgitory.services.notifications.types import NotificationResult
+from borgitory.services.notifications.types import (
+    NotificationPolicy,
+    NotificationResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +116,7 @@ class NotificationConfigService:
         db: AsyncSession,
         name: str,
         submission: AppriseSubmission,
+        notify_on: NotificationPolicy = NotificationPolicy.ALL,
     ) -> NotificationConfig:
         """
         Create a new notification configuration.
@@ -130,6 +134,7 @@ class NotificationConfigService:
             self._notification_service.prepare_config_for_storage(stored)
         )
         db_config.enabled = True
+        db_config.notify_on = notify_on.value
 
         db.add(db_config)
         await db.commit()
@@ -143,11 +148,13 @@ class NotificationConfigService:
         config_id: int,
         name: str,
         submission: AppriseSubmission,
+        notify_on: Optional[NotificationPolicy] = None,
     ) -> NotificationConfig:
         """
         Update an existing notification configuration.
 
-        Blank secret fields keep their stored values.
+        Blank secret fields keep their stored values. A notify_on of None
+        keeps the stored policy.
 
         Raises:
             HTTPException: If config not found or validation fails
@@ -164,6 +171,8 @@ class NotificationConfigService:
         config.provider_config = self._notification_service.prepare_config_for_storage(
             stored
         )
+        if notify_on is not None:
+            config.notify_on = notify_on.value
 
         await db.commit()
         await db.refresh(config)

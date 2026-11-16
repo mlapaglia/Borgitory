@@ -1,0 +1,21 @@
+{# "Notify on" policy dropdown; expects optional config #}
+{% set current_policy = NotificationPolicy.from_value(config.notify_on if config else None) %}
+<div>
+    <label for="notification-notify-on-select"
+           class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+        Notify On
+    </label>
+    <select name="notify_on"
+            id="notification-notify-on-select"
+            class="select-modern w-full mt-1">
+        {% for policy in NotificationPolicy %}
+            <option value="{{ policy.value }}"
+                    {% if policy == current_policy %}selected{% endif %}>
+                {{ policy.label }}
+            </option>
+        {% endfor %}
+    </select>
+    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+        Which job results send a notification. Test notifications are always sent.
+    </p>
+</div>
