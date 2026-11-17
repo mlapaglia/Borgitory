@@ -380,6 +380,40 @@ class TestRepositoryCheckConfigsAPI:
         # Verify HX-Trigger header is set
         assert result.headers["HX-Trigger"] == "checkConfigUpdate"
 
+    async def test_update_config_unchecked_options_are_cleared(
+        self,
+        mock_request: MagicMock,
+        mock_templates: TemplatesDep,
+        mock_service: RepositoryCheckConfigService,
+        mock_db: AsyncSession,
+    ) -> None:
+        """The edit form omits unchecked checkboxes; they must turn the option off
+        rather than keep the stored value."""
+        mock_config = MagicMock()
+        mock_config.name = "policy"
+        mock_service.update_config.return_value = (True, mock_config, None)  # type: ignore[attr-defined]
+
+        await update_repository_check_config(
+            mock_request,
+            1,
+            RepositoryCheckConfigUpdate(name="policy", check_type=CheckType.FULL),
+            mock_templates,
+            mock_service,
+            db=mock_db,
+        )
+
+        mock_service.update_config.assert_called_once_with(  # type: ignore[attr-defined]
+            mock_db,
+            1,
+            {
+                "name": "policy",
+                "check_type": CheckType.FULL,
+                "verify_data": False,
+                "repair_mode": False,
+                "save_space": False,
+            },
+        )
+
     async def test_update_config_failure_htmx_response(
         self,
         mock_request: MagicMock,

@@ -2,6 +2,8 @@
 Tests for RepositoryCheckConfigService - Business logic tests
 """
 
+import uuid
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
@@ -9,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from borgitory.services.repositories.repository_check_config_service import (
     RepositoryCheckConfigService,
 )
-from borgitory.models.database import RepositoryCheckConfig, Repository
+from borgitory.models.database import (
+    Job,
+    RepositoryCheckConfig,
+    Repository,
+    StringUUID,
+)
 
 
 @pytest.fixture
@@ -246,8 +253,8 @@ class TestRepositoryCheckConfigService:
         update_data = {
             "description": "Updated description",
             "check_type": "repository_only",
-            "verify_data": True,
             "max_duration": 7200,
+            "frequency_days": 14,
         }
 
         success, updated_config, error = await service.update_config(
@@ -259,10 +266,36 @@ class TestRepositoryCheckConfigService:
         assert updated_config is not None
         assert updated_config.description == "Updated description"
         assert updated_config.check_type == "repository_only"
-        assert updated_config.verify_data is True
+        assert updated_config.verify_data is False
         assert updated_config.max_duration == 7200
+        assert updated_config.frequency_days == 14
         # Unchanged fields should remain the same
         assert updated_config.name == "test-config"
+
+    async def test_update_config_rejects_invalid_merged_policy(
+        self,
+        service: RepositoryCheckConfigService,
+        test_db: AsyncSession,
+    ) -> None:
+        """A partial update that would combine with stored values into an invalid
+        policy is rejected and nothing is saved."""
+        config = RepositoryCheckConfig(
+            name="verifying", check_type="full", verify_data=True
+        )
+        test_db.add(config)
+        await test_db.commit()
+
+        success, updated, error = await service.update_config(
+            db=test_db,
+            config_id=config.id,
+            update_data={"check_type": "repository_only"},
+        )
+
+        assert success is False
+        assert updated is None
+        assert error == "Cannot use verify_data with repository_only checks"
+        await test_db.refresh(config)
+        assert config.check_type == "full"
 
     async def test_update_config_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
@@ -410,6 +443,33 @@ class TestRepositoryCheckConfigService:
         deleted_config = result.scalar_one_or_none()
         assert deleted_config is None
 
+    async def test_delete_config_clears_job_references(
+        self,
+        service: RepositoryCheckConfigService,
+        test_db: AsyncSession,
+        sample_config: RepositoryCheckConfig,
+        sample_repository: Repository,
+    ) -> None:
+        """Jobs stop pointing at a deleted policy, so a new policy that reuses its
+        id doesn't inherit its check history."""
+        job = Job(
+            id=StringUUID(uuid.uuid4().hex),
+            repository_id=sample_repository.id,
+            type="Scheduled Backup",
+            status="completed",
+            check_config_id=sample_config.id,
+        )
+        test_db.add(job)
+        await test_db.commit()
+
+        success, _, error = await service.delete_config(
+            db=test_db, config_id=sample_config.id
+        )
+
+        assert success is True, error
+        await test_db.refresh(job)
+        assert job.check_config_id is None
+
     async def test_delete_config_not_found(
         self, service: RepositoryCheckConfigService, test_db: AsyncSession
     ) -> None:
@@ -478,11 +538,11 @@ class TestRepositoryCheckConfigService:
         success, updated_config, error = await service.update_config(
             db=test_db,
             config_id=config_id,
-            update_data={"check_type": "repository_only", "verify_data": True},
+            update_data={"check_type": "archives_only", "verify_data": True},
         )
         assert success is True
         assert updated_config is not None
-        assert updated_config.check_type == "repository_only"
+        assert updated_config.check_type == "archives_only"
         assert updated_config.verify_data is True
 
         # Disable

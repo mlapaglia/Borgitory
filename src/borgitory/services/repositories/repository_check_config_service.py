@@ -5,12 +5,46 @@ Handles all repository check configuration-related business operations independe
 
 import logging
 from typing import List, Optional, Dict, Union, Tuple
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
-from borgitory.models.database import RepositoryCheckConfig, Repository
+from borgitory.models.database import Job, RepositoryCheckConfig, Repository
+from borgitory.models.schemas import RepositoryCheckConfigBase
 
 logger = logging.getLogger(__name__)
+
+# Fields validated together by RepositoryCheckConfigBase
+_POLICY_FIELDS = (
+    "name",
+    "description",
+    "check_type",
+    "verify_data",
+    "repair_mode",
+    "save_space",
+    "max_duration",
+    "archive_prefix",
+    "archive_glob",
+    "first_n_archives",
+    "last_n_archives",
+    "frequency_days",
+)
+
+
+def _merged_policy_error(
+    config: RepositoryCheckConfig, update_data: Dict[str, Union[str, int, bool, None]]
+) -> Optional[str]:
+    """Validate the policy as it would be after the update, since a partial update
+    can combine new values with stored ones into an invalid policy"""
+    merged = {field: getattr(config, field) for field in _POLICY_FIELDS}
+    merged.update({k: v for k, v in update_data.items() if k in _POLICY_FIELDS})
+    try:
+        RepositoryCheckConfigBase.model_validate(merged)
+    except ValidationError as e:
+        return "; ".join(
+            str(error["msg"]).removeprefix("Value error, ") for error in e.errors()
+        )
+    return None
 
 
 class RepositoryCheckConfigService:
@@ -140,6 +174,10 @@ class RepositoryCheckConfigService:
                 if existing:
                     return False, None, "A check policy with this name already exists"
 
+            validation_error = _merged_policy_error(config, update_data)
+            if validation_error:
+                return False, None, validation_error
+
             # Update fields that were provided
             for field, value in update_data.items():
                 if hasattr(config, field):
@@ -215,6 +253,13 @@ class RepositoryCheckConfigService:
                 return False, None, "Check policy not found"
 
             config_name = config.name
+            # SQLite doesn't enforce the foreign key, and a later policy can reuse this
+            # id; clear job references so it doesn't inherit this policy's check history
+            await db.execute(
+                update(Job)
+                .where(Job.check_config_id == config_id)
+                .values(check_config_id=None)
+            )
             await db.delete(config)
             await db.commit()
 
