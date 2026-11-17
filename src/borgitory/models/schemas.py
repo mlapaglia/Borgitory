@@ -941,6 +941,15 @@ class CloudSyncConfig(CloudSyncConfigBase):
     }
 
 
+MAX_CHECK_FREQUENCY_DAYS = 365
+
+
+def _blank_to_none_int(v: Union[str, int, None]) -> Optional[int]:
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        return None
+    return int(v)
+
+
 class RepositoryCheckConfigBase(BaseModel):
     name: str = Field(
         min_length=1, max_length=128, description="Repository check configuration name"
@@ -957,6 +966,12 @@ class RepositoryCheckConfigBase(BaseModel):
     archive_glob: Optional[str] = Field(None, max_length=255)
     first_n_archives: Optional[int] = Field(None, gt=0)
     last_n_archives: Optional[int] = Field(None, gt=0)
+    frequency_days: Optional[int] = Field(
+        None,
+        gt=0,
+        le=MAX_CHECK_FREQUENCY_DAYS,
+        description="Minimum days between successful checks; None runs every time",
+    )
 
     @field_validator("max_duration", mode="before")
     @classmethod
@@ -964,6 +979,11 @@ class RepositoryCheckConfigBase(BaseModel):
         if v == "" or v is None:
             return None
         return int(v)
+
+    @field_validator("frequency_days", mode="before")
+    @classmethod
+    def validate_frequency_days(cls, v: Union[str, int, None]) -> Optional[int]:
+        return _blank_to_none_int(v)
 
     @field_validator("first_n_archives", mode="before")
     @classmethod
@@ -1036,7 +1056,13 @@ class RepositoryCheckConfigUpdate(BaseModel):
     archive_glob: Optional[str] = Field(None, max_length=255)
     first_n_archives: Optional[int] = Field(None, gt=0)
     last_n_archives: Optional[int] = Field(None, gt=0)
+    frequency_days: Optional[int] = Field(None, gt=0, le=MAX_CHECK_FREQUENCY_DAYS)
     enabled: Optional[bool] = None
+
+    @field_validator("frequency_days", mode="before")
+    @classmethod
+    def validate_frequency_days(cls, v: Union[str, int, None]) -> Optional[int]:
+        return _blank_to_none_int(v)
 
 
 class RepositoryCheckConfig(RepositoryCheckConfigBase):

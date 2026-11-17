@@ -81,6 +81,7 @@ def sample_config_create() -> RepositoryCheckConfigCreate:
         archive_glob=None,
         first_n_archives=None,
         last_n_archives=None,
+        frequency_days=14,
     )
 
 
@@ -138,6 +139,7 @@ class TestRepositoryCheckConfigsAPI:
             archive_glob=sample_config_create.archive_glob,
             first_n_archives=sample_config_create.first_n_archives,
             last_n_archives=sample_config_create.last_n_archives,
+            frequency_days=14,
         )
 
         # Verify HTMX success template response

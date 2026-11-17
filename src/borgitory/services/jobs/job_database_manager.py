@@ -8,11 +8,11 @@ from datetime import datetime
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from borgitory.protocols.job_database_manager_protocol import JobDatabaseManagerProtocol
-from borgitory.services.jobs.job_models import TaskStatusEnum
+from borgitory.services.jobs.job_models import TaskStatusEnum, TaskTypeEnum
 from borgitory.models.job_results import JobStatusEnum
-from borgitory.utils.datetime_utils import now_utc
+from borgitory.utils.datetime_utils import ensure_utc, now_utc
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -35,6 +35,7 @@ class DatabaseJobData:
     output: Optional[str] = None
     error_message: Optional[str] = None
     cloud_sync_config_id: Optional[int] = None
+    check_config_id: Optional[int] = None
 
 
 class JobDatabaseManager(JobDatabaseManagerProtocol):
@@ -66,7 +67,7 @@ class JobDatabaseManager(JobDatabaseManagerProtocol):
                 db_job.container_id = None  # Explicitly set to None
                 db_job.cloud_sync_config_id = job_data.cloud_sync_config_id
                 db_job.prune_config_id = None  # Explicitly set to None
-                db_job.check_config_id = None  # Explicitly set to None
+                db_job.check_config_id = job_data.check_config_id
                 db_job.notification_config_id = None  # Explicitly set to None
                 db_job.job_type = "composite"  # Set as composite since we have tasks
                 db_job.total_tasks = 1  # Default total tasks
@@ -191,6 +192,38 @@ class JobDatabaseManager(JobDatabaseManagerProtocol):
         except Exception as e:
             logger.error(f"Failed to get jobs for repository {repository_id}: {e}")
             return []
+
+    async def get_last_successful_check_job_start(
+        self, repository_id: int, check_config_id: int
+    ) -> Optional[datetime]:
+        """Start time of the latest job whose check of this repository with this
+        policy completed successfully, or None if there is none (or the lookup fails).
+
+        Job start time is used rather than check completion so that a cron-fired job
+        is compared to the same clock time on earlier days, regardless of how long
+        the tasks before the check took.
+        """
+        try:
+            from borgitory.models.database import Job, JobTask
+
+            async with self.async_session_maker() as db:
+                result = await db.execute(
+                    select(func.max(Job.started_at))
+                    .join(JobTask, JobTask.job_id == Job.id)
+                    .where(
+                        Job.repository_id == repository_id,
+                        Job.check_config_id == check_config_id,
+                        JobTask.task_type == TaskTypeEnum.CHECK.value,
+                        JobTask.status == TaskStatusEnum.COMPLETED.value,
+                    )
+                )
+                return ensure_utc(result.scalar_one_or_none())
+
+        except Exception as e:
+            logger.error(
+                f"Failed to look up last check for repository {repository_id}: {e}"
+            )
+            return None
 
     async def _get_repository_data(
         self, repository_id: int

@@ -144,7 +144,8 @@
                     <option value="">No check</option>
                     {% for config in check_configs %}
                         <option value="{{ config.id }}"
-                                {{ 'selected' if config.id == schedule.check_config_id else '' }}>{{ config.name }}
+                                {{ 'selected' if config.id == schedule.check_config_id else '' }}>
+                            {{ config.name }}{% if config.frequency_days %} (at most every {{ config.frequency_days }}d){% endif %}
                         </option>
                     {% endfor %}
                 </select>

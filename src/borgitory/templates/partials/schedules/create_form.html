@@ -100,7 +100,9 @@
                         class="select-modern w-full">
                     <option value="">No check</option>
                     {% for config in check_configs %}
-                        <option value="{{ config.id }}">{{ config.name }}</option>
+                        <option value="{{ config.id }}">
+                            {{ config.name }}{% if config.frequency_days %} (at most every {{ config.frequency_days }}d){% endif %}
+                        </option>
                     {% endfor %}
                 </select>
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">

@@ -72,6 +72,7 @@ class RepositoryCheckConfigService:
         archive_glob: Optional[str] = None,
         first_n_archives: Optional[int] = None,
         last_n_archives: Optional[int] = None,
+        frequency_days: Optional[int] = None,
     ) -> Tuple[bool, Optional[RepositoryCheckConfig], Optional[str]]:
         """
         Create a new repository check configuration.
@@ -98,6 +99,7 @@ class RepositoryCheckConfigService:
             db_config.archive_glob = archive_glob
             db_config.first_n_archives = first_n_archives
             db_config.last_n_archives = last_n_archives
+            db_config.frequency_days = frequency_days
 
             db.add(db_config)
             await db.commit()

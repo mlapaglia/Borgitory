@@ -213,8 +213,12 @@ class JobService:
 
         # Determine check parameters - either from borgitory.config or request
         if check_request.check_config_id:
+            # A check started by hand always runs, regardless of the policy's frequency
             task_def = await builder.build_check_task_from_config(
-                db, check_request.check_config_id, repository.name
+                db,
+                check_request.check_config_id,
+                repository.name,
+                apply_frequency=False,
             )
             if task_def is None:
                 raise ValueError("Check configuration not found or disabled")

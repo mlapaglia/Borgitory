@@ -303,6 +303,7 @@ class TestJobService:
         check_config.repair_mode = False
         check_config.save_space = True
         check_config.max_duration = 3600
+        check_config.frequency_days = 14
         check_config.enabled = True
         test_db.add_all([repository, check_config])
         await test_db.commit()
@@ -336,6 +337,9 @@ class TestJobService:
         assert task_def.parameters["check_type"] == "repository"
         assert task_def.parameters["verify_data"] is True
         assert task_def.parameters["save_space"] is True
+        # A check started by hand ignores the policy's frequency but records the policy
+        assert task_def.parameters["frequency_days"] is None
+        assert task_def.parameters["check_config_id"] == check_config.id
 
     async def test_create_check_job_custom_parameters(
         self, test_db: AsyncSession

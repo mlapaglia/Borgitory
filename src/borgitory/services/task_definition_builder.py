@@ -181,7 +181,11 @@ class TaskDefinitionBuilder:
         )
 
     async def build_check_task_from_config(
-        self, db: AsyncSession, check_config_id: int, repository_name: str
+        self,
+        db: AsyncSession,
+        check_config_id: int,
+        repository_name: str,
+        apply_frequency: bool = True,
     ) -> Optional[TaskDefinition]:
         """
         Build a check task definition from a stored check configuration.
@@ -189,6 +193,8 @@ class TaskDefinitionBuilder:
         Args:
             check_config_id: ID of the repository check configuration
             repository_name: Name of the repository for display
+            apply_frequency: When False the policy's frequency is left out so the
+                check always runs (used for checks the user starts by hand)
 
         Returns:
             Task definition dictionary or None if config not found
@@ -207,6 +213,10 @@ class TaskDefinitionBuilder:
             type=TaskTypeEnum.CHECK,
             name=f"Check {repository_name} ({check_config.name})",
             parameters={
+                "check_config_id": check_config.id,
+                "frequency_days": check_config.frequency_days
+                if apply_frequency
+                else None,
                 "check_type": check_config.check_type,
                 "verify_data": check_config.verify_data,
                 "repair_mode": check_config.repair_mode,

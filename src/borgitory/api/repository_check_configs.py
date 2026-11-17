@@ -38,6 +38,7 @@ async def create_repository_check_config(
         archive_glob=config.archive_glob,
         first_n_archives=config.first_n_archives,
         last_n_archives=config.last_n_archives,
+        frequency_days=config.frequency_days,
     )
 
     if not success or not created_config:

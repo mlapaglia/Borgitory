@@ -24,6 +24,14 @@
                             <strong>Type:</strong> {{ config.check_type|title }}
                         </div>
                         <div>
+                            <strong>Frequency:</strong>
+                            {% if config.frequency_days %}
+                                At most every {{ config.frequency_days }} day{{ 's' if config.frequency_days != 1 else '' }}
+                            {% else %}
+                                Every run
+                            {% endif %}
+                        </div>
+                        <div>
                             <strong>Options:</strong>
                             {% if config.verify_data %}<span class="text-blue-600">✓ Data Verify</span>{% endif %}
                             {% if config.repair_mode %}<span class="text-red-600 ml-2">⚠️ Repair</span>{% endif %}
