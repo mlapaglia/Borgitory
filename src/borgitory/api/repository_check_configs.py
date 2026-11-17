@@ -38,6 +38,7 @@ async def create_repository_check_config(
         archive_glob=config.archive_glob,
         first_n_archives=config.first_n_archives,
         last_n_archives=config.last_n_archives,
+        frequency_days=config.frequency_days,
     )
 
     if not success or not created_config:
@@ -243,6 +244,9 @@ async def update_repository_check_config(
 ) -> HTMLResponse:
     """Update a repository check configuration"""
     update_dict = update_data.model_dump(exclude_unset=True)
+    # The edit form omits unchecked checkboxes, so a missing option means unchecked
+    for option in ("verify_data", "repair_mode", "save_space"):
+        update_dict.setdefault(option, False)
     success, updated_config, error_msg = await service.update_config(
         db, config_id, update_dict
     )

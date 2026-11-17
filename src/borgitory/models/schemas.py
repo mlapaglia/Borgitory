@@ -941,6 +941,28 @@ class CloudSyncConfig(CloudSyncConfigBase):
     }
 
 
+MAX_CHECK_FREQUENCY_DAYS = 365
+
+
+# create_borg_command rejects arguments containing these characters, so an archive
+# filter with one of them would fail when the check runs; reject it when it is saved
+_ARCHIVE_FILTER_FORBIDDEN_CHARS = re.compile(r"[;<>|&`$\n\r]")
+
+
+def _validate_archive_filter(v: Optional[str]) -> Optional[str]:
+    if v and _ARCHIVE_FILTER_FORBIDDEN_CHARS.search(v):
+        raise ValueError(
+            "Archive filters cannot contain any of these characters: ; < > | & ` $"
+        )
+    return v
+
+
+def _blank_to_none_int(v: Union[str, int, None]) -> Optional[int]:
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        return None
+    return int(v)
+
+
 class RepositoryCheckConfigBase(BaseModel):
     name: str = Field(
         min_length=1, max_length=128, description="Repository check configuration name"
@@ -957,6 +979,12 @@ class RepositoryCheckConfigBase(BaseModel):
     archive_glob: Optional[str] = Field(None, max_length=255)
     first_n_archives: Optional[int] = Field(None, gt=0)
     last_n_archives: Optional[int] = Field(None, gt=0)
+    frequency_days: Optional[int] = Field(
+        None,
+        gt=0,
+        le=MAX_CHECK_FREQUENCY_DAYS,
+        description="Minimum days between successful checks; None runs every time",
+    )
 
     @field_validator("max_duration", mode="before")
     @classmethod
@@ -964,6 +992,16 @@ class RepositoryCheckConfigBase(BaseModel):
         if v == "" or v is None:
             return None
         return int(v)
+
+    @field_validator("frequency_days", mode="before")
+    @classmethod
+    def validate_frequency_days(cls, v: Union[str, int, None]) -> Optional[int]:
+        return _blank_to_none_int(v)
+
+    @field_validator("archive_prefix", "archive_glob")
+    @classmethod
+    def validate_archive_filters(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_archive_filter(v)
 
     @field_validator("first_n_archives", mode="before")
     @classmethod
@@ -1036,7 +1074,18 @@ class RepositoryCheckConfigUpdate(BaseModel):
     archive_glob: Optional[str] = Field(None, max_length=255)
     first_n_archives: Optional[int] = Field(None, gt=0)
     last_n_archives: Optional[int] = Field(None, gt=0)
+    frequency_days: Optional[int] = Field(None, gt=0, le=MAX_CHECK_FREQUENCY_DAYS)
     enabled: Optional[bool] = None
+
+    @field_validator("frequency_days", mode="before")
+    @classmethod
+    def validate_frequency_days(cls, v: Union[str, int, None]) -> Optional[int]:
+        return _blank_to_none_int(v)
+
+    @field_validator("archive_prefix", "archive_glob")
+    @classmethod
+    def validate_archive_filters(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_archive_filter(v)
 
 
 class RepositoryCheckConfig(RepositoryCheckConfigBase):
@@ -1124,6 +1173,11 @@ class CheckRequest(BaseModel):
         if v is None:
             return None
         return int(v)
+
+    @field_validator("archive_prefix", "archive_glob")
+    @classmethod
+    def validate_archive_filters(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_archive_filter(v)
 
     @model_validator(mode="after")
     def validate_check_request(self) -> "CheckRequest":

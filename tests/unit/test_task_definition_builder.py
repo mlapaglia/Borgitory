@@ -78,6 +78,7 @@ def mock_check_config() -> MagicMock:
     config.archive_glob = "*"
     config.first_n_archives = 5
     config.last_n_archives = None
+    config.frequency_days = 14
     return config
 
 
@@ -304,6 +305,8 @@ class TestTaskDefinitionBuilder:
             type=TaskTypeEnum.CHECK,
             name="Check test-repo (Full Check)",
             parameters={
+                "check_config_id": 1,
+                "frequency_days": 14,
                 "check_type": "full",
                 "verify_data": True,
                 "repair_mode": False,
@@ -317,6 +320,25 @@ class TestTaskDefinitionBuilder:
         )
 
         assert task == expected
+
+    async def test_build_check_task_from_config_without_frequency(
+        self,
+        task_builder: TaskDefinitionBuilder,
+        mock_db: AsyncSession,
+        mock_check_config: MagicMock,
+    ) -> None:
+        """A hand-started check leaves out the policy's frequency so it always runs"""
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_check_config
+        mock_db.execute.return_value = mock_result  # type: ignore[attr-defined]
+
+        task = await task_builder.build_check_task_from_config(
+            mock_db, 1, "test-repo", apply_frequency=False
+        )
+
+        assert task is not None
+        assert task.parameters["frequency_days"] is None
+        assert task.parameters["check_config_id"] == 1
 
     async def test_build_check_task_from_config_not_found(
         self, task_builder: TaskDefinitionBuilder, mock_db: AsyncSession

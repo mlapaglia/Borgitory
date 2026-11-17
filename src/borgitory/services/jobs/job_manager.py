@@ -60,6 +60,16 @@ TERMINAL_JOB_STATUSES = frozenset(
 )
 
 
+def _check_config_id_of(task_definitions: List[TaskDefinition]) -> Optional[int]:
+    """The check policy used by the job's check task, if it was built from one"""
+    for task_def in task_definitions:
+        if task_def.type == TaskTypeEnum.CHECK:
+            config_id = task_def.parameters.get("check_config_id")
+            if isinstance(config_id, int) and not isinstance(config_id, bool):
+                return config_id
+    return None
+
+
 class JobManager:
     """
     Main Job Manager using dependency injection and modular architecture
@@ -371,6 +381,7 @@ class JobManager:
                 status=JobStatusEnum.PENDING,
                 started_at=job.started_at,
                 cloud_sync_config_id=cloud_sync_config_id,
+                check_config_id=_check_config_id_of(task_definitions),
             )
 
             await self.database_manager.create_database_job(db_job_data)

@@ -34,11 +34,17 @@
                 <span class="text-sm dark:text-gray-200">Full Check (Repository + Archives)</span>
             </label>
             <label class="flex items-center">
-                <input type="radio" name="check_type" value="repository_only" class="mr-2">
+                <input type="radio"
+                       name="check_type"
+                       value="repository_only"
+                       class="mr-2">
                 <span class="text-sm dark:text-gray-200">Repository Only (Faster)</span>
             </label>
             <label class="flex items-center">
-                <input type="radio" name="check_type" value="archives_only" class="mr-2">
+                <input type="radio"
+                       name="check_type"
+                       value="archives_only"
+                       class="mr-2">
                 <span class="text-sm dark:text-gray-200">Archives Only</span>
             </label>
         </div>
@@ -65,6 +71,23 @@
                 <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">(Slower but uses less memory)</span>
             </label>
         </div>
+    </div>
+    <!-- Frequency -->
+    <div>
+        <label for="check-policy-frequency-days"
+               class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Run at most every (days)
+        </label>
+        <input type="number"
+               id="check-policy-frequency-days"
+               name="frequency_days"
+               min="1"
+               max="365"
+               placeholder="Every run"
+               class="input-modern mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            On a schedule, the check is skipped until this many days have passed since its last successful run on that repository. Leave empty to check on every run. Checks started from this tab always run.
+        </p>
     </div>
     <!-- Advanced Options -->
     <div>

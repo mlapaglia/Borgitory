@@ -51,6 +51,13 @@ class JobDatabaseManagerProtocol(Protocol):
         """Get jobs for a specific repository"""
         ...
 
+    async def get_last_successful_check_job_start(
+        self, repository_id: int, check_config_id: int
+    ) -> Optional[datetime]:
+        """Start time of the latest job with a successful check of this repository
+        using this check policy"""
+        ...
+
     async def get_repository_data(
         self, repository_id: int
     ) -> Optional[Dict[str, object]]:

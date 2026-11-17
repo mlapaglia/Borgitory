@@ -491,6 +491,10 @@ class RepositoryCheckConfig(Base):
     first_n_archives: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_n_archives: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Minimum days between successful checks of a repository with this policy;
+    # None runs the check every time the job runs
+    frequency_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Metadata
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())
