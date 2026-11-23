@@ -77,6 +77,15 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
 
         logger.info(f"SCHEDULER: Found repository '{repository.name}'")
 
+        try:
+            compression = CompressionType(schedule.compression)
+        except ValueError:
+            logger.warning(
+                f"SCHEDULER: Schedule {schedule_id} has unknown compression "
+                f"'{schedule.compression}', falling back to zstd"
+            )
+            compression = CompressionType.ZSTD
+
         schedule.last_run = now_utc()
 
         scheduler_svc = get_scheduler_service_singleton()
@@ -95,6 +104,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             logger.info(f"  - repository: {repository.name}")
             logger.info(f"  - schedule: {schedule.name}")
             logger.info(f"  - source_paths: {schedule.source_paths}")
+            logger.info(f"  - compression: {compression.value}")
             logger.info(f"  - cloud_sync_config_id: {schedule.cloud_sync_config_id}")
 
             # Maintenance-only schedules have no source paths; BackupRequest requires at least
@@ -102,7 +112,7 @@ async def execute_scheduled_backup(schedule_id: int) -> None:
             backup_request = BackupRequest(
                 repository_id=repository.id,
                 source_paths=schedule.source_paths if include_backup else ["/"],
-                compression=CompressionType.ZSTD,
+                compression=compression,
                 dry_run=schedule.dry_run,
                 prune_config_id=schedule.prune_config_id,
                 check_config_id=schedule.check_config_id,

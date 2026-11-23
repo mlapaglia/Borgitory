@@ -30,6 +30,11 @@
                         <div>
                             <strong>Repository:</strong> {{ schedule.repository.name }}
                         </div>
+                        {% if schedule.source_paths %}
+                            <div>
+                                <strong>Compression:</strong> {{ schedule.compression | upper if schedule.compression != 'none' else 'None' }}
+                            </div>
+                        {% endif %}
                         <div>
                             {% if schedule.is_manual_only %}
                                 <strong>Trigger:</strong> Manual (Run Now)

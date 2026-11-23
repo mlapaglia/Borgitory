@@ -283,6 +283,9 @@ class Schedule(Base):
     dry_run: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    compression: Mapped[str] = mapped_column(
+        String, nullable=False, default="zstd", server_default="zstd"
+    )
     last_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: now_utc())

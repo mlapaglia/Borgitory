@@ -342,6 +342,34 @@ class TestScheduleService:
         assert result.schedule.dry_run is True
         mock_scheduler_service.add_schedule.assert_not_called()
 
+    async def test_create_schedule_compression(
+        self,
+        service: ScheduleService,
+        test_db: AsyncSession,
+        sample_repository: Repository,
+    ) -> None:
+        """Compression defaults to zstd and stores the chosen algorithm."""
+        default_result = await service.create_schedule(
+            db=test_db,
+            name="default-compression",
+            repository_id=sample_repository.id,
+            cron_expression="0 2 * * *",
+            source_paths=["/backup"],
+        )
+        assert default_result.schedule is not None
+        assert default_result.schedule.compression == "zstd"
+
+        lz4_result = await service.create_schedule(
+            db=test_db,
+            name="lz4-compression",
+            repository_id=sample_repository.id,
+            cron_expression="0 2 * * *",
+            source_paths=["/backup"],
+            compression="lz4",
+        )
+        assert lz4_result.schedule is not None
+        assert lz4_result.schedule.compression == "lz4"
+
     async def test_update_schedule_to_manual_only_clears_next_run(
         self,
         service: ScheduleService,

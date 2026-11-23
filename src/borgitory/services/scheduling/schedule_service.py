@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from borgitory.models.database import Schedule, Repository
-from borgitory.models.schemas import normalize_source_paths
+from borgitory.models.schemas import CompressionType, normalize_source_paths
 from borgitory.services.scheduling.cron_utils import normalize_cron_for_apscheduler
 
 if TYPE_CHECKING:
@@ -173,6 +173,7 @@ class ScheduleService:
         patterns: Optional[str] = None,
         check_config_id: Optional[int] = None,
         dry_run: bool = False,
+        compression: str = CompressionType.ZSTD.value,
     ) -> ScheduleOperationResult:
         """
         Create a new schedule. A None cron_expression creates a manual-only schedule.
@@ -213,6 +214,7 @@ class ScheduleService:
             db_schedule.source_paths = source_paths
             db_schedule.enabled = True
             db_schedule.dry_run = dry_run
+            db_schedule.compression = compression
             db_schedule.cloud_sync_config_id = cloud_sync_config_id
             db_schedule.prune_config_id = prune_config_id
             db_schedule.check_config_id = check_config_id
@@ -489,6 +491,21 @@ class ScheduleService:
             except ValueError as e:
                 return False, {}, str(e)
 
+            compression_raw = str(json_data.get("compression") or "").strip()
+            try:
+                compression = (
+                    CompressionType(compression_raw).value
+                    if compression_raw
+                    else CompressionType.ZSTD.value
+                )
+            except ValueError:
+                valid = ", ".join(c.value for c in CompressionType)
+                return (
+                    False,
+                    {},
+                    f"Invalid compression '{compression_raw}'. Valid options: {valid}",
+                )
+
             processed_data = {
                 "name": name,
                 "repository_id": repository_id,
@@ -504,6 +521,7 @@ class ScheduleService:
                 "post_job_hooks": safe_json_string(json_data.get("post_job_hooks")),
                 "patterns": safe_json_string(json_data.get("patterns")),
                 "dry_run": is_truthy(json_data.get("dry_run")),
+                "compression": compression,
             }
 
             if not schedule_has_work(
