@@ -1,5 +1,5 @@
 """
-Tests that the backup executor passes every source path to borg create.
+Tests the borg create command built by the backup executor: source paths and compression.
 """
 
 import uuid
@@ -19,6 +19,7 @@ from borgitory.services.jobs.job_models import (
     BorgJob,
     BorgJobTask,
     JobManagerDependencies,
+    TaskStatusEnum,
     TaskTypeEnum,
 )
 from borgitory.utils.datetime_utils import now_utc
@@ -102,3 +103,54 @@ class TestBackupSourcePaths:
         command = await self.run_backup(job_manager, mock_job, {})
 
         assert command[-1] == "/test/repo::test-archive"
+
+    @pytest.mark.parametrize("compression", ["zstd", "lz4", "zlib", "lzma", "none"])
+    async def test_compression_passed_to_borg_create(
+        self, job_manager: JobManager, mock_job: BorgJob, compression: str
+    ) -> None:
+        command = await self.run_backup(
+            job_manager,
+            mock_job,
+            {"source_paths": ["/data"], "compression": compression},
+        )
+
+        index = command.index("--compression")
+        assert command[index + 1] == compression
+
+    async def test_missing_compression_defaults_to_zstd(
+        self, job_manager: JobManager, mock_job: BorgJob
+    ) -> None:
+        command = await self.run_backup(
+            job_manager, mock_job, {"source_paths": ["/data"]}
+        )
+
+        index = command.index("--compression")
+        assert command[index + 1] == "zstd"
+
+    async def test_invalid_compression_fails_without_running_borg(
+        self, job_manager: JobManager, mock_job: BorgJob
+    ) -> None:
+        task = BorgJobTask(
+            task_type=TaskTypeEnum.BACKUP,
+            task_name="Backup",
+            parameters={
+                "archive_name": "test-archive",
+                "source_paths": ["/data"],
+                "compression": "CompressionType.ZSTD",
+            },
+        )
+
+        with patch.object(
+            job_manager.backup_executor.database_manager,
+            "get_repository_data",
+            return_value={"path": "/test/repo", "passphrase": "test-passphrase"},
+        ):
+            result = await job_manager.backup_executor.execute_backup_task(
+                mock_job, task, task_index=0
+            )
+
+        assert result is False
+        assert task.status == TaskStatusEnum.FAILED
+        assert task.error is not None
+        assert "Invalid compression" in task.error
+        cast(AsyncMock, job_manager.executor.start_process).assert_not_called()

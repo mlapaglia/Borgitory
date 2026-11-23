@@ -37,9 +37,11 @@
                 </p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label for="schedule-compression"
+                       class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                     Compression
                 </label>
+                {% set compression_select_id = "schedule-compression" %}
                 {% include "partials/shared/compression_select.html" %}
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
                     Applies to the backup; ignored for maintenance-only schedules

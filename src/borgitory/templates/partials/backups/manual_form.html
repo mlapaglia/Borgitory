@@ -27,9 +27,11 @@
                 {% include "partials/shared/source_paths_input.html" %}
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label for="backup-compression"
+                       class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                     Compression
                 </label>
+                {% set compression_select_id = "backup-compression" %}
                 {% include "partials/shared/compression_select.html" %}
             </div>
             <div>

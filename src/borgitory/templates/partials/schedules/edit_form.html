@@ -40,9 +40,11 @@
                 </p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label for="schedule-edit-compression"
+                       class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                     Compression
                 </label>
+                {% set compression_select_id = "schedule-edit-compression" %}
                 {% set selected_compression = schedule.compression %}
                 {% include "partials/shared/compression_select.html" %}
                 <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">

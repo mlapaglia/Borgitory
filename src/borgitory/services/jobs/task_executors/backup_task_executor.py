@@ -17,7 +17,7 @@ from borgitory.services.repositories.repository_environment import (
     build_repository_env_overrides_from_data,
 )
 from borgitory.services.jobs.job_models import BorgJob, BorgJobTask, TaskStatusEnum
-from borgitory.utils.security import create_borg_command
+from borgitory.utils.security import create_borg_command, validate_compression
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,18 @@ class BackupTaskExecutor:
             )
             logger.info(f"All task parameters: {params}")
 
+            compression = str(params.get("compression") or "zstd")
+            try:
+                validate_compression(compression)
+            except ValueError as e:
+                task.status = TaskStatusEnum.FAILED
+                task.return_code = 1
+                task.error = str(e)
+                task.completed_at = now_utc()
+                return False
+
             additional_args = []
+            additional_args.extend(["--compression", compression])
             additional_args.extend(["--stats", "--list"])
             additional_args.extend(["--filter", "AME"])
 

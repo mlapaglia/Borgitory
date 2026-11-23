@@ -135,7 +135,7 @@ class JobService:
         if include_backup:
             backup_params = {
                 "source_paths": backup_request.source_paths,
-                "compression": backup_request.compression,
+                "compression": backup_request.compression.value,
                 "dry_run": backup_request.dry_run,
                 "ignore_lock": backup_request.ignore_lock,
                 "patterns": patterns,

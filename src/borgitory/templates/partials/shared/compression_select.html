@@ -1,7 +1,10 @@
 <!-- Borg compression algorithm select -->
-<!-- Usage: optionally set selected_compression (defaults to zstd) before including -->
+<!-- Usage: set compression_select_id (for the label's "for"), and optionally -->
+<!-- selected_compression (defaults to zstd), before including -->
 {% set current_compression = selected_compression | default('zstd') %}
-<select name="compression" class="select-modern w-full">
+<select name="compression"
+        id="{{ compression_select_id }}"
+        class="select-modern w-full">
     {% for value, label in [
         ("zstd", "ZSTD (Recommended)"),
         ("lz4", "LZ4 (Fast)"),

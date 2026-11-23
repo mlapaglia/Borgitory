@@ -541,6 +541,8 @@ class TestSchedulesAPI:
         edit_response = await async_client.get(f"/api/schedules/{schedule.id}/edit")
         assert edit_response.status_code == 200
         assert re.search(r'<option value="lz4"\s+selected>', edit_response.text)
+        assert 'for="schedule-edit-compression"' in edit_response.text
+        assert 'id="schedule-edit-compression"' in edit_response.text
         assert not re.search(r'<option value="zstd"\s+selected>', edit_response.text)
 
         # An update without compression leaves it unchanged

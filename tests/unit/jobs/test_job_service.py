@@ -85,6 +85,10 @@ class TestJobService:
         assert call_args.kwargs["job_type"] == JobType.MANUAL_BACKUP
         assert len(call_args.kwargs["task_definitions"]) == 1
         assert call_args.kwargs["task_definitions"][0].type == "backup"
+        # The algorithm name, not the enum's str() ("CompressionType.LZ4")
+        assert call_args.kwargs["task_definitions"][0].parameters["compression"] == (
+            "lz4"
+        )
 
     async def test_create_backup_job_with_prune(self, test_db: AsyncSession) -> None:
         """Test creating a backup job with prune task."""
