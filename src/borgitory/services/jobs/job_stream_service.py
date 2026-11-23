@@ -40,7 +40,10 @@ def _sse_event(event: str, data: str) -> str:
     Command output can contain CR/LF (e.g. in filenames listed by borg), which
     would otherwise end the event early or inject extra SSE fields.
     """
-    data_fields = "\n".join(f"data: {line}" for line in data.splitlines() or [""])
+    # Only CRLF, CR and LF end an SSE line; str.splitlines() would also split
+    # on characters like U+2028 and drop a trailing newline.
+    lines = data.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    data_fields = "\n".join(f"data: {line}" for line in lines)
     return f"event: {event}\n{data_fields}\n\n"
 
 

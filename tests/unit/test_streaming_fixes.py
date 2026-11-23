@@ -9,7 +9,27 @@ from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 
-from borgitory.services.jobs.job_stream_service import JobStreamService
+from borgitory.services.jobs.job_stream_service import JobStreamService, _sse_event
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ("plain", "event: output\ndata: plain\n\n"),
+        ("", "event: output\ndata: \n\n"),
+        ("a\r\nb\rc\nd", "event: output\ndata: a\ndata: b\ndata: c\ndata: d\n\n"),
+        ("trailing\n", "event: output\ndata: trailing\ndata: \n\n"),
+        (
+            "file name \x0b\x0c\x1c\x85",
+            "event: output\ndata: file name \x0b\x0c\x1c\x85\n\n",
+        ),
+    ],
+)
+def test_sse_event_splits_only_on_sse_line_terminators(
+    data: str, expected: str
+) -> None:
+    """Only CRLF, CR and LF become new data fields; other characters pass through"""
+    assert _sse_event("output", data) == expected
 
 
 class TestJobStreamingFixes:
