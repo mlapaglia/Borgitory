@@ -418,6 +418,7 @@ class ScheduleCreate(ScheduleBase):
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
     dry_run: bool = False
+    compression: CompressionType = CompressionType.ZSTD
 
     @field_validator("source_paths", mode="before")
     @classmethod
@@ -512,6 +513,7 @@ class ScheduleUpdate(BaseModel):
     notification_config_id: Optional[int] = None
     enabled: Optional[bool] = None
     dry_run: Optional[bool] = None
+    compression: Optional[CompressionType] = None
     pre_job_hooks: Optional[str] = None
     post_job_hooks: Optional[str] = None
     patterns: Optional[str] = None
@@ -520,6 +522,14 @@ class ScheduleUpdate(BaseModel):
     @classmethod
     def validate_source_paths_update(cls, v: object) -> Optional[list[str]]:
         return normalize_source_paths(v)
+
+    @field_validator("compression", mode="before")
+    @classmethod
+    def validate_compression_update(cls, v: object) -> object:
+        # An empty selection means "leave unchanged"; compression is never null
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return None
+        return v
 
     @model_validator(mode="before")
     @classmethod
@@ -632,6 +642,7 @@ class Schedule(ScheduleBase):
     source_paths: list[str] = Field(default_factory=list)
     enabled: bool
     dry_run: bool = False
+    compression: CompressionType = CompressionType.ZSTD
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
     created_at: datetime

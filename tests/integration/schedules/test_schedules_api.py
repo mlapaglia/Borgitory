@@ -3,6 +3,7 @@ from typing import Any, Generator
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
+from urllib.parse import unquote
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -506,6 +507,111 @@ class TestSchedulesAPI:
         await test_db.refresh(schedule)
         assert schedule.cron_expression == "0 4 * * *"
         assert schedule.dry_run is True
+
+    async def test_schedule_compression_create_edit_update(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """Compression is saved on create, preselected on edit, and changed on update."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "Compressed",
+                "repository_id": sample_repository.id,
+                "cron_expression": "0 2 * * *",
+                "source_paths": ["/data"],
+                "compression": "lz4",
+            },
+        )
+        assert response.status_code == 200
+        assert "scheduleUpdate" in response.headers.get("HX-Trigger", "")
+
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "Compressed")
+        )
+        schedule = result.scalar_one()
+        assert schedule.compression == "lz4"
+
+        list_response = await async_client.get("/api/schedules/html")
+        assert "<strong>Compression:</strong> LZ4" in list_response.text
+
+        edit_response = await async_client.get(f"/api/schedules/{schedule.id}/edit")
+        assert edit_response.status_code == 200
+        assert re.search(r'<option value="lz4"\s+selected>', edit_response.text)
+        assert 'for="schedule-edit-compression"' in edit_response.text
+        assert 'id="schedule-edit-compression"' in edit_response.text
+        assert not re.search(r'<option value="zstd"\s+selected>', edit_response.text)
+
+        # An update without compression leaves it unchanged
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={"name": "Compressed", "compression": ""},
+        )
+        assert response.status_code == 200
+        await test_db.refresh(schedule)
+        assert schedule.compression == "lz4"
+
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={"name": "Compressed", "compression": "none"},
+        )
+        assert response.status_code == 200
+        await test_db.refresh(schedule)
+        assert schedule.compression == "none"
+
+    async def test_create_schedule_invalid_compression(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """An unknown compression is rejected and nothing is saved."""
+        response = await async_client.post(
+            "/api/schedules/",
+            json={
+                "name": "Bad Compression",
+                "repository_id": sample_repository.id,
+                "cron_expression": "0 2 * * *",
+                "source_paths": ["/data"],
+                "compression": "brotli",
+            },
+        )
+        assert "Invalid compression 'brotli'" in unquote(response.text)
+
+        result = await test_db.execute(
+            select(Schedule).where(Schedule.name == "Bad Compression")
+        )
+        assert result.scalar_one_or_none() is None
+
+    async def test_update_schedule_invalid_compression(
+        self,
+        setup_test_dependencies: dict[str, Any],
+        test_db: AsyncSession,
+        sample_repository: Repository,
+        async_client: AsyncClient,
+    ) -> None:
+        """An unknown compression on update is rejected and the value is kept."""
+        schedule = Schedule()
+        schedule.name = "keep-compression"
+        schedule.repository_id = sample_repository.id
+        schedule.cron_expression = "0 2 * * *"
+        schedule.source_paths = ["/data"]
+        test_db.add(schedule)
+        await test_db.commit()
+        await test_db.refresh(schedule)
+        assert schedule.compression == "zstd"
+
+        response = await async_client.put(
+            f"/api/schedules/{schedule.id}",
+            json={"name": "keep-compression", "compression": "brotli"},
+        )
+        assert "compression" in unquote(response.text)
+        await test_db.refresh(schedule)
+        assert schedule.compression == "zstd"
 
     async def test_create_schedule_multiple_source_paths(
         self,

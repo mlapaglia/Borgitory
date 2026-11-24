@@ -102,6 +102,7 @@ async def create_schedule(
         post_job_hooks=schedule.post_job_hooks,
         patterns=schedule.patterns,
         dry_run=schedule.dry_run,
+        compression=schedule.compression.value,
     )
 
     if result.is_error or not result.schedule:
@@ -272,6 +273,11 @@ async def update_schedule(
 
         schedule_update = ScheduleUpdate(**json_data)
         update_data = schedule_update.model_dump(exclude_unset=True)
+        # Compression is never null; an empty selection leaves it unchanged
+        if schedule_update.compression is None:
+            update_data.pop("compression", None)
+        else:
+            update_data["compression"] = schedule_update.compression.value
 
     except ValueError as e:
         return templates.TemplateResponse(

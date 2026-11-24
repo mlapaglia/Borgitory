@@ -47,6 +47,63 @@ class TestScheduleValidationService:
         assert processed_data["cron_expression"] is None
         assert processed_data["dry_run"] is True
 
+    def test_validate_schedule_creation_data_compression_defaults_to_zstd(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """A missing or empty compression falls back to zstd."""
+        for compression in (None, ""):
+            data = {
+                "name": "Backup",
+                "repository_id": "1",
+                "cron_expression": "0 2 * * *",
+                "source_paths": ["/data"],
+            }
+            if compression is not None:
+                data["compression"] = compression
+            is_valid, processed_data, error_msg = (
+                schedule_service.validate_schedule_creation_data(data)
+            )
+
+            assert is_valid is True, error_msg
+            assert processed_data["compression"] == "zstd"
+
+    def test_validate_schedule_creation_data_compression_selected(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """A selected compression is carried through."""
+        is_valid, processed_data, error_msg = (
+            schedule_service.validate_schedule_creation_data(
+                {
+                    "name": "Backup",
+                    "repository_id": "1",
+                    "cron_expression": "0 2 * * *",
+                    "source_paths": ["/data"],
+                    "compression": "lz4",
+                }
+            )
+        )
+
+        assert is_valid is True, error_msg
+        assert processed_data["compression"] == "lz4"
+
+    def test_validate_schedule_creation_data_invalid_compression(
+        self, schedule_service: ScheduleService
+    ) -> None:
+        """An unknown compression is rejected."""
+        is_valid, _, error_msg = schedule_service.validate_schedule_creation_data(
+            {
+                "name": "Backup",
+                "repository_id": "1",
+                "cron_expression": "0 2 * * *",
+                "source_paths": ["/data"],
+                "compression": "brotli",
+            }
+        )
+
+        assert is_valid is False
+        assert error_msg is not None
+        assert "Invalid compression 'brotli'" in error_msg
+
     def test_validate_schedule_creation_data_missing_cron_not_manual(
         self, schedule_service: ScheduleService
     ) -> None:
@@ -91,6 +148,7 @@ class TestScheduleValidationService:
             "post_job_hooks": None,
             "patterns": None,
             "dry_run": False,
+            "compression": "zstd",
         }
 
     def test_validate_schedule_creation_data_minimal_valid_input(
@@ -127,6 +185,7 @@ class TestScheduleValidationService:
             "post_job_hooks": None,
             "patterns": None,
             "dry_run": False,
+            "compression": "zstd",
         }
 
     def test_validate_schedule_creation_data_check_only_schedule(

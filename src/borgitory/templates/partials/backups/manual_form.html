@@ -27,14 +27,12 @@
                 {% include "partials/shared/source_paths_input.html" %}
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label for="backup-compression"
+                       class="block text-sm font-medium text-gray-900 dark:text-gray-100">
                     Compression
                 </label>
-                <select name="compression" class="select-modern w-full">
-                    <option value="zstd">ZSTD (Recommended)</option>
-                    <option value="lz4">LZ4 (Fast)</option>
-                    <option value="none">None</option>
-                </select>
+                {% set compression_select_id = "backup-compression" %}
+                {% include "partials/shared/compression_select.html" %}
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-900 dark:text-gray-100">

@@ -22,13 +22,7 @@
            name="strategy"
            value="{%- if config -%}{{ config.strategy }}{%- else -%}advanced{%- endif -%}">
     <div class="flex items-center mt-3">
-        <input type="checkbox"
-               name="compact_after"
-               {% if config %}{% if config.compact_after %}checked{% endif %}
-               {% else %}
-               checked
-               {% endif %}
-               class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+        <input type="checkbox" name="compact_after" {% if config %}{% if config.compact_after %}checked{% endif %} {% else %} checked {% endif %} class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
         <label class="ml-2 block text-sm text-gray-700 dark:text-gray-200">
             Run compact after prune (reclaim space)
         </label>
