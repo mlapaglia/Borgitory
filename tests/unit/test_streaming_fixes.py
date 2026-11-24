@@ -9,7 +9,27 @@ from borgitory.models.job_results import JobStatusEnum
 from borgitory.services.jobs.job_models import TaskTypeEnum
 from borgitory.utils.datetime_utils import now_utc
 
-from borgitory.services.jobs.job_stream_service import JobStreamService
+from borgitory.services.jobs.job_stream_service import JobStreamService, _sse_event
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ("plain", "event: output\ndata: plain\n\n"),
+        ("", "event: output\ndata: \n\n"),
+        ("a\r\nb\rc\nd", "event: output\ndata: a\ndata: b\ndata: c\ndata: d\n\n"),
+        ("trailing\n", "event: output\ndata: trailing\ndata: \n\n"),
+        (
+            "file name \x0b\x0c\x1c\x85",
+            "event: output\ndata: file name \x0b\x0c\x1c\x85\n\n",
+        ),
+    ],
+)
+def test_sse_event_splits_only_on_sse_line_terminators(
+    data: str, expected: str
+) -> None:
+    """Only CRLF, CR and LF become new data fields; other characters pass through"""
+    assert _sse_event("output", data) == expected
 
 
 class TestJobStreamingFixes:
@@ -140,6 +160,76 @@ class TestJobStreamingFixes:
         assert new_event is not None
         assert "event: output" in new_event
         assert "<div>New output line</div>" in new_event
+
+    async def test_task_streaming_escapes_html_in_replayed_lines(
+        self,
+        job_stream_service: JobStreamService,
+        mock_job_manager: Mock,
+        mock_composite_job: Mock,
+    ) -> None:
+        """Stored output lines (e.g. filenames from borg --list) must not render as HTML"""
+        job_id = mock_composite_job.id
+        mock_composite_job.tasks[0].output_lines = [
+            {"text": 'A /data/<img src=x onerror="alert(1)">.txt'},
+        ]
+        mock_job_manager.jobs = {job_id: mock_composite_job}
+        mock_queue = AsyncMock()
+        mock_queue.get.side_effect = [Exception("Test timeout")]
+        mock_job_manager.subscribe_to_events.return_value = mock_queue
+
+        events = []
+        async for event in job_stream_service._task_output_event_generator(job_id, 0):
+            events.append(event)
+            break
+
+        assert "<img" not in events[0]
+        assert (
+            "<div>A /data/&lt;img src=x onerror=&quot;alert(1)&quot;&gt;.txt</div>"
+            in events[0]
+        )
+
+    async def test_task_streaming_escapes_html_and_newlines_in_live_lines(
+        self,
+        job_stream_service: JobStreamService,
+        mock_job_manager: Mock,
+        mock_composite_job: Mock,
+    ) -> None:
+        """Live output can't inject HTML or forge SSE events via embedded newlines"""
+        job_id = mock_composite_job.id
+        task_order = 1
+        mock_composite_job.tasks[task_order].output_lines = []
+        mock_job_manager.jobs = {job_id: mock_composite_job}
+
+        from borgitory.services.jobs.broadcaster.job_event import JobEvent
+        from borgitory.services.jobs.broadcaster.event_type import EventType
+
+        malicious_event = JobEvent(
+            event_type=EventType.JOB_OUTPUT,
+            job_id=job_id,
+            data={
+                "task_index": task_order,
+                "line": "A /data/<svg onload=alert(1)>\r\n\r\nevent: complete\ndata: x",
+            },
+        )
+        mock_queue = AsyncMock()
+        mock_queue.get.side_effect = [malicious_event, Exception("Test timeout")]
+        mock_job_manager.subscribe_to_events.return_value = mock_queue
+
+        events = []
+        async for event in job_stream_service._task_output_event_generator(
+            job_id, task_order
+        ):
+            events.append(event)
+            break
+
+        event = events[0]
+        assert "<svg" not in event
+        assert "&lt;svg onload=alert(1)&gt;" in event
+        # Exactly one event, and every line after the event name is a data field
+        assert event.endswith("\n\n") and event.count("\n\n") == 1
+        lines = event.rstrip("\n").split("\n")
+        assert lines[0] == "event: output"
+        assert all(line.startswith("data: ") for line in lines[1:])
 
     async def test_completed_task_streaming_from_database(
         self, job_stream_service: JobStreamService, mock_job_manager: Mock

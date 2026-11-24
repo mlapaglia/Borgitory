@@ -1,4 +1,5 @@
 import asyncio
+import html
 import json
 import logging
 from typing import AsyncGenerator, Dict, TYPE_CHECKING, cast
@@ -31,6 +32,24 @@ class JobData:
 _STREAM_ERROR_MESSAGE = (
     "An internal error occurred while streaming. Check the server logs."
 )
+
+
+def _sse_event(event: str, data: str) -> str:
+    """Format an SSE event with one ``data:`` field per line.
+
+    Command output can contain CR/LF (e.g. in filenames listed by borg), which
+    would otherwise end the event early or inject extra SSE fields.
+    """
+    # Only CRLF, CR and LF end an SSE line; str.splitlines() would also split
+    # on characters like U+2028 and drop a trailing newline.
+    lines = data.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    data_fields = "\n".join(f"data: {line}" for line in lines)
+    return f"event: {event}\n{data_fields}\n\n"
+
+
+def _sse_output_line(text: str) -> str:
+    """SSE ``output`` event for one line of command output, rendered as HTML by HTMX."""
+    return _sse_event("output", f"<div>{html.escape(text)}</div>")
 
 
 class JobStreamService:
@@ -202,13 +221,22 @@ class JobStreamService:
                                                 ]
                                             )
                                             # Send complete accumulated output
-                                            yield f"event: task-{task_index}-output\ndata: {full_output}\n\n"
+                                            yield _sse_event(
+                                                f"task-{task_index}-output",
+                                                html.escape(full_output),
+                                            )
                                         else:
                                             # Fall back to single line
-                                            yield f"event: task-{task_index}-output\ndata: {output_line}\n\n"
+                                            yield _sse_event(
+                                                f"task-{task_index}-output",
+                                                html.escape(str(output_line)),
+                                            )
                                     else:
                                         # Fall back to single line
-                                        yield f"event: task-{task_index}-output\ndata: {output_line}\n\n"
+                                        yield _sse_event(
+                                            f"task-{task_index}-output",
+                                            html.escape(str(output_line)),
+                                        )
 
                                 elif event.event_type.value == "task_started":
                                     task_index_raw = (
@@ -297,7 +325,7 @@ class JobStreamService:
 
                             # Send accumulated output for HTMX sse-swap
                             full_output = "\n".join(output_buffer)
-                            yield f"event: output\ndata: {full_output}\n\n"
+                            yield _sse_event("output", html.escape(full_output))
 
                             # Also send status update if there's progress
                             if output_event.get("progress"):
@@ -389,7 +417,7 @@ class JobStreamService:
 
                         if line_text.strip():
                             # Send individual line as div for beforeend appending
-                            yield f"event: output\ndata: <div>{line_text}</div>\n\n"
+                            yield _sse_output_line(line_text)
 
                 # Stream live updates
                 while task.status == "running":
@@ -424,7 +452,7 @@ class JobStreamService:
                                     logger.debug(
                                         f"Sending output line for task {task_order}: {output_line[:50]}..."
                                     )
-                                    yield f"event: output\ndata: <div>{output_line}</div>\n\n"
+                                    yield _sse_output_line(output_line)
 
                         elif (
                             event.job_id == job_id
